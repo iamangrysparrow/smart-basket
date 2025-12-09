@@ -38,26 +38,49 @@ public partial class MainViewModel : ObservableObject
     private readonly SmartBasketDbContext _dbContext;
     private readonly IEmailService _emailService;
     private readonly IOllamaService _ollamaService;
+    private readonly ICategoryService _categoryService;
+    private readonly IProductClassificationService _classificationService;
+    private readonly ILabelAssignmentService _labelAssignmentService;
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
+    private readonly ReceiptProcessingService _receiptProcessingService;
     private CancellationTokenSource? _cts;
 
     public MainViewModel(
         SmartBasketDbContext dbContext,
         IEmailService emailService,
         IOllamaService ollamaService,
+        ICategoryService categoryService,
+        IProductClassificationService classificationService,
+        ILabelAssignmentService labelAssignmentService,
         AppSettings settings,
         SettingsService settingsService)
     {
         _dbContext = dbContext;
         _emailService = emailService;
         _ollamaService = ollamaService;
+        _categoryService = categoryService;
+        _classificationService = classificationService;
+        _labelAssignmentService = labelAssignmentService;
         _settings = settings;
         _settingsService = settingsService;
+        _receiptProcessingService = new ReceiptProcessingService(dbContext, labelAssignmentService);
 
-        // Set prompt template path (look for prompt_template.txt next to exe)
+        // Set prompt template paths
         var promptTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_template.txt");
         _ollamaService.SetPromptTemplatePath(promptTemplatePath);
+
+        var categoriesTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_categories.txt");
+        _categoryService.SetPromptTemplatePath(categoriesTemplatePath);
+
+        var classifyTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_classify_products.txt");
+        _classificationService.SetPromptTemplatePath(classifyTemplatePath);
+
+        var labelsTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_assign_labels.txt");
+        _labelAssignmentService.SetPromptTemplatePath(labelsTemplatePath);
+
+        var userLabelsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "user_labels.txt");
+        _receiptProcessingService.SetUserLabelsPath(userLabelsPath);
 
         // Initialize from settings
         ImapServer = settings.Email.ImapServer;
@@ -121,12 +144,12 @@ public partial class MainViewModel : ObservableObject
     private string _itemSearchText = string.Empty;
 
     // Filtered items for current receipt
-    public IEnumerable<RawItemViewModel> FilteredItems
+    public IEnumerable<ReceiptItemViewModel> FilteredItems
     {
         get
         {
             if (SelectedReceipt?.Items == null)
-                return Enumerable.Empty<RawItemViewModel>();
+                return Enumerable.Empty<ReceiptItemViewModel>();
 
             var items = SelectedReceipt.Items.AsEnumerable();
 
@@ -310,6 +333,9 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        // Categories are now created automatically during classification
+        // No need to check for existing categories
+
         IsProcessing = true;
         _cts = new CancellationTokenSource();
         StatusText = "Validating settings...";
@@ -450,7 +476,38 @@ public partial class MainViewModel : ObservableObject
                         continue;
                     }
 
-                    // Save to database
+                    // Step 2: Classify products via Ollama
+                    Log($"  -> Classifying {parsedReceipt.Items.Count} items...");
+
+                    var existingProducts = await Task.Run(async () =>
+                        await _receiptProcessingService.GetExistingProductsAsync(_cts.Token));
+
+                    var itemNames = parsedReceipt.Items.Select(i => i.Name).ToList();
+
+                    ProductClassificationResult classification;
+                    try
+                    {
+                        classification = await Task.Run(async () =>
+                            await _classificationService.ClassifyAsync(
+                                ollamaSettings, itemNames, existingProducts, progress, _cts.Token));
+                    }
+                    catch (Exception classifyEx)
+                    {
+                        Log($"  -> Classification error: {classifyEx.Message}");
+                        // Continue without classification - will use "Не категоризировано"
+                        classification = new ProductClassificationResult
+                        {
+                            IsSuccess = false,
+                            Message = classifyEx.Message
+                        };
+                    }
+
+                    if (!classification.IsSuccess)
+                    {
+                        Log($"  -> Classification failed: {classification.Message}, using defaults");
+                    }
+
+                    // Step 3: Save to database
                     var receiptDate = parsedReceipt.Date ?? email.Date;
                     var receipt = new Receipt
                     {
@@ -459,30 +516,27 @@ public partial class MainViewModel : ObservableObject
                         ReceiptNumber = parsedReceipt.OrderNumber,
                         Total = parsedReceipt.Total,
                         EmailId = email.MessageId,
-                        RawContent = email.Body,
                         Status = ReceiptStatus.Parsed
                     };
-
-                    foreach (var item in parsedReceipt.Items)
-                    {
-                        receipt.RawItems.Add(new RawReceiptItem
-                        {
-                            RawName = item.Name ?? "Unknown",
-                            RawVolume = item.Volume,
-                            RawPrice = item.Price?.ToString(),
-                            Unit = item.Unit,
-                            Quantity = item.Quantity,
-                            CategorizationStatus = CategorizationStatus.Pending
-                        });
-                    }
 
                     _dbContext.Receipts.Add(receipt);
                     await _dbContext.SaveChangesAsync(_cts.Token).ConfigureAwait(false);
 
+                    // Step 4: Process classification - create Products, Items, ReceiptItems, Labels
+                    _receiptProcessingService.SetOllamaSettings(ollamaSettings);
+                    var processingResult = await Task.Run(async () =>
+                        await _receiptProcessingService.ProcessClassificationAsync(
+                            receipt,
+                            parsedReceipt,
+                            classification,
+                            parsedReceipt.Shop ?? "Unknown",
+                            progress,
+                            _cts.Token));
+
                     await SaveEmailHistoryAsync(email, EmailProcessingStatus.Processed);
 
                     saved++;
-                    Log($"  -> OK: {parsedReceipt.Items.Count} items from {parsedReceipt.Shop}");
+                    Log($"  -> OK: {parsedReceipt.Items.Count} items, {processingResult.ProductsCreated} new products, {processingResult.ItemsCreated} new items, {processingResult.LabelsAssigned} labels");
 
                     // Add to collection (thread-safe via EnableCollectionSynchronization)
                     var receiptVm = new ReceiptViewModel(receipt);
@@ -510,6 +564,15 @@ public partial class MainViewModel : ObservableObject
 
             StatusText = $"Done: {saved} saved, {skipped} skipped, {errors} errors";
             Log($"=== Completed: {saved} saved, {skipped} skipped, {errors} errors ===");
+
+            // Reload receipts to show new data
+            if (saved > 0 && !_cts.Token.IsCancellationRequested)
+            {
+                Log("");
+                Log("Reloading receipts...");
+                await LoadReceiptsAsync();
+                await LoadCategoryTreeAsync();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -572,7 +635,7 @@ public partial class MainViewModel : ObservableObject
             var (receipts, shops) = await Task.Run(async () =>
             {
                 // Build query with filters
-                IQueryable<Receipt> query = _dbContext.Receipts.Include(r => r.RawItems);
+                IQueryable<Receipt> query = _dbContext.Receipts.Include(r => r.Items).ThenInclude(i => i.Item);
 
                 // Apply shop filter
                 if (!string.IsNullOrEmpty(SelectedShopFilter) && SelectedShopFilter != "Все")
@@ -634,7 +697,7 @@ public partial class MainViewModel : ObservableObject
             TotalReceiptsCount = receipts.Count;
             TotalSum = receipts.Sum(r => r.Total ?? 0);
 
-            Log($"Loaded {receipts.Count} receipts, total: {TotalSum:N2}₽");
+            Log($"Loaded {receipts.Count} receipts, total: {TotalSum:N2}\u20BD");
             StatusText = $"Loaded {receipts.Count} receipts";
         }
         catch (Exception ex)
@@ -824,6 +887,339 @@ public partial class MainViewModel : ObservableObject
             StatusText = "Settings save FAILED";
         }
     }
+
+    #region Categories Tab
+
+    // Category tree items
+    public ObservableCollection<CategoryTreeItemViewModel> CategoryTreeItems { get; } = new();
+    private readonly object _categoryTreeLock = new();
+
+    // Category items list
+    public ObservableCollection<ItemViewModel> CategoryItems { get; } = new();
+    private readonly object _categoryItemsLock = new();
+
+    // Category filters
+    public ObservableCollection<string> CategoryFilters { get; } = new() { "Все", "Не категоризировано" };
+    private readonly object _categoryFiltersLock = new();
+
+    [ObservableProperty]
+    private string _selectedCategoryFilter = "Все";
+
+    [ObservableProperty]
+    private string _categoryItemSearchText = string.Empty;
+
+    [ObservableProperty]
+    private string _selectedCategoryName = "Выберите категорию";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedItem))]
+    private ItemViewModel? _selectedCategoryItem;
+
+    public bool HasSelectedItem => SelectedCategoryItem != null;
+
+    // Statistics
+    [ObservableProperty]
+    private int _totalCategoriesCount;
+
+    [ObservableProperty]
+    private int _totalItemsCount;
+
+    [ObservableProperty]
+    private int _uncategorizedCount;
+
+    // Categorization progress
+    [ObservableProperty]
+    private bool _isCategorizing;
+
+    [ObservableProperty]
+    private string _categorizationProgress = string.Empty;
+
+    /// <summary>
+    /// Enable synchronization for category collections (call from UI thread)
+    /// </summary>
+    public void EnableCategoryCollectionSynchronization()
+    {
+        BindingOperations.EnableCollectionSynchronization(CategoryTreeItems, _categoryTreeLock);
+        BindingOperations.EnableCollectionSynchronization(CategoryItems, _categoryItemsLock);
+        BindingOperations.EnableCollectionSynchronization(CategoryFilters, _categoryFiltersLock);
+    }
+
+    /// <summary>
+    /// Handle tree item selection from code-behind
+    /// </summary>
+    public void OnCategoryTreeItemSelected(CategoryTreeItemViewModel item)
+    {
+        SelectedCategoryName = item.Name;
+        LoadCategoryItemsAsync(item).ConfigureAwait(false);
+    }
+
+    private async Task LoadCategoryItemsAsync(CategoryTreeItemViewModel treeItem)
+    {
+        try
+        {
+            var items = await Task.Run(async () =>
+            {
+                if (treeItem.ProductId.HasValue)
+                {
+                    // Load items for this product
+                    return await _dbContext.Items
+                        .Include(i => i.Product)
+                        .Include(i => i.ReceiptItems)
+                        .Where(i => i.ProductId == treeItem.ProductId.Value)
+                        .OrderBy(i => i.Name)
+                        .Take(200)
+                        .Select(i => new ItemViewModel(i))
+                        .ToListAsync()
+                        .ConfigureAwait(false);
+                }
+
+                // TODO: Handle uncategorized items differently in new schema
+                return new List<ItemViewModel>();
+            });
+
+            lock (_categoryItemsLock)
+            {
+                CategoryItems.Clear();
+                foreach (var item in items)
+                {
+                    CategoryItems.Add(item);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "LoadCategoryItems");
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadCategoryTreeAsync()
+    {
+        try
+        {
+            Log("Loading category tree...");
+
+            var products = await Task.Run(async () =>
+            {
+                return await _dbContext.Products
+                    .Include(p => p.Items)
+                    .OrderBy(p => p.Name)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+            });
+
+            lock (_categoryTreeLock)
+            {
+                CategoryTreeItems.Clear();
+
+                // Add products
+                foreach (var product in products)
+                {
+                    CategoryTreeItems.Add(new CategoryTreeItemViewModel
+                    {
+                        ProductId = product.Id,
+                        Name = product.Name,
+                        Icon = "\uD83D\uDCE6",
+                        Count = product.Items.Count
+                    });
+                }
+            }
+
+            // Update filters
+            lock (_categoryFiltersLock)
+            {
+                CategoryFilters.Clear();
+                CategoryFilters.Add("Все");
+                foreach (var product in products)
+                {
+                    CategoryFilters.Add(product.Name);
+                }
+            }
+
+            // Update statistics
+            TotalCategoriesCount = products.Count;
+            TotalItemsCount = products.Sum(p => p.Items.Count);
+            UncategorizedCount = 0; // TODO: Calculate based on new schema
+
+            Log($"Loaded {products.Count} categories");
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "LoadCategoryTree");
+        }
+    }
+
+    [RelayCommand]
+    private void OpenCategoriesDialog()
+    {
+        try
+        {
+            var dialog = new Views.CategoriesDialog { Owner = Application.Current.MainWindow };
+
+            // Load existing categories
+            var existingCategories = _dbContext.Products
+                .OrderBy(p => p.Name)
+                .Select(p => p.Name)
+                .ToList();
+
+            dialog.CategoriesText = string.Join("\n", existingCategories);
+
+            if (dialog.ShowDialog() == true)
+            {
+                var categories = dialog.GetCategories();
+                SaveCategoriesAsync(categories).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "OpenCategoriesDialog");
+        }
+    }
+
+    private async Task SaveCategoriesAsync(string[] categories)
+    {
+        try
+        {
+            Log($"Saving {categories.Length} categories...");
+
+            await Task.Run(async () =>
+            {
+                // Get existing products
+                var existing = await _dbContext.Products.ToListAsync().ConfigureAwait(false);
+                var existingNames = existing.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                // Add new categories
+                foreach (var category in categories)
+                {
+                    if (!existingNames.Contains(category))
+                    {
+                        _dbContext.Products.Add(new Product
+                        {
+                            Name = category
+                        });
+                        Log($"  + Added: {category}");
+                    }
+                }
+
+                await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+            });
+
+            Log("Categories saved");
+            await LoadCategoryTreeAsync();
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "SaveCategories");
+        }
+    }
+
+    [RelayCommand]
+    private void ChangeCategory()
+    {
+        if (SelectedCategoryItem == null) return;
+
+        try
+        {
+            var dialog = new Views.ChangeCategoryDialog { Owner = Application.Current.MainWindow };
+            dialog.ItemName = SelectedCategoryItem.Name;
+            dialog.CurrentCategory = SelectedCategoryItem.ProductName == "Не задана" ? null : SelectedCategoryItem.ProductName;
+
+            var categories = _dbContext.Products.OrderBy(p => p.Name).Select(p => p.Name).ToList();
+            dialog.SetAvailableCategories(categories);
+
+            if (dialog.ShowDialog() == true)
+            {
+                ApplyCategoryChangeAsync(SelectedCategoryItem, dialog.SelectedCategory!, dialog.IsNewCategory)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "ChangeCategory");
+        }
+    }
+
+    private async Task ApplyCategoryChangeAsync(ItemViewModel item, string categoryName, bool isNewCategory)
+    {
+        try
+        {
+            await Task.Run(async () =>
+            {
+                // Get or create product
+                var product = await _dbContext.Products
+                    .FirstOrDefaultAsync(p => p.Name == categoryName)
+                    .ConfigureAwait(false);
+
+                if (product == null && isNewCategory)
+                {
+                    product = new Product { Name = categoryName };
+                    _dbContext.Products.Add(product);
+                    await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+                    Log($"Created new category: {categoryName}");
+                }
+
+                if (product == null)
+                {
+                    Log($"ERROR: Category not found: {categoryName}");
+                    return;
+                }
+
+                // Update the item - move to new product
+                var existingItem = await _dbContext.Items
+                    .FirstOrDefaultAsync(i => i.Id == item.Id)
+                    .ConfigureAwait(false);
+
+                if (existingItem != null)
+                {
+                    existingItem.ProductId = product.Id;
+                    await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+                    Log($"Moved '{existingItem.Name}' to category '{categoryName}'");
+                }
+            });
+
+            await LoadCategoryTreeAsync();
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "ApplyCategoryChange");
+        }
+    }
+
+    [RelayCommand]
+    private async Task CategorizeAllAsync()
+    {
+        // TODO: Refactor categorization for new schema
+        // Old logic used RawReceiptItem with CategorizationStatus
+        // New schema should work directly with Items
+        Log("Categorization not yet implemented for new schema");
+        CategorizationProgress = "TODO: Refactor for new schema";
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Check if categories exist before allowing email fetch
+    /// </summary>
+    public async Task<bool> EnsureCategoriesExistAsync()
+    {
+        var count = await _dbContext.Products.CountAsync();
+        if (count > 0) return true;
+
+        var result = MessageBox.Show(
+            "Для работы с чеками необходимо сначала добавить категории продуктов.\n\nОткрыть диалог добавления категорий?",
+            "Нет категорий",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            OpenCategoriesDialog();
+            return await _dbContext.Products.CountAsync() > 0;
+        }
+
+        return false;
+    }
+
+    #endregion
 }
 
 public class ReceiptViewModel
@@ -836,8 +1232,8 @@ public class ReceiptViewModel
         OrderNumber = receipt.ReceiptNumber;
         Total = receipt.Total;
         Status = receipt.Status.ToString();
-        ItemCount = receipt.RawItems.Count;
-        Items = receipt.RawItems.Select(i => new RawItemViewModel(i)).ToList();
+        ItemCount = receipt.Items.Count;
+        Items = receipt.Items.Select(i => new ReceiptItemViewModel(i)).ToList();
     }
 
     public Guid Id { get; }
@@ -847,27 +1243,29 @@ public class ReceiptViewModel
     public decimal? Total { get; }
     public string Status { get; }
     public int ItemCount { get; }
-    public List<RawItemViewModel> Items { get; }
+    public List<ReceiptItemViewModel> Items { get; }
 
     public string DisplayText => $"{Date:dd.MM.yyyy} - {Shop} ({ItemCount} items) - {Total:N2}₽";
 }
 
-public class RawItemViewModel
+public class ReceiptItemViewModel
 {
-    public RawItemViewModel(RawReceiptItem item)
+    public ReceiptItemViewModel(ReceiptItem item)
     {
-        Name = item.RawName;
-        Volume = item.RawVolume;
-        Price = item.RawPrice;
-        Unit = item.Unit;
+        Id = item.Id;
+        Name = item.Item?.Name ?? "Unknown";
+        ProductName = item.Item?.Product?.Name ?? "Не задана";
+        Price = item.Price;
         Quantity = item.Quantity;
-        Status = item.CategorizationStatus.ToString();
+        Amount = item.Amount;
+        UnitOfMeasure = item.Item?.UnitOfMeasure;
     }
 
+    public Guid Id { get; }
     public string Name { get; }
-    public string? Volume { get; }
-    public string? Price { get; }
-    public string? Unit { get; }
+    public string ProductName { get; }
+    public decimal? Price { get; }
     public decimal Quantity { get; }
-    public string Status { get; }
+    public decimal? Amount { get; }
+    public string? UnitOfMeasure { get; }
 }

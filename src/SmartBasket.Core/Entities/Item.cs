@@ -1,10 +1,14 @@
 namespace SmartBasket.Core.Entities;
 
 /// <summary>
-/// Товарная позиция - конкретный вариант продукта (например, "Молоко 3.2%", "Молоко 1.5%")
+/// Товар - уникальное название товара из чека (справочник)
+/// Например: "Молоко Parmalat 2.5% 1л", "Свинина шейка охл. кг"
 /// </summary>
 public class Item : BaseEntity
 {
+    /// <summary>
+    /// Ссылка на продукт (обязательная)
+    /// </summary>
     public Guid ProductId { get; set; }
 
     /// <summary>
@@ -13,17 +17,22 @@ public class Item : BaseEntity
     public required string Name { get; set; }
 
     /// <summary>
-    /// Коэффициент для приведения к единицам продукта
-    /// Например, если продукт в литрах, а товар 500мл, то unit_ratio = 0.5
+    /// Единица измерения: "шт", "кг", "л", "г", "мл"
     /// </summary>
-    public decimal UnitRatio { get; set; } = 1;
+    public string? UnitOfMeasure { get; set; }
 
     /// <summary>
-    /// Магазин-источник
+    /// Количество в единице (например, 0.5 для "500мл", 1 для "1л")
+    /// </summary>
+    public decimal? UnitQuantity { get; set; }
+
+    /// <summary>
+    /// Магазин, из которого товар впервые появился (для фильтрации)
     /// </summary>
     public string? Shop { get; set; }
 
     // Navigation properties
     public Product? Product { get; set; }
-    public ICollection<Good> Goods { get; set; } = new List<Good>();
+    public ICollection<ReceiptItem> ReceiptItems { get; set; } = new List<ReceiptItem>();
+    public ICollection<ItemLabel> ItemLabels { get; set; } = new List<ItemLabel>();
 }

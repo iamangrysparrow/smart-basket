@@ -1,5 +1,7 @@
 # SmartBasket Architecture
 
+> **AI Integration:** См. [ARCHITECTURE-AI.md](ARCHITECTURE-AI.md) для документации по интеграции с Ollama LLM.
+
 ## Overview
 
 SmartBasket - приложение для автоматического парсинга чеков из email с использованием локального LLM (Ollama).
@@ -24,18 +26,85 @@ SmartBasket - приложение для автоматического пар�
 └─────────────────┘   └─────────────────┘   └─────────────────┘
 ```
 
+## Data Model
+
+```
+┌─────────────────┐
+│     Labels      │  ← Метки пользователя ("Молоко для кофе", "Папа доволен")
+├─────────────────┤
+│ Id              │
+│ Name            │
+│ Color           │
+└────────┬────────┘
+         │
+         ├──────────────────────┐
+         ▼                      ▼
+┌─────────────────┐    ┌─────────────────┐
+│  ProductLabels  │    │   ItemLabels    │  ← Связующие таблицы (many-to-many)
+└────────┬────────┘    └────────┬────────┘
+         │                      │
+         ▼                      ▼
+┌─────────────────┐    ┌─────────────────┐
+│    Products     │    │     Items       │  ← Справочник товаров
+├─────────────────┤    ├─────────────────┤
+│ Id              │    │ Id              │
+│ ParentId (self) │◄───│ ProductId (FK)  │  1 ──── *
+│ Name            │    │ UnitOfMeasure   │
+└─────────────────┘    │ UnitQuantity    │
+   (иерархия)          │ Name            │
+                       └────────┬────────┘
+                                │
+                                │ 1
+                                ▼
+                       ┌─────────────────┐
+                       │  ReceiptItems   │  ← Позиция в чеке
+                       ├─────────────────┤
+                       │ Id              │
+                       │ ItemId (FK)     │
+                       │ ReceiptId (FK)  │
+                       │ Quantity        │
+                       │ Price           │
+                       │ Amount          │
+                       └────────┬────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │    Receipts     │  ← Чек из магазина
+                       ├─────────────────┤
+                       │ Id              │
+                       │ Shop            │
+                       │ ReceiptDate     │
+                       │ Total           │
+                       │ Status          │
+                       └─────────────────┘
+```
+
+### Entity Descriptions
+
+| Entity | Description |
+|--------|-------------|
+| **Product** | Группа товаров с иерархией (ParentId). AI генерирует, пользователь переименовывает. |
+| **Item** | Уникальный товар из чека. Справочник всех названий с единицами измерения. |
+| **ReceiptItem** | Позиция в конкретном чеке: ссылка на Item + количество + цена. |
+| **Receipt** | Чек (магазин, дата, статус обработки). |
+| **Label** | Пользовательская метка для группировки ("Сытая семья", "Чистый дом"). |
+| **ProductLabel** | Связь Product ↔ Label (many-to-many). |
+| **ItemLabel** | Связь Item ↔ Label (many-to-many). |
+| **EmailHistory** | История обработки писем для дедупликации. |
+
 ## Projects
 
 ### SmartBasket.Core
 Базовые сущности и конфигурация. Без зависимостей.
 
 **Entities:**
-- `Receipt` - чек (магазин, дата, статус)
-- `RawReceiptItem` - сырая позиция из чека (имя, цена, объем)
-- `Good` - категоризированный товар
-- `Product` - эталонный продукт из справочника
-- `EmailHistory` - история обработки писем (для дедупликации)
-- `Alert` - уведомления о заканчивающихся продуктах
+- `Product` - группа товаров с иерархией
+- `Item` - справочник уникальных товаров
+- `Receipt` - чек из магазина
+- `ReceiptItem` - позиция в чеке
+- `Label` - пользовательская метка
+- `ProductLabel`, `ItemLabel` - связи many-to-many
+- `EmailHistory` - история обработки писем
 
 **Configuration:**
 - `AppSettings` - корневой класс настроек
@@ -49,10 +118,13 @@ Entity Framework Core DbContext.
 ```csharp
 public class SmartBasketDbContext : DbContext
 {
-    public DbSet<Receipt> Receipts { get; set; }
-    public DbSet<RawReceiptItem> RawItems { get; set; }
-    public DbSet<Good> Goods { get; set; }
     public DbSet<Product> Products { get; set; }
+    public DbSet<Item> Items { get; set; }
+    public DbSet<Receipt> Receipts { get; set; }
+    public DbSet<ReceiptItem> ReceiptItems { get; set; }
+    public DbSet<Label> Labels { get; set; }
+    public DbSet<ProductLabel> ProductLabels { get; set; }
+    public DbSet<ItemLabel> ItemLabels { get; set; }
     public DbSet<EmailHistory> EmailHistory { get; set; }
 }
 ```
@@ -91,6 +163,8 @@ WPF приложение с MVVM (CommunityToolkit.Mvvm).
 - Master-Detail: список чеков → детали с позициями
 - Фильтры: дата, магазин (с поиском через ComboBox)
 - Поиск по позициям в выбранном чеке
+- Управление категориями (Products)
+- Назначение меток (Labels)
 
 **Key Commands:**
 - `TestEmailConnectionCommand` - тест IMAP
@@ -100,6 +174,7 @@ WPF приложение с MVVM (CommunityToolkit.Mvvm).
 - `ApplyFiltersCommand` / `ClearFiltersCommand` - фильтрация
 - `SaveSettingsCommand` - сохранение настроек
 - `SaveLogCommand` - сохранение лога в файл
+- `LoadCategoryTreeCommand` - загрузка дерева категорий
 
 ### SmartBasket.CLI
 Консольные утилиты для тестирования.
@@ -129,13 +204,17 @@ dotnet run -- parse                # Скачать и распарсить
    │  - Extract JSON from response
    │
    ▼
-4. Receipt + RawReceiptItems
+4. Receipt + Items + ReceiptItems
+   │  - Find or create Product (via AI)
+   │  - Find or create Item (unique name)
+   │  - Create ReceiptItem
    │  - Save to PostgreSQL
    │  - Mark email as processed
    │
    ▼
 5. UI (MainViewModel)
    - Отображение в Master-Detail с фильтрами и поиском
+   - Управление категориями и метками
 ```
 
 ## Configuration
@@ -195,18 +274,11 @@ BindingOperations.EnableCollectionSynchronization
 позволяет безопасно модифицировать коллекции из ThreadPool
 ```
 
-## Completed Features
+## TODO (Refactoring in Progress)
 
-- [x] Email fetching (IMAP) + Ollama parsing
-- [x] Receipt + RawReceiptItems сохраняются в БД
-- [x] Modern UI: Master-Detail, фильтры, поиск по позициям
-
-## Future Plans (Phase 2+)
-
-- [ ] Добавление продуктов и товарных позиций
-- [ ] Категоризация товаров через LLM
-- [ ] Справочник продуктов с нормализованными названиями
-- [ ] Отслеживание расхода продуктов
-- [ ] Алерты о заканчивающихся продуктах
-- [ ] Аналитика покупок (графики, статистика)
-- [ ] Web UI (Blazor/React)
+- [x] Реализовать создание Items и ReceiptItems при парсинге чеков
+- [x] AI категоризация товаров → Product (ProductClassificationService)
+- [x] Иерархия продуктов (Product.ParentId)
+- [x] AI назначение меток (LabelAssignmentService)
+- [ ] UI для управления метками (Labels)
+- [ ] Аналитика по меткам и категориям

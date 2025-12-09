@@ -1,0 +1,60 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Dark Theme Colors -->
+
+    <!-- Backgrounds -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#1C1C1E"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#2C2C2E"/>
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#3A3A3C"/>
+    <SolidColorBrush x:Key="ToolbarBrush" Color="#2C2C2E"/>
+
+    <!-- Borders -->
+    <SolidColorBrush x:Key="BorderBrush" Color="#3A3A3C"/>
+    <SolidColorBrush x:Key="BorderLightBrush" Color="#48484A"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="#3A3A3C"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F5F5F7"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8E8E93"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#636366"/>
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="#FFFFFF"/>
+
+    <!-- Accent -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#5E5CE6"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#7A78F0"/>
+    <SolidColorBrush x:Key="AccentLightBrush" Color="#3A3A5C"/>
+    <SolidColorBrush x:Key="AccentVeryLightBrush" Color="#2C2C3E"/>
+
+    <!-- Semantic -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="#32D74B"/>
+    <SolidColorBrush x:Key="SuccessLightBrush" Color="#1A3D2A"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="#FF453A"/>
+    <SolidColorBrush x:Key="ErrorLightBrush" Color="#3D1A1A"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#FF9F0A"/>
+    <SolidColorBrush x:Key="WarningLightBrush" Color="#3D2E0A"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="#0A84FF"/>
+    <SolidColorBrush x:Key="InfoLightBrush" Color="#1A2A3D"/>
+
+    <!-- Interactive -->
+    <SolidColorBrush x:Key="HoverBrush" Color="#3A3A3C"/>
+    <SolidColorBrush x:Key="SelectedBrush" Color="#3A3A5C"/>
+    <SolidColorBrush x:Key="PressedBrush" Color="#48484A"/>
+
+    <!-- Log Panel -->
+    <SolidColorBrush x:Key="LogBackgroundBrush" Color="#0D0D0D"/>
+    <SolidColorBrush x:Key="LogHeaderBrush" Color="#1C1C1E"/>
+    <SolidColorBrush x:Key="LogTextBrush" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="LogBorderBrush" Color="#3A3A3C"/>
+
+    <!-- Badges -->
+    <SolidColorBrush x:Key="BadgeDefaultBrush" Color="#3A3A3C"/>
+    <SolidColorBrush x:Key="BadgeDefaultTextBrush" Color="#AEAEB2"/>
+
+    <!-- Gradient for receipt header -->
+    <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#5E5CE6" Offset="0"/>
+        <GradientStop Color="#9D8CFF" Offset="1"/>
+    </LinearGradientBrush>
+
+</ResourceDictionary>

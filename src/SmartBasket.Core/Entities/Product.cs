@@ -1,29 +1,24 @@
 namespace SmartBasket.Core.Entities;
 
 /// <summary>
-/// Продукт - пользовательская категория товаров (например, "Молоко", "Мясо на суп")
+/// Продукт - группа товаров, генерируется AI (например, "Молоко", "Свинина", "Гречка")
+/// Поддерживает иерархию через ParentId
 /// </summary>
 public class Product : BaseEntity
 {
+    /// <summary>
+    /// Ссылка на родительский продукт для иерархии
+    /// </summary>
+    public Guid? ParentId { get; set; }
+
+    /// <summary>
+    /// Название продукта (генерируется AI, можно переименовать)
+    /// </summary>
     public required string Name { get; set; }
 
-    /// <summary>
-    /// Единица измерения: "л", "шт", "г", "кг"
-    /// </summary>
-    public required string Unit { get; set; }
-
-    /// <summary>
-    /// Пороговое значение для уведомлений
-    /// </summary>
-    public decimal Threshold { get; set; }
-
-    /// <summary>
-    /// Средний расход в день (рассчитывается автоматически)
-    /// </summary>
-    public decimal? AvgDailyConsumption { get; set; }
-
     // Navigation properties
+    public Product? Parent { get; set; }
+    public ICollection<Product> Children { get; set; } = new List<Product>();
     public ICollection<Item> Items { get; set; } = new List<Item>();
-    public ICollection<ConsumptionHistory> ConsumptionHistory { get; set; } = new List<ConsumptionHistory>();
-    public ICollection<Alert> Alerts { get; set; } = new List<Alert>();
+    public ICollection<ProductLabel> ProductLabels { get; set; } = new List<ProductLabel>();
 }

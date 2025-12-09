@@ -55,6 +55,10 @@ switch (mode)
     case "parse":
         return await ParseEmailsAsync(settings);
 
+    case "classify":
+        var model = args.Length > 1 ? args[1] : settings.Ollama.Model;
+        return await TestClassificationAsync(settings, model);
+
     default:
         Console.WriteLine("=== SmartBasket CLI ===");
         Console.WriteLine();
@@ -62,6 +66,7 @@ switch (mode)
         Console.WriteLine("  dotnet run -- test-ollama [count]  - Test Ollama performance (default: 3 runs)");
         Console.WriteLine("  dotnet run -- email                - Fetch and save emails");
         Console.WriteLine("  dotnet run -- parse                - Fetch emails and parse with Ollama");
+        Console.WriteLine("  dotnet run -- classify [model]     - Test classification pipeline");
         Console.WriteLine();
         Console.WriteLine($"Settings: {settingsPath}");
         Console.WriteLine($"Ollama: {settings.Ollama.BaseUrl}, Model: {settings.Ollama.Model}");
@@ -352,3 +357,341 @@ static string BuildPrompt(string body) => $@"Извлеки из чека JSON. 
 
 Чек:
 {body}";
+
+// ============= CLASSIFY TEST MODE =============
+async Task<int> TestClassificationAsync(AppSettings settings, string model)
+{
+    Console.WriteLine("=== Classification Pipeline Test ===");
+    Console.WriteLine($"URL: {settings.Ollama.BaseUrl}");
+    Console.WriteLine($"Model: {model}");
+    Console.WriteLine();
+
+    // Test items
+    var testItems = new[]
+    {
+        "Колбаса вареная Клинский Докторская 400 г",
+        "Свекла",
+        "Джем Ратибор малиновый 360 г",
+        "Голень цыпленка-бройлера Куриное Царство с кожей охлажденное ~1 кг",
+        "Яйцо куриное Экстра СО коричневое 10 шт",
+        "Макаронные изделия Makfa Спагетти 450 г",
+        "Яблоки Ред Делишес новый урожай",
+        "Сыр полутвердый Брест-Литовск Финский 45% БЗМЖ 200 г",
+        "Бедро куриное «Петелинка» с кожей охлажденное, ~ 1 кг",
+        "Капуста квашеная Белоручка Фитнес 1 кг",
+        "Томаты красные",
+        "Лук репчатый",
+        "Огурец среднеплодный 180 г",
+        "Мандарины с листочком",
+        "Морковь мытая",
+        "Кофе Жокей Классический молотый 250 г",
+        "Огурцы Каждый День маринованные 680 г",
+        "Рис Увелка круглозерный в варочных пакетиках 80 г х 5 шт",
+        "Кабачки Цукини зеленые",
+        "Картофель Лайт 2 кг",
+        "Конфеты шоколадные Акконд Птица дивная с суфлейной начинкой",
+        "Вода питьевая Сенежская газированная 1,5 л",
+        "Молоко 1,5% пастеризованное 930 мл Простоквашино БЗМЖ",
+        "Борщ АШАН Красная птица с курицей, 250 г",
+        "Сметана 15% Простоквашино БЗМЖ 300 г",
+        "Варенье Вологодское варенье Домашнее малиновое 370 г",
+        "Подсолнечное масло Затея рафинированное дезодорированное 1 л",
+        "Шампиньоны АШАН Красная птица целые 250 г",
+        "Горошек АШАН Красная птица зеленый консервированный 400 г",
+        "Батон Коломенский пшеничный в нарезке 400 г"
+    };
+
+    // User labels
+    var userLabels = new[]
+    {
+        "Здоровое питание",
+        "Диетический продукт",
+        "Для детей",
+        "Для завтрака",
+        "Для выпечки",
+        "Для салата",
+        "Для супа",
+        "Для бутербродов",
+        "К чаю/кофе",
+        "Любимое",
+        "Попробовать новое",
+        "Не покупать больше"
+    };
+
+    using var httpClient = new HttpClient();
+    httpClient.Timeout = TimeSpan.FromSeconds(180);
+
+    var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
+    Directory.CreateDirectory(outputDir);
+
+    var results = new
+    {
+        model = model,
+        timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+        classification = new List<object>(),
+        items = new List<object>(),
+        labels = new List<object>()
+    };
+
+    // ========== STEP 1: Product Classification (batches of 5) ==========
+    Console.WriteLine("=== STEP 1: Product Classification (batches of 5) ===");
+    Console.WriteLine();
+
+    var sw = Stopwatch.StartNew();
+    var existingHierarchy = new List<string>(); // Накапливаем иерархию между батчами
+    var batchSize = 5;
+    var batches = testItems.Chunk(batchSize).ToList();
+    var totalProducts = 0;
+    var totalItemsMapped = 0;
+
+    for (int batchIdx = 0; batchIdx < batches.Count; batchIdx++)
+    {
+        var batch = batches[batchIdx];
+        Console.WriteLine($"\n--- Batch {batchIdx + 1}/{batches.Count} ({batch.Length} items) ---");
+
+        var hierarchyText = existingHierarchy.Count > 0
+            ? string.Join("\n", existingHierarchy)
+            : "(пусто - создай новые продукты)";
+
+        var classifyPrompt = $@"Выдели продукты из списка товаров и построй иерархию.
+
+СУЩЕСТВУЮЩАЯ ИЕРАРХИЯ ПРОДУКТОВ:
+{hierarchyText}
+
+ТОВАРЫ ДЛЯ КЛАССИФИКАЦИИ:
+{string.Join("\n", batch.Select((item, i) => $"{i + 1}. {item}"))}
+
+ПРАВИЛА:
+1. Продукт - это категория товаров (Молоко, Овощи, Фрукты, Кофе молотый и т.п.)
+2. Продукты могут быть иерархичными: Овощи -> Томаты, Овощи -> Горошек консервированный
+3. Если продукт уже есть в существующей иерархии - используй его
+4. Если продукта нет - создай новый и укажи parent если он вложенный
+5. parent должен ссылаться на существующий или новый продукт из этого же ответа
+
+ФОРМАТ ОТВЕТА (строго JSON):
+{{
+  ""products"": [
+    {{""name"": ""Название продукта"", ""parent"": null или ""Название родителя""}}
+  ],
+  ""items"": [
+    {{""name"": ""Полное название товара"", ""product"": ""Название продукта""}}
+  ]
+}}
+
+Классифицируй товары:";
+
+        var classifyRequest = new
+        {
+            model = model,
+            prompt = classifyPrompt,
+            stream = false,
+            options = new { temperature = 0.1, num_predict = 2048 }
+        };
+
+        sw.Restart();
+
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", classifyRequest);
+            sw.Stop();
+            Console.WriteLine($"Response: {sw.Elapsed.TotalSeconds:F1}s");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JsonSerializer.Deserialize<JsonElement>(content);
+                var responseText = json.TryGetProperty("response", out var rt) ? rt.GetString() ?? "" : "";
+
+                var match = Regex.Match(responseText, @"\{[\s\S]*\}");
+                if (match.Success)
+                {
+                    var parsed = JsonSerializer.Deserialize<JsonElement>(match.Value);
+                    var prettyJson = JsonSerializer.Serialize(parsed, jsonOptions);
+
+                    Console.WriteLine(prettyJson);
+
+                    // Count and accumulate
+                    if (parsed.TryGetProperty("products", out var products))
+                    {
+                        totalProducts += products.GetArrayLength();
+                        // Добавить новые продукты в иерархию для следующих батчей
+                        foreach (var p in products.EnumerateArray())
+                        {
+                            var name = p.TryGetProperty("name", out var n) ? n.GetString() : null;
+                            var parent = p.TryGetProperty("parent", out var pr) && pr.ValueKind != JsonValueKind.Null ? pr.GetString() : null;
+                            if (!string.IsNullOrEmpty(name))
+                            {
+                                var entry = parent != null ? $"- {name} (parent: {parent})" : $"- {name}";
+                                if (!existingHierarchy.Contains(entry))
+                                    existingHierarchy.Add(entry);
+                            }
+                        }
+                    }
+                    if (parsed.TryGetProperty("items", out var items))
+                        totalItemsMapped += items.GetArrayLength();
+
+                    ((List<object>)results.classification).Add(new { batch = batchIdx + 1, time = sw.Elapsed.TotalSeconds, response = match.Value });
+                }
+                else
+                {
+                    Console.WriteLine("No JSON in response!");
+                    Console.WriteLine(responseText.Length > 500 ? responseText[..500] + "..." : responseText);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine($"\n=== Classification Summary: {totalProducts} products, {totalItemsMapped} items mapped ===");
+    Console.WriteLine($"Accumulated hierarchy ({existingHierarchy.Count} entries):");
+    foreach (var h in existingHierarchy.Take(20))
+        Console.WriteLine($"  {h}");
+    if (existingHierarchy.Count > 20)
+        Console.WriteLine($"  ... and {existingHierarchy.Count - 20} more");
+
+    // ========== STEP 2: Unit extraction (sample) ==========
+    Console.WriteLine("\n=== STEP 2: Unit Extraction (sample of 5 items) ===");
+    Console.WriteLine();
+
+    var sampleItems = testItems.Take(5).ToList();
+    var unitPrompt = $@"Извлеки единицы измерения из названий товаров.
+
+ТОВАРЫ:
+{string.Join("\n", sampleItems.Select((item, i) => $"{i + 1}. {item}"))}
+
+Для каждого товара определи:
+- unit_of_measure: единица измерения товара (г/кг/мл/л/шт)
+- unit_quantity: количество в единице (число)
+
+ПРИМЕРЫ:
+""Молоко Простоквашино 930 мл"" -> unit_of_measure: ""мл"", unit_quantity: 930
+""Яйцо куриное 10 шт"" -> unit_of_measure: ""шт"", unit_quantity: 10
+
+ФОРМАТ ОТВЕТА (строго JSON массив):
+[{{""name"":"""",""unit_of_measure"":"""",""unit_quantity"":0}}]
+
+Извлеки данные:";
+
+    var unitRequest = new
+    {
+        model = model,
+        prompt = unitPrompt,
+        stream = false,
+        options = new { temperature = 0.1, num_predict = 1024 }
+    };
+
+    Console.WriteLine("Sending unit extraction request...");
+    sw.Restart();
+
+    try
+    {
+        var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", unitRequest);
+        sw.Stop();
+        Console.WriteLine($"Response: {sw.Elapsed.TotalSeconds:F1}s");
+
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var json = JsonSerializer.Deserialize<JsonElement>(content);
+            var responseText = json.TryGetProperty("response", out var rt) ? rt.GetString() ?? "" : "";
+
+            var match = Regex.Match(responseText, @"\[[\s\S]*?\]");
+            if (match.Success)
+            {
+                var parsed = JsonSerializer.Deserialize<JsonElement>(match.Value);
+                var prettyJson = JsonSerializer.Serialize(parsed, jsonOptions);
+
+                Console.WriteLine("\n--- Unit Extraction Result ---");
+                Console.WriteLine(prettyJson);
+
+                ((List<object>)results.items).Add(new { time = sw.Elapsed.TotalSeconds, response = match.Value });
+            }
+            else
+            {
+                Console.WriteLine("No JSON array in response!");
+                Console.WriteLine(responseText);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"ERROR: {ex.Message}");
+    }
+
+    // ========== STEP 3: Label Assignment (sample) ==========
+    Console.WriteLine("\n=== STEP 3: Label Assignment (sample of 5 items) ===");
+    Console.WriteLine();
+
+    foreach (var item in sampleItems)
+    {
+        var labelPrompt = $@"Назначь подходящие метки для товара.
+
+ДОСТУПНЫЕ МЕТКИ:
+{string.Join("\n", userLabels.Select(l => $"- {l}"))}
+
+ТОВАР:
+{item}
+
+ПРАВИЛА:
+1. Выбери только те метки, которые точно подходят к товару
+2. Товар может иметь 0, 1 или несколько меток
+3. Не придумывай новые метки - используй только из списка выше
+4. Если ни одна метка не подходит - верни пустой массив
+
+ФОРМАТ ОТВЕТА (строго JSON массив):
+[""Метка1"", ""Метка2""]
+
+Назначь метки:";
+
+        var labelRequest = new
+        {
+            model = model,
+            prompt = labelPrompt,
+            stream = false,
+            options = new { temperature = 0.1, num_predict = 256 }
+        };
+
+        Console.Write($"  {item.Substring(0, Math.Min(40, item.Length))}... ");
+        sw.Restart();
+
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", labelRequest);
+            sw.Stop();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JsonSerializer.Deserialize<JsonElement>(content);
+                var responseText = json.TryGetProperty("response", out var rt) ? rt.GetString() ?? "" : "";
+
+                var match = Regex.Match(responseText, @"\[[\s\S]*?\]");
+                if (match.Success)
+                {
+                    var labels = JsonSerializer.Deserialize<string[]>(match.Value) ?? Array.Empty<string>();
+                    Console.WriteLine($"[{sw.Elapsed.TotalSeconds:F1}s] {string.Join(", ", labels)}");
+
+                    ((List<object>)results.labels).Add(new { item = item, labels = labels, time = sw.Elapsed.TotalSeconds });
+                }
+                else
+                {
+                    Console.WriteLine($"[{sw.Elapsed.TotalSeconds:F1}s] (no labels)");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+        }
+    }
+
+    // Save results
+    var outputPath = Path.Combine(outputDir, $"classify_test_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+    File.WriteAllText(outputPath, JsonSerializer.Serialize(results, jsonOptions));
+    Console.WriteLine($"\n=== Results saved to: {outputPath} ===");
+
+    return 0;
+}

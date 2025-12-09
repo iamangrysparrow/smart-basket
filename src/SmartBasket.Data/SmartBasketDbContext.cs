@@ -11,62 +11,51 @@ public class SmartBasketDbContext : DbContext
 
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Item> Items => Set<Item>();
-    public DbSet<Good> Goods => Set<Good>();
     public DbSet<Receipt> Receipts => Set<Receipt>();
-    public DbSet<RawReceiptItem> RawReceiptItems => Set<RawReceiptItem>();
-    public DbSet<ConsumptionHistory> ConsumptionHistory => Set<ConsumptionHistory>();
-    public DbSet<Alert> Alerts => Set<Alert>();
-    public DbSet<CategorizationCache> CategorizationCache => Set<CategorizationCache>();
+    public DbSet<ReceiptItem> ReceiptItems => Set<ReceiptItem>();
+    public DbSet<Label> Labels => Set<Label>();
+    public DbSet<ProductLabel> ProductLabels => Set<ProductLabel>();
+    public DbSet<ItemLabel> ItemLabels => Set<ItemLabel>();
     public DbSet<EmailHistory> EmailHistory => Set<EmailHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Product
+        // Product (с иерархией)
         modelBuilder.Entity<Product>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
-            entity.Property(e => e.Unit).HasMaxLength(50).IsRequired();
-            entity.Property(e => e.Threshold).HasPrecision(10, 3);
-            entity.Property(e => e.AvgDailyConsumption).HasPrecision(10, 3);
             entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.ParentId);
+
+            // Self-referencing для иерархии
+            entity.HasOne(e => e.Parent)
+                  .WithMany(p => p.Children)
+                  .HasForeignKey(e => e.ParentId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Item
+        // Item (справочник товаров)
         modelBuilder.Entity<Item>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
-            entity.Property(e => e.UnitRatio).HasPrecision(10, 3);
+            entity.Property(e => e.Name).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.UnitOfMeasure).HasMaxLength(50);
+            entity.Property(e => e.UnitQuantity).HasPrecision(10, 3);
             entity.Property(e => e.Shop).HasMaxLength(255);
+            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.ProductId);
+            entity.HasIndex(e => e.Shop);
+
             entity.HasOne(e => e.Product)
                   .WithMany(p => p.Items)
                   .HasForeignKey(e => e.ProductId)
                   .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => e.ProductId);
         });
 
-        // Good
-        modelBuilder.Entity<Good>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Quantity).HasPrecision(10, 3);
-            entity.Property(e => e.Price).HasPrecision(10, 2);
-            entity.HasOne(e => e.Item)
-                  .WithMany(i => i.Goods)
-                  .HasForeignKey(e => e.ItemId)
-                  .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.Receipt)
-                  .WithMany(r => r.Goods)
-                  .HasForeignKey(e => e.ReceiptId)
-                  .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => e.ItemId);
-            entity.HasIndex(e => e.ReceiptId);
-        });
-
-        // Receipt
+        // Receipt (чек)
         modelBuilder.Entity<Receipt>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -77,67 +66,69 @@ public class SmartBasketDbContext : DbContext
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
             entity.HasIndex(e => e.EmailId).IsUnique();
             entity.HasIndex(e => e.ReceiptDate);
+            entity.HasIndex(e => e.Shop);
         });
 
-        // RawReceiptItem
-        modelBuilder.Entity<RawReceiptItem>(entity =>
+        // ReceiptItem (товарная позиция в чеке)
+        modelBuilder.Entity<ReceiptItem>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.RawName).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.RawVolume).HasMaxLength(100);
-            entity.Property(e => e.RawPrice).HasMaxLength(50);
-            entity.Property(e => e.Unit).HasMaxLength(50);
             entity.Property(e => e.Quantity).HasPrecision(10, 3);
-            entity.Property(e => e.CategorizationStatus).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.Price).HasPrecision(10, 2);
+            entity.Property(e => e.Amount).HasPrecision(10, 2);
+            entity.HasIndex(e => e.ItemId);
+            entity.HasIndex(e => e.ReceiptId);
+
+            entity.HasOne(e => e.Item)
+                  .WithMany(i => i.ReceiptItems)
+                  .HasForeignKey(e => e.ItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
             entity.HasOne(e => e.Receipt)
-                  .WithMany(r => r.RawItems)
+                  .WithMany(r => r.Items)
                   .HasForeignKey(e => e.ReceiptId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Label (метки)
+        modelBuilder.Entity<Label>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Color).HasMaxLength(20);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // ProductLabel (many-to-many)
+        modelBuilder.Entity<ProductLabel>(entity =>
+        {
+            entity.HasKey(e => new { e.ProductId, e.LabelId });
+
+            entity.HasOne(e => e.Product)
+                  .WithMany(p => p.ProductLabels)
+                  .HasForeignKey(e => e.ProductId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Label)
+                  .WithMany(l => l.ProductLabels)
+                  .HasForeignKey(e => e.LabelId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ItemLabel (many-to-many)
+        modelBuilder.Entity<ItemLabel>(entity =>
+        {
+            entity.HasKey(e => new { e.ItemId, e.LabelId });
+
             entity.HasOne(e => e.Item)
-                  .WithMany()
+                  .WithMany(i => i.ItemLabels)
                   .HasForeignKey(e => e.ItemId)
-                  .OnDelete(DeleteBehavior.SetNull);
-            entity.HasIndex(e => e.ReceiptId);
-            entity.HasIndex(e => e.CategorizationStatus);
-        });
-
-        // ConsumptionHistory
-        modelBuilder.Entity<ConsumptionHistory>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.QuantityConsumed).HasPrecision(10, 3);
-            entity.Property(e => e.Source).HasMaxLength(50);
-            entity.HasOne(e => e.Product)
-                  .WithMany(p => p.ConsumptionHistory)
-                  .HasForeignKey(e => e.ProductId)
                   .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => new { e.ProductId, e.Date });
-        });
 
-        // Alert
-        modelBuilder.Entity<Alert>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
-            entity.HasOne(e => e.Product)
-                  .WithMany(p => p.Alerts)
-                  .HasForeignKey(e => e.ProductId)
+            entity.HasOne(e => e.Label)
+                  .WithMany(l => l.ItemLabels)
+                  .HasForeignKey(e => e.LabelId)
                   .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => new { e.ProductId, e.Status });
-        });
-
-        // CategorizationCache
-        modelBuilder.Entity<CategorizationCache>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.RawItemName).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.Confidence).HasPrecision(5, 2);
-            entity.Property(e => e.CategorizedBy).HasMaxLength(50);
-            entity.HasOne(e => e.Product)
-                  .WithMany()
-                  .HasForeignKey(e => e.ProductId)
-                  .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => e.RawItemName).IsUnique();
         });
 
         // EmailHistory

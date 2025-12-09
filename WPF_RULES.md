@@ -1,4 +1,4 @@
-# WPF Async Development Rules
+# WPF Development Rules
 
 ## Critical Rules for WPF + async/await
 
@@ -97,16 +97,15 @@ private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledEx
 
 ### 8. Exception Logging - ALWAYS use DEBUG level with full details
 ```csharp
-// BAD - недостаточно информации для отладки
+// BAD
 Log($"ERROR: {ex.Message}");
 
-// GOOD - полная информация: тип, сообщение, вся цепочка InnerException, StackTrace
+// GOOD - full info: type, message, InnerException chain, StackTrace
 private void LogException(Exception ex, string context = "")
 {
     var prefix = string.IsNullOrEmpty(context) ? "ERROR" : $"ERROR [{context}]";
     Log($"{prefix}: {ex.GetType().Name}: {ex.Message}");
 
-    // Логируем всю цепочку InnerException
     var inner = ex.InnerException;
     var depth = 1;
     while (inner != null)
@@ -117,7 +116,6 @@ private void LogException(Exception ex, string context = "")
         depth++;
     }
 
-    // StackTrace (первые 15 строк)
     if (!string.IsNullOrEmpty(ex.StackTrace))
     {
         Log("--- StackTrace ---");
@@ -129,12 +127,161 @@ private void LogException(Exception ex, string context = "")
 }
 ```
 
-**Обязательно включать:**
-- Тип исключения (`ex.GetType().Name`)
-- Сообщение (`ex.Message`)
-- Все уровни `InnerException` (особенно важно для EF Core, HttpClient)
-- StackTrace (хотя бы первые 10-15 строк)
-- Контекст операции (название метода/команды)
+---
+
+## Theme System
+
+### Architecture
+```
+src/SmartBasket.WPF/
+├── Themes/
+│   ├── ThemeManager.cs      # Static theme switcher
+│   ├── LightTheme.xaml      # Light color palette
+│   ├── DarkTheme.xaml       # Dark color palette
+│   ├── Icons.xaml           # Path-based vector icons
+│   └── SharedStyles.xaml    # Reusable styles (use DynamicResource)
+├── App.xaml                 # Merges theme resources
+```
+
+### Using ThemeManager
+```csharp
+// Apply theme on startup (App.xaml.cs)
+ThemeManager.ApplyTheme(AppTheme.Light);
+
+// Toggle theme
+ThemeManager.ToggleTheme();
+
+// Get current theme
+var current = ThemeManager.CurrentTheme;
+
+// Subscribe to changes
+ThemeManager.ThemeChanged += (_, theme) => UpdateUI();
+```
+
+### Color Resources (DynamicResource required!)
+```xml
+<!-- Background layers -->
+BackgroundBrush        <!-- Main window background -->
+SurfaceBrush           <!-- Cards, panels -->
+SurfaceAltBrush        <!-- Alternate surface -->
+ToolbarBrush           <!-- Toolbars, headers -->
+
+<!-- Borders -->
+BorderBrush            <!-- Primary borders -->
+BorderLightBrush       <!-- Subtle borders -->
+DividerBrush           <!-- Separators -->
+
+<!-- Text -->
+TextPrimaryBrush       <!-- Main text -->
+TextSecondaryBrush     <!-- Muted text -->
+TextTertiaryBrush      <!-- Very muted text -->
+TextOnAccentBrush      <!-- Text on accent buttons -->
+
+<!-- Accent -->
+AccentBrush            <!-- Primary action color -->
+AccentHoverBrush       <!-- Hover state -->
+AccentLightBrush       <!-- Light accent background -->
+AccentGradientBrush    <!-- Gradient for headers -->
+
+<!-- Semantic -->
+SuccessBrush / SuccessLightBrush
+ErrorBrush / ErrorLightBrush
+WarningBrush / WarningLightBrush
+InfoBrush / InfoLightBrush
+
+<!-- Interactive states -->
+HoverBrush             <!-- Mouse hover -->
+SelectedBrush          <!-- Selected item -->
+PressedBrush           <!-- Pressed state -->
+
+<!-- Log panel -->
+LogBackgroundBrush / LogHeaderBrush / LogTextBrush
+```
+
+### Style Keys
+```xml
+<!-- Buttons -->
+PrimaryButton          <!-- Main action (accent colored) -->
+SecondaryButton        <!-- Secondary action (neutral) -->
+DangerButton           <!-- Destructive action (red) -->
+ToolbarButton          <!-- Compact toolbar button -->
+IconButtonBase         <!-- Icon-only button -->
+
+<!-- Containers -->
+Card                   <!-- Elevated surface with shadow -->
+SectionHeader          <!-- Panel header background -->
+Badge                  <!-- Small info tag -->
+
+<!-- Text -->
+H1, H2, H3             <!-- Headings -->
+TextPrimary            <!-- Normal text -->
+TextSecondary          <!-- Muted text -->
+PriceText              <!-- Green price display -->
+BadgeText              <!-- Badge label text -->
+
+<!-- Lists -->
+ReceiptListBox         <!-- Styled ListBox -->
+ReceiptListBoxItem     <!-- List item with selection -->
+ReceiptCard            <!-- Receipt item card -->
+ItemCard               <!-- Product item card -->
+
+<!-- Controls -->
+TextInput              <!-- Styled TextBox -->
+ModernTabControl       <!-- Tab container -->
+ModernTabItem          <!-- Tab header -->
+ModernTreeView         <!-- Tree container -->
+ModernDataGrid         <!-- Data grid -->
+ToolbarSeparator       <!-- Vertical separator -->
+```
+
+### Icon Usage
+```xml
+<!-- Icons are Geometry resources, use with Path -->
+<Path Data="{StaticResource IconEmail}"
+      Fill="{DynamicResource TextPrimaryBrush}"
+      Width="14" Height="14" Stretch="Uniform"/>
+
+<!-- Available icons -->
+IconEmail, IconCancel, IconRefresh, IconDatabase, IconTrash,
+IconLog, IconCategories, IconCategorize, IconSettings, IconSave,
+IconPlug, IconClear, IconEdit, IconSearch, IconFilter,
+IconArrowDown, IconArrowUp, IconPopOut, IconDock,
+IconSun, IconMoon, IconReceipt, IconProducts, IconInfo,
+IconCheck, IconWarning
+```
+
+### Creating New Views
+
+1. **Always use DynamicResource for theme colors:**
+```xml
+<!-- CORRECT -->
+Background="{DynamicResource BackgroundBrush}"
+
+<!-- WRONG - won't update on theme change -->
+Background="{StaticResource BackgroundBrush}"
+```
+
+2. **Use StaticResource for styles (they don't change):**
+```xml
+<Button Style="{StaticResource PrimaryButton}"/>
+<Border Style="{StaticResource Card}"/>
+```
+
+3. **Set Window background:**
+```xml
+<Window Background="{DynamicResource BackgroundBrush}">
+```
+
+4. **Use shared styles instead of inline:**
+```xml
+<!-- WRONG -->
+<TextBlock FontWeight="Bold" FontSize="20" Foreground="#1B1B1B"/>
+
+<!-- CORRECT -->
+<TextBlock Style="{StaticResource H1}"/>
+```
+
+---
 
 ## Project Structure
 ```
@@ -143,6 +290,10 @@ SmartBasket/
 ├── SmartBasket.Data/        # EF Core DbContext, Migrations
 ├── SmartBasket.Services/    # Business logic (Email, Ollama)
 ├── SmartBasket.WPF/         # WPF UI (MVVM with CommunityToolkit)
+│   ├── Themes/              # Color palettes, icons, shared styles
+│   ├── Views/               # Dialogs and secondary windows
+│   ├── ViewModels/          # MVVM ViewModels
+│   └── Services/            # WPF-specific services
 └── SmartBasket.CLI/         # Console tools for testing
 ```
 
@@ -152,18 +303,44 @@ SmartBasket/
 - **Entity Framework Core** - PostgreSQL/SQLite
 - **Microsoft.Extensions.DependencyInjection** - DI container
 
+## Detachable Log Panel
+
+The log panel supports VS-style docking:
+- **Docked**: Resizable panel at bottom with GridSplitter
+- **Detached**: Separate window (LogWindow.xaml)
+- **Dock back**: Click dock button to return to main window
+
+```csharp
+// In MainWindow.xaml.cs
+private LogWindow? _logWindow;
+
+private void PopOutLog_Click(object sender, RoutedEventArgs e)
+{
+    LogPanel.Visibility = Visibility.Collapsed;
+    _logWindow = new LogWindow(_viewModel) { Owner = this };
+    _logWindow.LogWindowClosed += OnLogWindowClosed;
+    _logWindow.Show();
+}
+```
+
 ## Quick Start Prompt
 
 ```
-This is a WPF .NET 8 application using CommunityToolkit.Mvvm for MVVM pattern.
+This is a WPF .NET 8 application using CommunityToolkit.Mvvm.
 
-Key async rules:
-1. Use BindingOperations.EnableCollectionSynchronization for thread-safe ObservableCollection
+Key rules:
+1. Use BindingOperations.EnableCollectionSynchronization for thread-safe collections
 2. Wrap service calls in Task.Run() to free UI thread
 3. Use ThreadSafeProgress<T> instead of Progress<T>
 4. Always ConfigureAwait(false) in services
 5. Never use lock inside Dispatcher.Invoke
 
-Project: SmartBasket - receipt parser with email fetching (MailKit),
+Theme system:
+- Use DynamicResource for colors (theme switching)
+- Use StaticResource for styles and icons
+- Themes: LightTheme.xaml, DarkTheme.xaml
+- ThemeManager.ToggleTheme() to switch
+
+Project: SmartBasket - receipt parser with email (MailKit),
 Ollama LLM parsing, PostgreSQL storage (EF Core).
 ```

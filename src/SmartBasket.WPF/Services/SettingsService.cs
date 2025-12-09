@@ -25,4 +25,9 @@ public class SettingsService
         var json = JsonSerializer.Serialize(settings, JsonOptions);
         File.WriteAllText(_settingsPath, json);
     }
+
+    public Task SaveSettingsAsync(AppSettings settings)
+    {
+        return Task.Run(() => Save(settings));
+    }
 }

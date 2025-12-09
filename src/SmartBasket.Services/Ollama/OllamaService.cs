@@ -267,8 +267,10 @@ public class OllamaService : IOllamaService
                                     Name = item.Name ?? "Unknown",
                                     Quantity = item.Quantity ?? 1,
                                     Unit = item.Unit,
-                                    Price = item.Price ?? item.Amount, // Use amount if price is null
-                                    Volume = item.Volume
+                                    Price = item.Price,
+                                    Amount = item.Amount,
+                                    UnitOfMeasure = item.UnitOfMeasure,
+                                    UnitQuantity = item.UnitQuantity
                                 });
                             }
                         }
@@ -301,12 +303,18 @@ public class OllamaService : IOllamaService
             result.IsSuccess = false;
             result.Message = "Ollama request timed out";
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            progress?.Report("  [Ollama] Cancelled by user");
+            result.IsSuccess = false;
+            result.Message = "Operation cancelled by user";
+            throw;
+        }
         catch (OperationCanceledException)
         {
-            progress?.Report("  [Ollama] Cancelled");
+            progress?.Report("  [Ollama] Timed out");
             result.IsSuccess = false;
-            result.Message = "Operation cancelled";
-            throw;
+            result.Message = "Ollama request timed out";
         }
         catch (HttpRequestException ex)
         {
@@ -464,7 +472,12 @@ JSON:
         public decimal? Quantity { get; set; }
         public string? Unit { get; set; }
         public decimal? Price { get; set; }
-        public decimal? Amount { get; set; } // итоговая цена за позицию
-        public string? Volume { get; set; }
+        public decimal? Amount { get; set; }
+
+        [JsonPropertyName("unit_of_measure")]
+        public string? UnitOfMeasure { get; set; }
+
+        [JsonPropertyName("unit_quantity")]
+        public decimal? UnitQuantity { get; set; }
     }
 }

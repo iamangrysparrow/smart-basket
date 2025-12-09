@@ -1,4 +1,44 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace SmartBasket.Services.Ollama;
+
+/// <summary>
+/// Конвертер для decimal? который обрабатывает пустые строки как null.
+/// Нужен потому что Ollama иногда возвращает "" вместо числа или null
+/// когда не может определить значение (например unit_quantity для товара без веса в названии).
+/// </summary>
+public class NullableDecimalConverter : JsonConverter<decimal?>
+{
+    public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+            return null;
+
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            var str = reader.GetString();
+            if (string.IsNullOrWhiteSpace(str))
+                return null;
+            if (decimal.TryParse(str, out var result))
+                return result;
+            return null;
+        }
+
+        if (reader.TokenType == JsonTokenType.Number)
+            return reader.GetDecimal();
+
+        return null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
+    {
+        if (value.HasValue)
+            writer.WriteNumberValue(value.Value);
+        else
+            writer.WriteNullValue();
+    }
+}
 
 /// <summary>
 /// Товарная позиция, распознанная Ollama из текста письма
@@ -11,24 +51,36 @@ public class ParsedReceiptItem
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Количество
+    /// Количество купленного
     /// </summary>
     public decimal Quantity { get; set; } = 1;
 
     /// <summary>
-    /// Единица измерения (шт, кг, л, г, мл)
+    /// Единица измерения за цену (шт, кг, л)
     /// </summary>
     public string? Unit { get; set; }
 
     /// <summary>
-    /// Цена
+    /// Цена за единицу
     /// </summary>
     public decimal? Price { get; set; }
 
     /// <summary>
-    /// Объем/вес (если указан отдельно)
+    /// Итоговая сумма за позицию
     /// </summary>
-    public string? Volume { get; set; }
+    [JsonConverter(typeof(NullableDecimalConverter))]
+    public decimal? Amount { get; set; }
+
+    /// <summary>
+    /// Единица измерения товара (г, кг, мл, л, шт) - выделено из названия
+    /// </summary>
+    public string? UnitOfMeasure { get; set; }
+
+    /// <summary>
+    /// Количество в единице товара (например 930 для "930 мл") - выделено из названия
+    /// </summary>
+    [JsonConverter(typeof(NullableDecimalConverter))]
+    public decimal? UnitQuantity { get; set; }
 }
 
 /// <summary>

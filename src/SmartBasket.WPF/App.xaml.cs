@@ -9,6 +9,7 @@ using SmartBasket.Data;
 using SmartBasket.Services.Email;
 using SmartBasket.Services.Ollama;
 using SmartBasket.WPF.Services;
+using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
 
 namespace SmartBasket.WPF;
@@ -16,6 +17,7 @@ namespace SmartBasket.WPF;
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
+    private AppSettings? _appSettings;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -25,6 +27,22 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        // Load configuration first
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
+
+        _appSettings = new AppSettings();
+        configuration.Bind(_appSettings);
+
+        // Apply saved theme before showing UI
+        var themeName = _appSettings.Theme ?? "Light";
+        var theme = themeName.Equals("Dark", StringComparison.OrdinalIgnoreCase)
+            ? AppTheme.Dark
+            : AppTheme.Light;
+        ThemeManager.ApplyTheme(theme);
 
         var services = new ServiceCollection();
         ConfigureServices(services);
@@ -36,15 +54,7 @@ public partial class App : Application
 
     private void ConfigureServices(IServiceCollection services)
     {
-        // Configuration
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
-
-        var appSettings = new AppSettings();
-        configuration.Bind(appSettings);
-        services.AddSingleton(appSettings);
+        services.AddSingleton(_appSettings!);
 
         // Logging
         services.AddLogging(builder =>
@@ -54,14 +64,14 @@ public partial class App : Application
         });
 
         // Database
-        var dbProvider = appSettings.Database.Provider.ToLowerInvariant() switch
+        var dbProvider = _appSettings!.Database.Provider.ToLowerInvariant() switch
         {
             "postgresql" or "postgres" => DatabaseProviderType.PostgreSQL,
             "sqlite" => DatabaseProviderType.SQLite,
             _ => DatabaseProviderType.PostgreSQL
         };
 
-        services.AddSmartBasketDbContext(dbProvider, appSettings.Database.ConnectionString);
+        services.AddSmartBasketDbContext(dbProvider, _appSettings.Database.ConnectionString);
 
         // HTTP Client for Ollama
         services.AddHttpClient();
@@ -69,6 +79,9 @@ public partial class App : Application
         // Services
         services.AddSingleton<IEmailService, EmailService>();
         services.AddSingleton<IOllamaService, OllamaService>();
+        services.AddSingleton<ICategoryService, CategoryService>();
+        services.AddSingleton<IProductClassificationService, ProductClassificationService>();
+        services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
         services.AddSingleton<SettingsService>();
 
         // ViewModels

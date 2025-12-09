@@ -1,0 +1,12 @@
+{
+  "model": "MFDoom/deepseek-r1-tool-calling:8b",
+  "timestamp": "2025-12-09 22:18:37",
+  "classification": [],
+  "items": [
+    {
+      "time": 95.8965997,
+      "response": "[\n  {\n    \"name\": \"Колбаса вареная Клинский Докторская\",\n    \"unit_of_measure\": \"г\",\n    \"unit_quantity\": 400\n  },\n  {\n    \"name\": \"Свекла\",\n    \"unit_of_measure\": \"г\",\n    \"unit_quantity\": null\n  },\n  {\n    \"name\": \"Джем Ратибор малиновый\",\n    \"unit_of_measure\": \"г\",\n    \"unit_quantity\": 360\n  },\n  {\n    \"name\": \"Голень цыпленка-бройлера Куриное Царство с кожей охлажденное\",\n    \"unit_of_measure\": \"кг\",\n    \"unit_quantity\": 1\n  },\n  {\n    \"name\": \"Яйцо куриное Экстра СО коричневое\",\n    \"unit_of_measure\": \"шт\",\n    \"unit_quantity\": 10\n  }\n]"
+    }
+  ],
+  "labels": []
+}

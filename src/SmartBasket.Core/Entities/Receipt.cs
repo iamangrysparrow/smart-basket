@@ -26,30 +26,22 @@ public class Receipt : BaseEntity
     public string? EmailId { get; set; }
 
     /// <summary>
-    /// Исходный HTML для переиспользования
-    /// </summary>
-    public string? RawContent { get; set; }
-
-    /// <summary>
     /// Итоговая сумма чека
     /// </summary>
     public decimal? Total { get; set; }
 
     /// <summary>
-    /// Статус обработки: raw, parsed, categorized, archived
+    /// Статус обработки
     /// </summary>
-    public ReceiptStatus Status { get; set; } = ReceiptStatus.Raw;
+    public ReceiptStatus Status { get; set; } = ReceiptStatus.Parsed;
 
     // Navigation properties
-    public ICollection<Good> Goods { get; set; } = new List<Good>();
-    public ICollection<RawReceiptItem> RawItems { get; set; } = new List<RawReceiptItem>();
+    public ICollection<ReceiptItem> Items { get; set; } = new List<ReceiptItem>();
 }
 
 public enum ReceiptStatus
 {
-    Raw,
     Parsed,
-    Categorized,
     Archived,
     Error
 }
