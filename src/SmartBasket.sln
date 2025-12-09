@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartBasket.Core", "SmartBasket.Core\SmartBasket.Core.csproj", "{A9C41118-5D06-40DB-9796-E5D7080E8C83}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartBasket.Data", "SmartBasket.Data\SmartBasket.Data.csproj", "{4CADBD73-DEAF-4CCD-BB2F-A08FD2DA9740}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartBasket.Services", "SmartBasket.Services\SmartBasket.Services.csproj", "{24DF775D-5C6F-415E-B7A2-63C0F1A65E54}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartBasket.WPF", "SmartBasket.WPF\SmartBasket.WPF.csproj", "{FC0CEF3C-6105-4026-B0A1-66F814B56F4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartBasket.CLI", "SmartBasket.CLI\SmartBasket.CLI.csproj", "{45249292-432A-4038-8500-C4B6D7142DFE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A9C41118-5D06-40DB-9796-E5D7080E8C83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9C41118-5D06-40DB-9796-E5D7080E8C83}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9C41118-5D06-40DB-9796-E5D7080E8C83}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9C41118-5D06-40DB-9796-E5D7080E8C83}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CADBD73-DEAF-4CCD-BB2F-A08FD2DA9740}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CADBD73-DEAF-4CCD-BB2F-A08FD2DA9740}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CADBD73-DEAF-4CCD-BB2F-A08FD2DA9740}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CADBD73-DEAF-4CCD-BB2F-A08FD2DA9740}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24DF775D-5C6F-415E-B7A2-63C0F1A65E54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24DF775D-5C6F-415E-B7A2-63C0F1A65E54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24DF775D-5C6F-415E-B7A2-63C0F1A65E54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24DF775D-5C6F-415E-B7A2-63C0F1A65E54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC0CEF3C-6105-4026-B0A1-66F814B56F4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC0CEF3C-6105-4026-B0A1-66F814B56F4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC0CEF3C-6105-4026-B0A1-66F814B56F4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC0CEF3C-6105-4026-B0A1-66F814B56F4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45249292-432A-4038-8500-C4B6D7142DFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45249292-432A-4038-8500-C4B6D7142DFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45249292-432A-4038-8500-C4B6D7142DFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45249292-432A-4038-8500-C4B6D7142DFE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

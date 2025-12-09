@@ -1,0 +1,3254 @@
+Received: from postback9d.mail.yandex.net (postback9d.mail.yandex.net [2a02:6b8:c41:1300:1:45:d181:da09])
+	by mail-notsolitesrv-production-main-27.klg.yp-c.yandex.net (notsolitesrv/Yandex) with LMTPS id SYUhtjaV7Wt4-ZqNWgIm1
+	for <hssparrow@ya.ru>; Wed, 03 Dec 2025 18:55:46 +0300
+Received: from mail-nwsmtp-mxfront-production-main-95.klg.yp-c.yandex.net (mail-nwsmtp-mxfront-production-main-95.klg.yp-c.yandex.net [IPv6:2a02:6b8:c42:7ea6:0:640:ea14:0])
+	by postback9d.mail.yandex.net (Yandex) with ESMTPS id 7CAE8C0016
+	for <hssparrow@ya.ru>; Wed, 03 Dec 2025 18:55:46 +0300 (MSK)
+Received: from goyang54.sndsy.ru (goyang54.sndsy.ru [185.231.50.54])
+	by mail-nwsmtp-mxfront-production-main-95.klg.yp-c.yandex.net (mxfront/Yandex) with ESMTPS id ktmuX70ECW20-nyoZXsoc;
+	Wed, 03 Dec 2025 18:55:46 +0300
+X-Yandex-Fwd: 1
+Authentication-Results: mail-nwsmtp-mxfront-production-main-95.klg.yp-c.yandex.net; spf=pass (mail-nwsmtp-mxfront-production-main-95.klg.yp-c.yandex.net: domain of mail.sendsay.ru designates 185.231.50.54 as permitted sender, rule=[ip4:185.231.48.0/22]) smtp.mail=gluck-sg-176477734527218vfd0ai1bc8048m47092-kuper@mail.sendsay.ru; dkim=pass header.i=@sendcrm.kuper.ru
+X-Yandex-Spam: 1
+Received: id 8EC2640008-1764777345
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=mail.sendsay.ru; s=sendsay.201502;
+	t=1764777345; bh=VhlnSMi3jIAB3VeN0nwROzUy0nJrXCA30mvcFuXnYRU=;
+	h=List-Id:List-Issue:List-Unsubscribe-Post:List-Unsubscribe:
+	 List-Subscribe:List-Archive:List-Post:X-Felis-L:X-rpcampaign:
+	 X-Mailru-Msgtype:Feedback-Id:Received:Date:From:To:Message-ID:
+	 Subject:Mime-Version:Content-Type:Content-Transfer-Encoding;
+	b=gg4mq3Q1lJ0VdYvifRUBKzcEcJCYE/+C1aRDQx7eQqu+qTeGNA244lDswXYc7OOde
+	 ylQVVCDlGaAT/OrOCl41Xzmm4Mv5+8NYBZ9mesXomaCWNY+Wm2DSUVLsTn7VEigySu
+	 MhfD9KaKnUgSzwmzVqdomKKEs+BGHHPwwHsbZ4CE=
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sendcrm.kuper.ru; s=kuper.48;
+	t=1764777345; bh=VhlnSMi3jIAB3VeN0nwROzUy0nJrXCA30mvcFuXnYRU=;
+	h=List-Id:List-Issue:List-Unsubscribe-Post:List-Unsubscribe:
+	 List-Subscribe:List-Archive:List-Post:X-Felis-L:X-rpcampaign:
+	 X-Mailru-Msgtype:Feedback-Id:Received:Date:From:To:Message-ID:
+	 Subject:Mime-Version:Content-Type:Content-Transfer-Encoding;
+	b=oZ69Qb4XxcUZ5R81rLgG+JmLeIuauu3CGhcWmbTuVS84XTHknsiKM2gyKdGXRuJGZ
+	 S8ArA+qwMhsizaQG/kd+bTDZuem8mtsm+KxDNETzNvZzRpgLQsuuLGQRwS+QXxgEql
+	 NNPa0pMb/JIShKmewVlAbVbAyJNd3s4H+S5zt4SY=
+List-Id: <kuper.sg_sendsay>
+List-Issue: <20251203185545.kuper.sg>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Unsubscribe: <https://sendsay.ru/backend/member/unsub/1R0SYj5sdJuMvOp5rfvUIJ_45sBBU4ZlGDFShr7lkqDniLA4Dvav2CCmP8mXEvE7qWOsNgMhZUzOEjYJGSOfagpa8c52xxluCSy9RxjUBKCTWzue46ET1dgzf>
+List-Subscribe: NO
+List-Archive: NO
+List-Post: NO
+X-Felis-L: 176477734527218Vfd0aI1bc8048M47092.kuper.sg
+X-rpcampaign: sgkuper20251203185545
+X-Mailru-Msgtype: sendsay_sg.kuper
+Feedback-Id: kuper:kuper:20251203185545:sg_sendsay
+Received: from kuper.gate.sendsay.ru (unknown [188.72.109.164])
+	by smtp.gate.sendsay.ru (Postfix) with ESMTPSA id DE5FA9CE5D1
+	for <hssparrow@ya.ru>; Wed,  3 Dec 2025 18:55:41 +0300 (MSK)
+Date: Wed, 03 Dec 2025 18:55:41 +0300
+From: =?UTF-8?B?0JrRg9C/0LXRgA==?= <info@kuper.ru>
+To: hssparrow@ya.ru
+Message-ID: <69305d7d85dce_19968a6c225132f@sidekiq-mailers-7c89ddcbf8-vqcw7.mail>
+Subject: =?UTF-8?Q?=D0=92=D0=B0=D1=88_=D0=B7=D0=B0=D0=BA=D0=B0=D0=B7_=D0=B2?=
+ =?UTF-8?Q?_=D0=BC=D0=B0=D0=B3=D0=B0=D0=B7=D0=B8=D0=BD=D0=B5?=
+ =?UTF-8?Q?_=D0=90=D0=A8=D0=90=D0=9D_=D1=81=D0=BE=D0=B1=D1=80=D0=B0=D0=BD?=
+Mime-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="--==_mimepart_69305d7d8560e_19968a6c2251229"
+Content-Transfer-Encoding: 7bit
+Return-Path: gluck-sg-176477734527218vfd0ai1bc8048m47092-kuper@mail.sendsay.ru
+X-Yandex-Forward: 3879277972f72623bb710a6fcb6dcc98
+
+
+----==_mimepart_69305d7d8560e_19968a6c2251229
+Content-Type: text/plain;
+ charset=UTF-8
+Content-Transfer-Encoding: base64
+
+KCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxNcTE4
+QzRDdVNPNzgxNmdyOVRfREZnLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgw
+NDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9O
+RSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzg9ICkNCg0KSDAzMjU1NzY0MTE0
+DQoNCjMg0LTQtdC60LDQsdGA0Y8g4oaSDQoxOTowMOKAkzIxOjAwDQoNCtCS
+0LDRiCDQt9Cw0LrQsNC3INGB0L7QsdGA0LDQvQ0KDQrQn9C+0LrRg9C/0LrQ
+uA0KDQrQnNCw0L3QtNCw0YDQuNC90Ysg0YEg0LvQuNGB0YLQvtGH0LrQvtC8
+IA0KKCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxS
+cmJ4UHg5UVpzdXZXQlRpdC10SWRnLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFi
+YzgwNDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUs
+Tk9ORSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZiV0Z1WkdG
+eWFXNTVMWE10YkdsemRHOWphR3R2YlMxa1pUUmxaR0kwICkNCg0KMS4wNTIg
+0LrQsyDDlw0KDQoxNzksOTkg4oK9DQoNCjE4OSwzNSDigr0NCg0K0KHQvtCx
+0YDQsNC90L4gMS4wNTLQutCzLiDQuNC3IDHQutCzLg0KDQrQn9C+0LTRgdC+
+0LvQvdC10YfQvdC+0LUg0LzQsNGB0LvQviDQl9Cw0YLQtdGPINGA0LDRhNC4
+0L3QuNGA0L7QstCw0L3QvdC+0LUg0LTQtdC30L7QtNC+0YDQuNGA0L7QstCw
+0L3QvdC+0LUgMSDQuyANCiggaHR0cHM6Ly9saW5rLnNlbmRzYXkucnUva3Vw
+ZXIvc210cGdhdGUsOHJldUxaaUJkMEZnU1hMMndCclhkZy8xNzY0Nzc3MzQ1
+MjcyMThWZmQwYUkxYmM4MDQ4TTQ3MDkyLGhzc3BhcnJvdyU0MHlhLnJ1LDIw
+MjUxMjAzMTg1NTQ1LE5PTkUsP2FIUjBjSE02THk5cmRYQmxjaTV5ZFM5aGRX
+Tm9ZVzR2Y0c5a2MyOXNibVZqYUc1dlpTMXRZWE5zYnkxNllYUmxlV0V0Y21G
+bWFXNXBjbTkyWVc1dWIyVXRaR1Y2YjJSdmNtbHliM1poYm01dlpTMHhMV3d0
+TVRZeFpHUTNOZz09ICkNCg0KDQoxINGI0YIgw5cNCg0KMTM5LDk5IOKCvQ0K
+DQo5MTUg0LzQuw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQkdC+0YDRiSDQkNCo
+0JDQnSDQmtGA0LDRgdC90LDRjyDQv9GC0LjRhtCwINGBINC60YPRgNC40YbQ
+tdC5LCAyNTAg0LMgDQooIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVy
+L3NtdHBnYXRlLC11b0hKNWMtLVhSRTNMeHpHdHdWRHcvMTc2NDc3NzM0NTI3
+MjE4VmZkMGFJMWJjODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1
+MTIwMzE4NTU0NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05v
+WVc0dlltOXljMk5vTFdGemFHRnVMV3R5WVhOdVlYbGhMWEIwYVhSellTMXpM
+V3QxY21sMGMyVjVMVEkxTUMxbkxURmxZekV3TlRJPSApDQoNCg0KNCDRiNGC
+IMOXDQoNCjEwOSw5OSDigr0NCg0KNDM5LDk2IOKCvQ0KDQoyNTAg0LMNCg0K
+0KHQvtCx0YDQsNC90L4NCg0K0JzQvtGA0LrQvtCy0Ywg0LzRi9GC0LDRjyAo
+IGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBnYXRlLE96VlJF
+QVkwMVVBanluVUZ0YzF3N3cvMTc2NDc3NzM0NTI3MjE4VmZkMGFJMWJjODA0
+OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4NTU0NSxOT05F
+LD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0dmJXOXlhMjkyTFcx
+NWRHRjVZUzFrWVRWaU9XUXkgKQ0KDQowLjQ3OCDQutCzIMOXDQoNCjU5LDk5
+IOKCvQ0KDQoyOCw2OCDigr0NCg0K0KHQvtCx0YDQsNC90L4gMC40NzjQutCz
+LiDQuNC3IDAuNdC60LMuDQoNCtCS0LDRgNC10L3RjNC1INCS0L7Qu9C+0LPQ
+vtC00YHQutC+0LUg0LLQsNGA0LXQvdGM0LUg0JTQvtC80LDRiNC90LXQtSDQ
+vNCw0LvQuNC90L7QstC+0LUgMzcwINCzIA0KKCBodHRwczovL2xpbmsuc2Vu
+ZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSw3czgxQnQwWHZtZ2ZWWTMzRUI2Nkhn
+LzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgwNDhNNDcwOTIsaHNzcGFycm93
+JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9ORSw/YUhSMGNITTZMeTlyZFhC
+bGNpNXlkUzloZFdOb1lXNHZkbUZ5Wlc1cFpTMTJiMnh2WjI5a2MydHZaUzEy
+WVhKbGJtbGxMV1J2YldGemFHNWxaUzF0WVd4cGJtOTJiMlV0TXpjd0xXYz0g
+KQ0KDQoNCjEg0YjRgiDDlw0KDQoyNjksOTkg4oK9DQoNCjM3MCDQsw0KDQrQ
+odC+0LHRgNCw0L3Qvg0KDQrQqNCw0LzQv9C40L3RjNC+0L3RiyDQkNCo0JDQ
+nSDQmtGA0LDRgdC90LDRjyDQv9GC0LjRhtCwINGG0LXQu9GL0LUgMjUwINCz
+IA0KKCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxS
+TXQyd0xjWGpTZHg0U3pOQkVjSWxBLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFi
+YzgwNDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUs
+Tk9ORSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZjMmhoYlhC
+cGJpMXZibmt0WVhOb1lXNHRhM0poYzI1aGVXRXRjSFJwZEhOaExYUnpaV3g1
+WlMweU5UQXRaeTB5TWpBeE9EQXcgKQ0KDQoNCjEg0YjRgiDDlw0KDQoxMjks
+OTkg4oK9DQoNCjI1MCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQnNCw0LrQ
+sNGA0L7QvdC90YvQtSDQuNC30LTQtdC70LjRjyBNYWtmYSDQodC/0LDQs9C1
+0YLRgtC4IDQ1MCDQsyANCiggaHR0cHM6Ly9saW5rLnNlbmRzYXkucnUva3Vw
+ZXIvc210cGdhdGUsLXlMaTdMSEJTUjhVNVVpOWJUaWJwUS8xNzY0Nzc3MzQ1
+MjcyMThWZmQwYUkxYmM4MDQ4TTQ3MDkyLGhzc3BhcnJvdyU0MHlhLnJ1LDIw
+MjUxMjAzMTg1NTQ1LE5PTkUsP2FIUjBjSE02THk5cmRYQmxjaTV5ZFM5aGRX
+Tm9ZVzR2YldGcllYSnZibTU1WlMxcGVtUmxiR2w1WVMxdFlXdG1ZUzF6Y0dG
+blpYUjBhUzAwTlRBdFp5MWxPREZoTTJNMSApDQoNCg0KMSDRiNGCIMOXDQoN
+CjU3LDk5IOKCvQ0KDQo0NTAg0LMNCg0K0KHQvtCx0YDQsNC90L4NCg0K0JPQ
+vtC70LXQvdGMINGG0YvQv9C70LXQvdC60LAt0LHRgNC+0LnQu9C10YDQsCDQ
+mtGD0YDQuNC90L7QtSDQptCw0YDRgdGC0LLQviDRgSDQutC+0LbQtdC5INC+
+0YXQu9Cw0LbQtNC10L3QvdC+0LUgfjENCtC60LMgDQooIGh0dHBzOi8vbGlu
+ay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBnYXRlLGxIY2NRb2FjLVJMTkhqNjFz
+TjdKUFEvMTc2NDc3NzM0NTI3MjE4VmZkMGFJMWJjODA0OE00NzA5Mixoc3Nw
+YXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4NTU0NSxOT05FLD9hSFIwY0hNNkx5
+OXJkWEJsY2k1eWRTOWhkV05vWVc0dloyOXNaVzR0ZEhONWNHeGxibXRoTFdK
+eWIzbHNaWEpoTFd0MWNtbHViMlV0ZEhOaGNuTjBkbTh0Y3kxcmIzcG9aWGt0
+YjJoc1lYcG9aR1Z1Ym05bExURXRhMmN0WmpVeE1tUXpaZz09ICkNCg0KDQox
+INGI0YIgw5cNCg0KMzIwLDU5IOKCvQ0KDQoxINC60LMNCg0K0KHQvtCx0YDQ
+sNC90L4gMC45MTbQutCzLiDQuNC3IDHQutCzLg0KDQrQkdC10LTRgNC+INC6
+0YPRgNC40L3QvtC1IMKr0J/QtdGC0LXQu9C40L3QutCwwrsg0YEg0LrQvtC2
+0LXQuSDQvtGF0LvQsNC20LTQtdC90L3QvtC1LCB+IDEg0LrQsyANCiggaHR0
+cHM6Ly9saW5rLnNlbmRzYXkucnUva3VwZXIvc210cGdhdGUsWWhWaDVwczhi
+OWtPLW01emZtQkRrZy8xNzY0Nzc3MzQ1MjcyMThWZmQwYUkxYmM4MDQ4TTQ3
+MDkyLGhzc3BhcnJvdyU0MHlhLnJ1LDIwMjUxMjAzMTg1NTQ1LE5PTkUsP2FI
+UjBjSE02THk5cmRYQmxjaTV5ZFM5aGRXTm9ZVzR2WW1Wa2NtOHRhM1Z5YVc1
+dlpTMXdaWFJsYkdsdWEyRXRjeTFyYjNwb1pYa3RiMmhzWVhwb1pHVnVibTls
+TFRFdGEyY3RaakF3TURjMU1RPT0gKQ0KDQoNCjIg0YjRgiDDlw0KDQozMTYs
+MTkg4oK9DQoNCjYzMiwzOCDigr0NCg0KMSDQutCzDQoNCtCh0L7QsdGA0LDQ
+vdC+IDEuODbQutCzLiDQuNC3IDLQutCzLg0KDQrQmtCw0YDRgtC+0YTQtdC7
+0Ywg0JvQsNC50YIgMiDQutCzIA0KKCBodHRwczovL2xpbmsuc2VuZHNheS5y
+dS9rdXBlci9zbXRwZ2F0ZSxDck5PNUROb3hvdTdOTUsyOUpNbjB3LzE3NjQ3
+NzczNDUyNzIxOFZmZDBhSTFiYzgwNDhNNDcwOTIsaHNzcGFycm93JTQweWEu
+cnUsMjAyNTEyMDMxODU1NDUsTk9ORSw/YUhSMGNITTZMeTlyZFhCbGNpNXlk
+UzloZFdOb1lXNHZhMkZ5ZEc5bVpXd3RiR0Y1ZEMweUxXdG5MVGcxTkRJeE1E
+WT0gKQ0KDQoxINGI0YIgw5cNCg0KMTY5LDk5IOKCvQ0KDQoyINC60LMNCg0K
+0KHQvtCx0YDQsNC90L4NCg0K0KLQvtC80LDRgtGLINC60YDQsNGB0L3Ri9C1
+ICggaHR0cHM6Ly9saW5rLnNlbmRzYXkucnUva3VwZXIvc210cGdhdGUsOS05
+SDVjc3h1UGFRR1RWNGQzRS10dy8xNzY0Nzc3MzQ1MjcyMThWZmQwYUkxYmM4
+MDQ4TTQ3MDkyLGhzc3BhcnJvdyU0MHlhLnJ1LDIwMjUxMjAzMTg1NTQ1LE5P
+TkUsP2FIUjBjSE02THk5cmRYQmxjaTV5ZFM5aGRXTm9ZVzR2ZEc5dFlYUjVM
+V3R5WVhOdWVXVXRNRFl5TlRkak5RPT0gKQ0KDQowLjMyOCDQutCzIMOXDQoN
+CjEwOCw5OSDigr0NCg0KMzUsNzUg4oK9DQoNCtCh0L7QsdGA0LDQvdC+IDAu
+MzI40LrQsy4g0LjQtyAwLjPQutCzLg0KDQrQodC80LXRgtCw0L3QsCAxNSUg
+0J/RgNC+0YHRgtC+0LrQstCw0YjQuNC90L4g0JHQl9Cc0JYgMzAwINCzIA0K
+KCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxIYVF3
+NDB5OHNoUXB1TVdDbmRvMnpRLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgw
+NDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9O
+RSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZjMjFsZEdGdVlT
+MHhOUzF3Y205emRHOXJkbUZ6YUdsdWJ5MWllbTE2YUMwek1EQXRaeTB5WmpV
+Mk1qbGogKQ0KDQoNCjIg0YjRgiDDlw0KDQoxMDIsOTkg4oK9DQoNCjIwNSw5
+OCDigr0NCg0KMzAwINCzDQoNCtCh0L7QsdGA0LDQvdC+DQoNCtCv0LHQu9C+
+0LrQuCDQoNC10LQg0JTQtdC70LjRiNC10YEg0L3QvtCy0YvQuSDRg9GA0L7Q
+ttCw0LkgDQooIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBn
+YXRlLEU3eXhyc0JwX0Q2V0o2RFRtR2VpSGcvMTc2NDc3NzM0NTI3MjE4VmZk
+MGFJMWJjODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4
+NTU0NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0dmVX
+RmliRzlyYVMxeVpXUXRaR1ZzYVhOb1pYTXRibTkyZVhrdGRYSnZlbWhoZVMw
+ek5qRmtNVFZqICkNCg0KDQowLjU1OCDQutCzIMOXDQoNCjE1OSw5OSDigr0N
+Cg0KODksMjcg4oK9DQoNCtCh0L7QsdGA0LDQvdC+IDAuNTU40LrQsy4g0LjQ
+tyAwLjXQutCzLg0KDQrQmtC+0YTQtSDQltC+0LrQtdC5INCa0LvQsNGB0YHQ
+uNGH0LXRgdC60LjQuSDQvNC+0LvQvtGC0YvQuSAyNTAg0LMgDQooIGh0dHBz
+Oi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBnYXRlLGtGczN3ODZuSTY4
+ZU8tYVhhLThJX0EvMTc2NDc3NzM0NTI3MjE4VmZkMGFJMWJjODA0OE00NzA5
+Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4NTU0NSxOT05FLD9hSFIw
+Y0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0dmEyOW1aUzE2YUc5clpYa3Rh
+MnhoYzNOcFkyaGxjMnRwZVMxdGIyeHZkSGw1TFRJMU1DMW5MVEl6WXpOaU9U
+WT0gKQ0KDQoNCjEg0YjRgiDDlw0KDQo0NzgsOTkg4oK9DQoNCjI1MCDQsw0K
+DQrQodC+0LHRgNCw0L3Qvg0KDQrQmtC+0LvQsdCw0YHQsCDQstCw0YDQtdC9
+0LDRjyDQmtC70LjQvdGB0LrQuNC5INCU0L7QutGC0L7RgNGB0LrQsNGPIDQw
+MCDQsyANCiggaHR0cHM6Ly9saW5rLnNlbmRzYXkucnUva3VwZXIvc210cGdh
+dGUsR0Z3UVB1aEUyTDZYWlpzUTliUG9JUS8xNzY0Nzc3MzQ1MjcyMThWZmQw
+YUkxYmM4MDQ4TTQ3MDkyLGhzc3BhcnJvdyU0MHlhLnJ1LDIwMjUxMjAzMTg1
+NTQ1LE5PTkUsP2FIUjBjSE02THk5cmRYQmxjaTV5ZFM5aGRXTm9ZVzR2YTI5
+c1ltRnpZUzEyWVhKbGJtRjVZUzFyYkdsdWMydHBlUzFrYjJ0MGIzSnphMkY1
+WVMwME1EQXRadz09ICkNCg0KDQoyINGI0YIgw5cNCg0KMjU5LDk5IOKCvQ0K
+DQo1MTksOTgg4oK9DQoNCjQwMCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQ
+ktC+0LTQsCDQv9C40YLRjNC10LLQsNGPINCh0LXQvdC10LbRgdC60LDRjyDQ
+s9Cw0LfQuNGA0L7QstCw0L3QvdCw0Y8gMSw1INC7IA0KKCBodHRwczovL2xp
+bmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxzQTRsc2VIVkw5aVNIcGRm
+b0dnbkdRLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgwNDhNNDcwOTIsaHNz
+cGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9ORSw/YUhSMGNITTZM
+eTlyZFhCbGNpNXlkUzloZFdOb1lXNHZkbTlrWVMxd2FYUnBaWFpoZVdFdGMy
+VnVaWHBvYzJ0aGVXRXRaMkY2YVhKdmRtRnVibUY1WVMweExUVXRiQzAwTXpr
+MU5ERTMgKQ0KDQoNCjMg0YjRgiDDlw0KDQo1MCw5OSDigr0NCg0KMTUyLDk3
+IOKCvQ0KDQoxINGI0YINCg0K0KHQvtCx0YDQsNC90L4NCg0K0JHQsNGC0L7Q
+vSDQmtC+0LvQvtC80LXQvdGB0LrQuNC5INC/0YjQtdC90LjRh9C90YvQuSDQ
+siDQvdCw0YDQtdC30LrQtSA0MDAg0LMgDQooIGh0dHBzOi8vbGluay5zZW5k
+c2F5LnJ1L2t1cGVyL3NtdHBnYXRlLG5WUFlBMUt4dTNWT2tKMFIxUkhDRGcv
+MTc2NDc3NzM0NTI3MjE4VmZkMGFJMWJjODA0OE00NzA5Mixoc3NwYXJyb3cl
+NDB5YS5ydSwyMDI1MTIwMzE4NTU0NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJs
+Y2k1eWRTOWhkV05vWVc0dlltRjBiMjR0YTI5c2IyMWxibk5yYVhrdGNITm9a
+VzVwWTJodWVYa3RkaTF1WVhKbGVtdGxMVFF3TUMxbkxUY3daRGd5TXpnPSAp
+DQoNCg0KMiDRiNGCIMOXDQoNCjc5LDk5IOKCvQ0KDQoxNTksOTgg4oK9DQoN
+CjQwMCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQodC+0Log0JTQvtCx0YDR
+i9C5INGC0L7QvNCw0YIgMSDQuyANCiggaHR0cHM6Ly9saW5rLnNlbmRzYXku
+cnUva3VwZXIvc210cGdhdGUsVXU2QUhxdl92bTVhOXFVSEJ6cHNVdy8xNzY0
+Nzc3MzQ1MjcyMThWZmQwYUkxYmM4MDQ4TTQ3MDkyLGhzc3BhcnJvdyU0MHlh
+LnJ1LDIwMjUxMjAzMTg1NTQ1LE5PTkUsP2FIUjBjSE02THk5cmRYQmxjaTV5
+ZFM5aGRXTm9ZVzR2YzI5ckxXUnZZbko1ZVMxMGIyMWhkQzB4TFd3dE1XRXla
+VGRrWVE9PSApDQoNCjEg0YjRgiDDlw0KDQoxMTksOTkg4oK9DQoNCjEg0LsN
+Cg0K0KHQvtCx0YDQsNC90L4NCg0K0JrQvtC90YTQtdGC0Ysg0YjQvtC60L7Q
+u9Cw0LTQvdGL0LUg0JDQutC60L7QvdC0INCf0YLQuNGG0LAg0LTQuNCy0L3Q
+sNGPINGBINGB0YPRhNC70LXQudC90L7QuSDQvdCw0YfQuNC90LrQvtC5IA0K
+KCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxBOGZo
+MURtOEtWemF3amxkemRHQ3FRLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgw
+NDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9O
+RSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZhMjl1Wm1WMGVT
+MXphRzlyYjJ4aFpHNTVaUzFoYTJ0dmJtUXRjSFJwZEhOaExXUnBkbTVoZVdF
+dGN5MXpkV1pzWlhsdWIza3RibUZqYUdsdWEyOTVMVEJtT0RFM05HUT0gKQ0K
+DQoNCjAuMjI0INC60LMgw5cNCg0KNjQ5LDk5IOKCvQ0KDQoxNDUsNjAg4oK9
+DQoNCtCh0L7QsdGA0LDQvdC+IDAuMjI00LrQsy4g0LjQtyAwLjLQutCzLg0K
+DQrQnNC+0LvQvtC60L4gMSw1JSDQv9Cw0YHRgtC10YDQuNC30L7QstCw0L3Q
+vdC+0LUgOTMwINC80Lsg0J/RgNC+0YHRgtC+0LrQstCw0YjQuNC90L4g0JHQ
+l9Cc0JYgDQooIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBn
+YXRlLFRNUVRhSExtdENiLTljMTlmeG5KdEEvMTc2NDc3NzM0NTI3MjE4VmZk
+MGFJMWJjODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4
+NTU0NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0dmJX
+OXNiMnR2TFRFdE5TMXdZWE4wWlhKcGVtOTJZVzV1YjJVdE9UTXdMVzFzTFhC
+eWIzTjBiMnQyWVhOb2FXNXZMV0o2Ylhwb0xUVXhZak15WVRVPSApDQoNCg0K
+NCDRiNGCIMOXDQoNCjkzLDk5IOKCvQ0KDQozNzUsOTYg4oK9DQoNCjkzMCDQ
+sw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQodCw0YXQsNGAINC/0LXRgdC+0Log
+MSDQutCzIA0KKCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRw
+Z2F0ZSxOVEFJVnpwRzZVU0RmOW1RMWpDSS1BLzE3NjQ3NzczNDUyNzIxOFZm
+ZDBhSTFiYzgwNDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMx
+ODU1NDUsTk9ORSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZj
+MkZvWVhJdGNHVnpiMnN0TVMxclp5MHdZV1E0TmpVeiApDQoNCjEg0YjRgiDD
+lw0KDQo1Miw5OSDigr0NCg0KMSDQutCzDQoNCtCh0L7QsdGA0LDQvdC+DQoN
+CtCe0LPRg9GA0LXRhiDRgdGA0LXQtNC90LXQv9C70L7QtNC90YvQuSAxODAg
+0LMgDQooIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBnYXRl
+LGIzMkNMYVBpN3BKeERwSmh0d0cwc0EvMTc2NDc3NzM0NTI3MjE4VmZkMGFJ
+MWJjODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4NTU0
+NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0dmIyZDFj
+bVYwY3kxemNtVmtibVZ3Ykc5a2JubDVMVEU0TUMxbkxXWXlOMk5qWTJJPSAp
+DQoNCjYg0YjRgiDDlw0KDQo2OSw5OSDigr0NCg0KNDE5LDk0IOKCvQ0KDQox
+INGI0YIuDQoNCtCh0L7QsdGA0LDQvdC+DQoNCtCh0YvRgCDQv9C+0LvRg9GC
+0LLQtdGA0LTRi9C5INCR0YDQtdGB0YIt0JvQuNGC0L7QstGB0Log0KTQuNC9
+0YHQutC40LkgNDUlINCR0JfQnNCWIDIwMCDQsyANCiggaHR0cHM6Ly9saW5r
+LnNlbmRzYXkucnUva3VwZXIvc210cGdhdGUsNmdEV0RmRDdUUl9IdFNuZVZr
+WXkyQS8xNzY0Nzc3MzQ1MjcyMThWZmQwYUkxYmM4MDQ4TTQ3MDkyLGhzc3Bh
+cnJvdyU0MHlhLnJ1LDIwMjUxMjAzMTg1NTQ1LE5PTkUsP2FIUjBjSE02THk5
+cmRYQmxjaTV5ZFM5aGRXTm9ZVzR2YzNseUxYQnZiSFYwZG1WeVpIbDVMV0p5
+WlhOMExXeHBkRzkyYzJzdFptbHVjMnRwZVMwME5TMWllbTE2YUMweU1EQXRa
+eTFqT0dFNU9EYzUgKQ0KDQoNCjEg0YjRgiDDlw0KDQoxNzksOTkg4oK9DQoN
+CjIwMCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQr9C50YbQviDQutGD0YDQ
+uNC90L7QtSDQrdC60YHRgtGA0LAg0KHQniDQutC+0YDQuNGH0L3QtdCy0L7Q
+tSAxMCDRiNGCIA0KKCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9z
+bXRwZ2F0ZSxVNS1VRjhGR0JBMV9MRExydzZQeUd3LzE3NjQ3NzczNDUyNzIx
+OFZmZDBhSTFiYzgwNDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEy
+MDMxODU1NDUsTk9ORSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lX
+NHZlV0Y1ZEhOdkxXdDFjbWx1YjJVdFpXdHpkSEpoTFhOdkxXdHZjbWxqYUc1
+bGRtOWxMVEV3TFhOb2RBPT0gKQ0KDQoNCjEg0YjRgiDDlw0KDQoxMzksOTkg
+4oK9DQoNCjcwMCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQm9GD0Log0YDQ
+tdC/0YfQsNGC0YvQuSAoIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVy
+L3NtdHBnYXRlLEZMbUtpaE5iUENJNnB3ZTFadnZGdGcvMTc2NDc3NzM0NTI3
+MjE4VmZkMGFJMWJjODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1
+MTIwMzE4NTU0NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05v
+WVc0dmJIVnJMWEpsY0dOb1lYUjVlUzAyWVRJeU5XUmggKQ0KDQowLjU5NCDQ
+utCzIMOXDQoNCjM2LDk5IOKCvQ0KDQoyMSw5NyDigr0NCg0K0KHQvtCx0YDQ
+sNC90L4gMC41OTTQutCzLiDQuNC3IDAuNdC60LMuDQoNCtCh0LLQtdC60LvQ
+sCAoIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3NtdHBnYXRlLDRE
+eGZZLXh0bDQycmJJbWZUdm55bXcvMTc2NDc3NzM0NTI3MjE4VmZkMGFJMWJj
+ODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIwMzE4NTU0NSxO
+T05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0dmMzWmxhMnho
+TFRsbFpUaGxNems9ICkNCg0KMC41Njgg0LrQsyDDlw0KDQozMCw5OSDigr0N
+Cg0KMTcsNjAg4oK9DQoNCtCh0L7QsdGA0LDQvdC+IDAuNTY40LrQsy4g0LjQ
+tyAwLjXQutCzLg0KDQrQk9C+0YDQvtGI0LXQuiDQkNCo0JDQnSDQmtGA0LDR
+gdC90LDRjyDQv9GC0LjRhtCwINC30LXQu9C10L3Ri9C5INC60L7QvdGB0LXR
+gNCy0LjRgNC+0LLQsNC90L3Ri9C5IDQwMCDQsyANCiggaHR0cHM6Ly9saW5r
+LnNlbmRzYXkucnUva3VwZXIvc210cGdhdGUsR1RiWjlLLVhieHhieTZySzlX
+YklrUS8xNzY0Nzc3MzQ1MjcyMThWZmQwYUkxYmM4MDQ4TTQ3MDkyLGhzc3Bh
+cnJvdyU0MHlhLnJ1LDIwMjUxMjAzMTg1NTQ1LE5PTkUsP2FIUjBjSE02THk5
+cmRYQmxjaTV5ZFM5aGRXTm9ZVzR2WjI5eWIzTm9aV3N0WVhOb1lXNHRhM0po
+YzI1aGVXRXRjSFJwZEhOaExYcGxiR1Z1ZVhrdGEyOXVjMlZ5ZG1seWIzWmhi
+bTU1ZVMwME1EQXRadz09ICkNCg0KDQoxINGI0YIgw5cNCg0KNjksOTkg4oK9
+DQoNCjQwMCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQntCz0YPRgNGG0Ysg
+0JrQsNC20LTRi9C5INCU0LXQvdGMINC80LDRgNC40L3QvtCy0LDQvdC90YvQ
+tSA2ODAg0LMgDQooIGh0dHBzOi8vbGluay5zZW5kc2F5LnJ1L2t1cGVyL3Nt
+dHBnYXRlLDhNcE91Qm5GX2hOQUlhUGIxOFBINWcvMTc2NDc3NzM0NTI3MjE4
+VmZkMGFJMWJjODA0OE00NzA5Mixoc3NwYXJyb3clNDB5YS5ydSwyMDI1MTIw
+MzE4NTU0NSxOT05FLD9hSFIwY0hNNkx5OXJkWEJsY2k1eWRTOWhkV05vWVc0
+dmIyZDFjblJ6ZVMxcllYcG9aSGw1TFdSbGJpMXRZWEpwYm05MllXNXVlV1V0
+Tmpnd0xXY3ROVEZtTWpZelpnPT0gKQ0KDQoNCjEg0YjRgiDDlw0KDQoxMTks
+OTgg4oK9DQoNCjY4MCDQsw0KDQrQodC+0LHRgNCw0L3Qvg0KDQrQodC+0Log
+Sjcg0LDQv9C10LvRjNGB0LjQvdC+0LLRi9C5IDk3MCDQvNC7IA0KKCBodHRw
+czovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxjSmEyTVg4TVFO
+dkMxZ0tma2wtMUZRLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgwNDhNNDcw
+OTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9ORSw/YUhS
+MGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZjMjlyTFdvM0xXRndaV3d0
+YzJsdWIzWjVlUzA1TnpBdGJXd3RZV1JrT1dVNE53PT0gKQ0KDQoxINGI0YIg
+w5cNCg0KMzAzLDk5IOKCvQ0KDQo5NzAg0LzQuw0KDQrQodC+0LHRgNCw0L3Q
+vg0KDQrQoNC40YEg0KPQstC10LvQutCwINCx0YPRgNGL0Lkg0LIg0LLQsNGA
+0L7Rh9C90YvRhSDQv9Cw0LrQtdGC0LjQutCw0YUgODAg0LMg0YUgNSDRiNGC
+IA0KKCBodHRwczovL2xpbmsuc2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSx6
+MjNMX19oSjM4SmlaRHhMS0pGMUt3LzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFi
+YzgwNDhNNDcwOTIsaHNzcGFycm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUs
+Tk9ORSw/YUhSMGNITTZMeTlyZFhCbGNpNXlkUzloZFdOb1lXNHZjbWx6TFhW
+MlpXeHJZUzFpZFhKNWVTMTJMWFpoY205amFHNTVhQzF3WVd0bGRHbHJZV2d0
+T0RBdFp5MW9MVFV0YzJoMExXWmpaREZrT0RRPSApDQoNCg0KMSDRiNGCIMOX
+DQoNCjEzOSw5OSDigr0NCg0KNDAwINCzDQoNCtCh0L7QsdGA0LDQvdC+DQoN
+CtCe0L/Qu9Cw0YLQsA0KDQrQmtCw0YDRgtC+0Lkg0L7QvdC70LDQudC9DQoN
+CtCf0YDQvtC00YPQutGC0YsNCg0KNiAxMjksODEg4oK9DQoNCtCh0LHQvtGA
+0LrQsA0KDQo4OSwwMCDigr0NCg0K0JTQvtGB0YLQsNCy0LrQsA0KDQrQsdC1
+0YHQv9C70LDRgtC90L4NCg0K0KHQtdGA0LLQuNGB0L3Ri9C5INGB0LHQvtGA
+DQoNCjY5LDAwIOKCvQ0KDQrQmNGC0L7Qs9C+Og0KDQo2IDI4Nyw4MSDigr0N
+Cg0K0JTQvtGB0YLQsNCy0LrQsA0KDQozINC00LXQutCw0LHRgNGPLA0KMTk6
+MDDigJMyMTowMA0KDQrQndC+0LLRi9C1INCl0LjQvNC60Lgg0Lwt0L0sINCl
+0LjQvNC60LgsINGD0LvQuNGG0LAg0J/QsNC90YTQuNC70L7QstCwLCAxLCDQ
+utCyLiAxMjkNCg0K0KHQu9GD0LbQsdCwINC30LDQsdC+0YLRiw0KDQorNyA4
+MDAgMjIyLTExLTAwICggdGVsOis3ODAwMjIyMTEwMCApDQrQtNC70Y8g0LrQ
+u9C40LXQvdGC0L7Qsg0KDQorNyA4MDAgNTUwLTk0LTExICggdGVsOis3ODAw
+NTUwOTQxMSApDQrQtNC70Y8g0LrQvtGA0L/QvtGA0LDRgtC40LLQvdGL0YUg
+0LrQu9C40LXQvdGC0L7Qsg0KDQrQl9Cy0L7QvdC+0Log0L/QviDQoNC+0YHR
+gdC40Lgg0LHQtdGB0L/Qu9Cw0YLQvdGL0LkNCg0KKCBodHRwczovL2xpbmsu
+c2VuZHNheS5ydS9rdXBlci9zbXRwZ2F0ZSxxS1hCSVJWbXgwZ3RkWl91ckdW
+ZGtRLzE3NjQ3NzczNDUyNzIxOFZmZDBhSTFiYzgwNDhNNDcwOTIsaHNzcGFy
+cm93JTQweWEucnUsMjAyNTEyMDMxODU1NDUsTk9ORSw/YUhSMGNITTZMeTlx
+WVRaM0xtRmthaTV6ZEM5dFlXbHVYM0JoWjJVL1lXUnFYM1E5TVdReU5YaGla
+Mnc9ICkNCiggaHR0cHM6Ly9saW5rLnNlbmRzYXkucnUva3VwZXIvc210cGdh
+dGUsYU96SXYzdjN4SGNwZ3lsSXZGcG53QS8xNzY0Nzc3MzQ1MjcyMThWZmQw
+YUkxYmM4MDQ4TTQ3MDkyLGhzc3BhcnJvdyU0MHlhLnJ1LDIwMjUxMjAzMTg1
+NTQ1LE5PTkUsP2FIUjBjSE02THk5cVlUWjNMbUZrYWk1emRDOXRZV2x1WDNC
+aFoyVS9ZV1JxWDNROU1XUmlOM1pyTmpNPSAp
+
+----==_mimepart_69305d7d8560e_19968a6c2251229
+Content-Type: text/html;
+ charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html>
+<html style=3D"margin: 0; padding: 0;">
+<head>
+<meta content=3D"width=3Ddevice-width, initial-scale=3D1" name=3D"viewport">
+<meta content=3D"text/html; charset=3Dutf-8" http-equiv=3D"Content-Type">
+<meta content=3D"IE=3Dedge" http-equiv=3D"X-UA-Compatible">
+<title>Instamart</title>
+
+
+<style>body {
+margin: 0; padding: 0;
+}
+img {
+display: block; max-height: 100%; max-width: 100%;
+}
+</style>
+</head>
+<body style=3D"margin: 0; padding: 0;">
+<table style=3D"position: relative; text-align: center; color: #222; font-f=
+amily: Arial, serif; font-size: 15px; margin: 0; padding: 0; border: 0;" bg=
+color=3D"#ebebeb" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<center style=3D"min-width: 410px; max-width: 600px; margin: 0 auto; paddin=
+g: 30px 5px;">
+<table style=3D"position: relative; text-align: center; border-radius: 10px=
+; margin: 0 0 8px; padding: 0; border: 0;" bgcolor=3D"#fff" width=3D"100%" =
+cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"border-bottom-width: 1px; border-bottom-color: #ece9e9; border=
+-bottom-style: solid; height: 85px;">
+<a
+href=3D"https://link.sendsay.ru/kuper/smtpgate,Mq18C4CuSO7816gr9T_DFg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS8=3D"
+ style=3D"display: inline-block; color: inherit; text-decoration: none;">
+<img alt=3D"" src=3D"https://kuper.ru/statics/downloads/mailers/logo_kuper.=
+png" style=3D"display: block; max-height: 100%; max-width: 100%; margin-top=
+: 8px;" width=3D"238" height=3D"30">
+</a>
+</td>
+</tr>
+<tr>
+<td style=3D"padding: 30px 0 40px;">
+<span style=3D"display: block; padding: 0 20px;">
+
+<table style=3D"position: relative; text-align: center; border-radius: 16px=
+; margin: 0; padding: 20px; border: 1px solid #ece9e9;" width=3D"100%" cell=
+padding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"border-radius: 30px; padding: 10px;" bgcolor=3D"#e0001a" width=
+=3D"80" height=3D"80">
+<img src=3D"https://kuper.ru/statics/retailer_banners/2/logo_images/fify.pn=
+g?1761835566" style=3D"display: block; max-height: 100%; max-width: 100%; w=
+idth: 80px; height: auto;">
+</td>
+<td style=3D"padding-left: 15px;" align=3D"left" valign=3D"top">
+<span style=3D"display: block; font-size: 22px; font-weight: bold; color: #=
+fc4c04; margin: 20px 0 12px;">
+H03255764114
+</span>
+<span style=3D"display: block; font-size: 17px; white-space: nowrap;">
+ 3 =D0=B4=D0=B5=D0=BA=D0=B0=D0=B1=D1=80=D1=8F =E2=86=92
+19:00=E2=80=9321:00
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 5px 0; padd=
+ing: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; background-color: #ece9e9; height: 1px;"></s=
+pan>
+</td>
+<td style=3D"width: 66px;">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/collected.png" style=
+=3D"display: block; max-height: 100%; max-width: 100%; width: 100%;">
+</td>
+<td>
+<span style=3D"display: block; background-color: #ece9e9; height: 1px;"></s=
+pan>
+</td>
+</tr>
+</tbody>
+</table>
+<strong style=3D"display: block; font-size: 22px; font-weight: bold; margin=
+: 10px 0;">
+=D0=92=D0=B0=D1=88 =D0=B7=D0=B0=D0=BA=D0=B0=D0=B7 =D1=81=D0=BE=D0=B1=D1=80=
+=D0=B0=D0=BD
+
+</strong>
+
+</td>
+</tr>
+</tbody>
+</table>
+</span>
+<span style=3D"display: block; padding: 0 20px;">
+<strong style=3D"display: block; font-size: 22px; text-align: left; margin:=
+ 28px 0 20px;">
+=D0=9F=D0=BE=D0=BA=D1=83=D0=BF=D0=BA=D0=B8
+</strong>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,RrbxPx9QZsuvWBTit-tIdg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbWFuZGFyaW55LXMtbGlzdG9jaGtvbS1kZTRlZGI0"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzExNjM4OS9vcmlnaW5hbC8xLzIwMjQtMTEtMTIlMjAxM=
+yUzQTE4JTNBNTcuMTcxOTc1JTJCMDAlM0EwMC8xMTYzODlfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,RrbxPx9QZsuvWBTit-tIdg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbWFuZGFyaW55LXMtbGlzdG9jaGtvbS1kZTRlZGI0"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9C=D0=
+=B0=D0=BD=D0=B4=D0=B0=D1=80=D0=B8=D0=BD=D1=8B =D1=81 =D0=BB=D0=B8=D1=81=D1=
+=82=D0=BE=D1=87=D0=BA=D0=BE=D0=BC</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1.052 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+179,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+189,35 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 1.052=D0=BA=D0=B3. =D0=B8=D0=B7 =
+1=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,8reuLZiBd0FgSXL2wBrXdg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vcG9kc29sbmVjaG5vZS1tYXNsby16YXRleWEtcmFmaW5pcm92Y=
+W5ub2UtZGV6b2Rvcmlyb3Zhbm5vZS0xLWwtMTYxZGQ3Ng=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE1MzA2NDM2L29yaWdpbmFsLzEvMjAyNC0xMC0yNCUyM=
+DA3JTNBMDAlM0EwMC44Mzg4NzglMkIwMCUzQTAwLzE1MzA2NDM2XzEuanBn.jpg" style=3D"d=
+isplay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,8reuLZiBd0FgSXL2wBrXdg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vcG9kc29sbmVjaG5vZS1tYXNsby16YXRleWEtcmFmaW5pcm92Y=
+W5ub2UtZGV6b2Rvcmlyb3Zhbm5vZS0xLWwtMTYxZGQ3Ng=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9F=D0=
+=BE=D0=B4=D1=81=D0=BE=D0=BB=D0=BD=D0=B5=D1=87=D0=BD=D0=BE=D0=B5 =D0=BC=D0=
+=B0=D1=81=D0=BB=D0=BE =D0=97=D0=B0=D1=82=D0=B5=D1=8F =D1=80=D0=B0=D1=84=D0=
+=B8=D0=BD=D0=B8=D1=80=D0=BE=D0=B2=D0=B0=D0=BD=D0=BD=D0=BE=D0=B5 =D0=B4=D0=
+=B5=D0=B7=D0=BE=D0=B4=D0=BE=D1=80=D0=B8=D1=80=D0=BE=D0=B2=D0=B0=D0=BD=D0=BD=
+=D0=BE=D0=B5 1 =D0=BB</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+139,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+915 =D0=BC=D0=BB
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,-uoHJ5c--XRE3LxzGtwVDw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vYm9yc2NoLWFzaGFuLWtyYXNuYXlhLXB0aXRzYS1zLWt1cml0c=
+2V5LTI1MC1nLTFlYzEwNTI=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzIwMzQ1NzI3L29yaWdpbmFsLzEvMjAyMi0wOC0wNlQxO=
+CUzQTIzJTNBMjcuMTM0MDAwJTJCMDAlM0EwMC8yMDM0NTcyN18xLmpwZw=3D=3D.jpg" style=
+=3D"display: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,-uoHJ5c--XRE3LxzGtwVDw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vYm9yc2NoLWFzaGFuLWtyYXNuYXlhLXB0aXRzYS1zLWt1cml0c=
+2V5LTI1MC1nLTFlYzEwNTI=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=91=D0=
+=BE=D1=80=D1=89 =D0=90=D0=A8=D0=90=D0=9D =D0=9A=D1=80=D0=B0=D1=81=D0=BD=D0=
+=B0=D1=8F =D0=BF=D1=82=D0=B8=D1=86=D0=B0 =D1=81 =D0=BA=D1=83=D1=80=D0=B8=D1=
+=86=D0=B5=D0=B9, 250 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+4 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+109,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+439,96 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+250 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,OzVREAY01UAjynUFtc1w7w/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbW9ya292LW15dGF5YS1kYTViOWQy"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzEyNDg4MDcvb3JpZ2luYWwvMS8yMDIyLTExLTEwVDExJ=
+TNBNDQlM0EzMy44MDI0NzglMkIwMCUzQTAwLzEyNDg4MDdfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,OzVREAY01UAjynUFtc1w7w/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbW9ya292LW15dGF5YS1kYTViOWQy"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9C=D0=
+=BE=D1=80=D0=BA=D0=BE=D0=B2=D1=8C =D0=BC=D1=8B=D1=82=D0=B0=D1=8F</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+0.478 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+59,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+28,68 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.478=D0=BA=D0=B3. =D0=B8=D0=B7 =
+0.5=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,7s81Bt0XvmgfVY33EB66Hg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vdmFyZW5pZS12b2xvZ29kc2tvZS12YXJlbmllLWRvbWFzaG5lZ=
+S1tYWxpbm92b2UtMzcwLWc=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzIwOTU1NC9vcmlnaW5hbC8xLzIwMjUtMTAtMjMlMjAwN=
+iUzQTU1JTNBNTAuOTI5MTEwJTJCMDAlM0EwMC8yMDk1NTRfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,7s81Bt0XvmgfVY33EB66Hg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vdmFyZW5pZS12b2xvZ29kc2tvZS12YXJlbmllLWRvbWFzaG5lZ=
+S1tYWxpbm92b2UtMzcwLWc=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=92=D0=
+=B0=D1=80=D0=B5=D0=BD=D1=8C=D0=B5 =D0=92=D0=BE=D0=BB=D0=BE=D0=B3=D0=BE=D0=
+=B4=D1=81=D0=BA=D0=BE=D0=B5 =D0=B2=D0=B0=D1=80=D0=B5=D0=BD=D1=8C=D0=B5 =D0=
+=94=D0=BE=D0=BC=D0=B0=D1=88=D0=BD=D0=B5=D0=B5 =D0=BC=D0=B0=D0=BB=D0=B8=D0=
+=BD=D0=BE=D0=B2=D0=BE=D0=B5 370 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+269,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+370 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,RMt2wLcXjSdx4SzNBEcIlA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc2hhbXBpbi1vbnktYXNoYW4ta3Jhc25heWEtcHRpdHNhLXRzZ=
+Wx5ZS0yNTAtZy0yMjAxODAw"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzI0MjEzNTU2L29yaWdpbmFsLzEvMjAyMy0wNS0xNlQwO=
+SUzQTU0JTNBMzEuNTU2MjE2JTJCMDAlM0EwMC8yNDIxMzU1Nl8xLmpwZw=3D=3D.jpg" style=
+=3D"display: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,RMt2wLcXjSdx4SzNBEcIlA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc2hhbXBpbi1vbnktYXNoYW4ta3Jhc25heWEtcHRpdHNhLXRzZ=
+Wx5ZS0yNTAtZy0yMjAxODAw"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A8=D0=
+=B0=D0=BC=D0=BF=D0=B8=D0=BD=D1=8C=D0=BE=D0=BD=D1=8B =D0=90=D0=A8=D0=90=D0=
+=9D =D0=9A=D1=80=D0=B0=D1=81=D0=BD=D0=B0=D1=8F =D0=BF=D1=82=D0=B8=D1=86=D0=
+=B0 =D1=86=D0=B5=D0=BB=D1=8B=D0=B5 250 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+129,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+250 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,-yLi7LHBSR8U5Ui9bTibpQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbWFrYXJvbm55ZS1pemRlbGl5YS1tYWtmYS1zcGFnZXR0aS00N=
+TAtZy1lODFhM2M1"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE5MTYzODM1L29yaWdpbmFsLzEvMjAyNS0xMC0wN1QwN=
+yUzQTU4JTNBNTYuNTM2Mjc2JTJCMDAlM0EwMC8xOTE2MzgzNV8xLnBuZw=3D=3D.png" style=
+=3D"display: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,-yLi7LHBSR8U5Ui9bTibpQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbWFrYXJvbm55ZS1pemRlbGl5YS1tYWtmYS1zcGFnZXR0aS00N=
+TAtZy1lODFhM2M1"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9C=D0=
+=B0=D0=BA=D0=B0=D1=80=D0=BE=D0=BD=D0=BD=D1=8B=D0=B5 =D0=B8=D0=B7=D0=B4=D0=
+=B5=D0=BB=D0=B8=D1=8F Makfa =D0=A1=D0=BF=D0=B0=D0=B3=D0=B5=D1=82=D1=82=D0=
+=B8 450 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+57,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+450 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,lHccQoac-RLNHj61sN7JPQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vZ29sZW4tdHN5cGxlbmthLWJyb3lsZXJhLWt1cmlub2UtdHNhc=
+nN0dm8tcy1rb3poZXktb2hsYXpoZGVubm9lLTEta2ctZjUxMmQzZg=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE3Mzc1OTczL29yaWdpbmFsLzEvMjAyMi0wOC0yM1QxO=
+CUzQTUwJTNBMTIuODc0MDAwJTJCMDAlM0EwMC8xNzM3NTk3M18xLmpwZw=3D=3D.jpg" style=
+=3D"display: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,lHccQoac-RLNHj61sN7JPQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vZ29sZW4tdHN5cGxlbmthLWJyb3lsZXJhLWt1cmlub2UtdHNhc=
+nN0dm8tcy1rb3poZXktb2hsYXpoZGVubm9lLTEta2ctZjUxMmQzZg=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=93=D0=
+=BE=D0=BB=D0=B5=D0=BD=D1=8C =D1=86=D1=8B=D0=BF=D0=BB=D0=B5=D0=BD=D0=BA=D0=
+=B0-=D0=B1=D1=80=D0=BE=D0=B9=D0=BB=D0=B5=D1=80=D0=B0 =D0=9A=D1=83=D1=80=D0=
+=B8=D0=BD=D0=BE=D0=B5 =D0=A6=D0=B0=D1=80=D1=81=D1=82=D0=B2=D0=BE =D1=81 =D0=
+=BA=D0=BE=D0=B6=D0=B5=D0=B9 =D0=BE=D1=85=D0=BB=D0=B0=D0=B6=D0=B4=D0=B5=D0=
+=BD=D0=BD=D0=BE=D0=B5 ~1 =D0=BA=D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+320,59 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+1 =D0=BA=D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.916=D0=BA=D0=B3. =D0=B8=D0=B7 =
+1=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,YhVh5ps8b9kO-m5zfmBDkg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vYmVkcm8ta3VyaW5vZS1wZXRlbGlua2Etcy1rb3poZXktb2hsY=
+XpoZGVubm9lLTEta2ctZjAwMDc1MQ=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE1MDY5NTgvb3JpZ2luYWwvMS8yMDIzLTA2LTA3VDA4J=
+TNBMzQlM0E0My4xOTk1MzElMkIwMCUzQTAwLzE1MDY5NThfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,YhVh5ps8b9kO-m5zfmBDkg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vYmVkcm8ta3VyaW5vZS1wZXRlbGlua2Etcy1rb3poZXktb2hsY=
+XpoZGVubm9lLTEta2ctZjAwMDc1MQ=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=91=D0=
+=B5=D0=B4=D1=80=D0=BE =D0=BA=D1=83=D1=80=D0=B8=D0=BD=D0=BE=D0=B5 =C2=AB=D0=
+=9F=D0=B5=D1=82=D0=B5=D0=BB=D0=B8=D0=BD=D0=BA=D0=B0=C2=BB =D1=81 =D0=BA=D0=
+=BE=D0=B6=D0=B5=D0=B9 =D0=BE=D1=85=D0=BB=D0=B0=D0=B6=D0=B4=D0=B5=D0=BD=D0=
+=BD=D0=BE=D0=B5, ~ 1 =D0=BA=D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+2 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+316,19 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+632,38 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+1 =D0=BA=D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 1.86=D0=BA=D0=B3. =D0=B8=D0=B7 2=
+=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,CrNO5DNoxou7NMK29JMn0w/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va2FydG9mZWwtbGF5dC0yLWtnLTg1NDIxMDY=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzY1MzE1MS9vcmlnaW5hbC8xLzIwMjItMTItMTNUMTAlM=
+0EyMCUzQTQ3Ljk5MjYwNCUyQjAwJTNBMDAvNjUzMTUxXzEuanBn.jpg" style=3D"display: =
+block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,CrNO5DNoxou7NMK29JMn0w/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va2FydG9mZWwtbGF5dC0yLWtnLTg1NDIxMDY=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9A=D0=
+=B0=D1=80=D1=82=D0=BE=D1=84=D0=B5=D0=BB=D1=8C =D0=9B=D0=B0=D0=B9=D1=82 2 =
+=D0=BA=D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+169,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+2 =D0=BA=D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,9-9H5csxuPaQGTV4d3E-tw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vdG9tYXR5LWtyYXNueWUtMDYyNTdjNQ=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzI0Nzk4OS9vcmlnaW5hbC8xLzIwMjQtMTItMDZUMTIlM=
+0EwMCUzQTI0LjQxMjkyNiUyQjAwJTNBMDAvMjQ3OTg5XzEuanBn.jpg" style=3D"display: =
+block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,9-9H5csxuPaQGTV4d3E-tw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vdG9tYXR5LWtyYXNueWUtMDYyNTdjNQ=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A2=D0=
+=BE=D0=BC=D0=B0=D1=82=D1=8B =D0=BA=D1=80=D0=B0=D1=81=D0=BD=D1=8B=D0=B5</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+0.328 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+108,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+35,75 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.328=D0=BA=D0=B3. =D0=B8=D0=B7 =
+0.3=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,HaQw40y8shQpuMWCndo2zQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc21ldGFuYS0xNS1wcm9zdG9rdmFzaGluby1iem16aC0zMDAtZ=
+y0yZjU2Mjlj"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE1MjQyOTIxL29yaWdpbmFsLzEvMjAyNS0xMS0xMSUyM=
+DA5JTNBMDklM0E1Ny45OTY0NjYlMkIwMCUzQTAwLzE1MjQyOTIxXzEuanBn.jpg" style=3D"d=
+isplay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,HaQw40y8shQpuMWCndo2zQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc21ldGFuYS0xNS1wcm9zdG9rdmFzaGluby1iem16aC0zMDAtZ=
+y0yZjU2Mjlj"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A1=D0=
+=BC=D0=B5=D1=82=D0=B0=D0=BD=D0=B0 15% =D0=9F=D1=80=D0=BE=D1=81=D1=82=D0=BE=
+=D0=BA=D0=B2=D0=B0=D1=88=D0=B8=D0=BD=D0=BE =D0=91=D0=97=D0=9C=D0=96 300 =D0=
+=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+2 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+102,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+205,98 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+300 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,E7yxrsBp_D6WJ6DTmGeiHg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4veWFibG9raS1yZWQtZGVsaXNoZXMtbm92eXktdXJvemhheS0zN=
+jFkMTVj"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzExNTA0NjEvb3JpZ2luYWwvMS8yMDI0LTA0LTIyVDE0J=
+TNBNTklM0ExOS4xOTg1NDElMkIwMCUzQTAwLzExNTA0NjFfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,E7yxrsBp_D6WJ6DTmGeiHg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4veWFibG9raS1yZWQtZGVsaXNoZXMtbm92eXktdXJvemhheS0zN=
+jFkMTVj"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=AF=D0=
+=B1=D0=BB=D0=BE=D0=BA=D0=B8 =D0=A0=D0=B5=D0=B4 =D0=94=D0=B5=D0=BB=D0=B8=D1=
+=88=D0=B5=D1=81 =D0=BD=D0=BE=D0=B2=D1=8B=D0=B9 =D1=83=D1=80=D0=BE=D0=B6=D0=
+=B0=D0=B9</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+0.558 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+159,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+89,27 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.558=D0=BA=D0=B3. =D0=B8=D0=B7 =
+0.5=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,kFs3w86nI68eO-aXa-8I_A/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va29mZS16aG9rZXkta2xhc3NpY2hlc2tpeS1tb2xvdHl5LTI1M=
+C1nLTIzYzNiOTY=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzI3MzQxL29yaWdpbmFsLzEvMjAyNS0xMC0yMiUyMDE4J=
+TNBMjUlM0EwOC4yMzY4MTclMkIwMCUzQTAwLzI3MzQxXzEuanBn.jpg" style=3D"display: =
+block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,kFs3w86nI68eO-aXa-8I_A/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va29mZS16aG9rZXkta2xhc3NpY2hlc2tpeS1tb2xvdHl5LTI1M=
+C1nLTIzYzNiOTY=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9A=D0=
+=BE=D1=84=D0=B5 =D0=96=D0=BE=D0=BA=D0=B5=D0=B9 =D0=9A=D0=BB=D0=B0=D1=81=D1=
+=81=D0=B8=D1=87=D0=B5=D1=81=D0=BA=D0=B8=D0=B9 =D0=BC=D0=BE=D0=BB=D0=BE=D1=
+=82=D1=8B=D0=B9 250 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+478,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+250 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,GFwQPuhE2L6XZZsQ9bPoIQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va29sYmFzYS12YXJlbmF5YS1rbGluc2tpeS1kb2t0b3Jza2F5Y=
+S00MDAtZw=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE5Mzk2MzE0L29yaWdpbmFsLzEvMjAyNS0wNC0xNSUyM=
+DExJTNBMzklM0EwMS41NTI4NzglMkIwMCUzQTAwLzE5Mzk2MzE0XzEuanBn.jpg" style=3D"d=
+isplay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,GFwQPuhE2L6XZZsQ9bPoIQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va29sYmFzYS12YXJlbmF5YS1rbGluc2tpeS1kb2t0b3Jza2F5Y=
+S00MDAtZw=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9A=D0=
+=BE=D0=BB=D0=B1=D0=B0=D1=81=D0=B0 =D0=B2=D0=B0=D1=80=D0=B5=D0=BD=D0=B0=D1=
+=8F =D0=9A=D0=BB=D0=B8=D0=BD=D1=81=D0=BA=D0=B8=D0=B9 =D0=94=D0=BE=D0=BA=D1=
+=82=D0=BE=D1=80=D1=81=D0=BA=D0=B0=D1=8F 400 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+2 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+259,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+519,98 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+400 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,sA4lseHVL9iSHpdfoGgnGQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vdm9kYS1waXRpZXZheWEtc2VuZXpoc2theWEtZ2F6aXJvdmFub=
+mF5YS0xLTUtbC00Mzk1NDE3"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzEyNTIxL29yaWdpbmFsLzEvMjAyNS0xMC0zMSUyMDA4J=
+TNBNTclM0EwMi4xNDk1ODYlMkIwMCUzQTAwLzEyNTIxXzEuanBn.jpg" style=3D"display: =
+block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,sA4lseHVL9iSHpdfoGgnGQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vdm9kYS1waXRpZXZheWEtc2VuZXpoc2theWEtZ2F6aXJvdmFub=
+mF5YS0xLTUtbC00Mzk1NDE3"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=92=D0=
+=BE=D0=B4=D0=B0 =D0=BF=D0=B8=D1=82=D1=8C=D0=B5=D0=B2=D0=B0=D1=8F =D0=A1=D0=
+=B5=D0=BD=D0=B5=D0=B6=D1=81=D0=BA=D0=B0=D1=8F =D0=B3=D0=B0=D0=B7=D0=B8=D1=
+=80=D0=BE=D0=B2=D0=B0=D0=BD=D0=BD=D0=B0=D1=8F 1,5 =D0=BB</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+3 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+50,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+152,97 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+1 =D1=88=D1=82
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,nVPYA1Kxu3VOkJ0R1RHCDg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vYmF0b24ta29sb21lbnNraXktcHNoZW5pY2hueXktdi1uYXJle=
+mtlLTQwMC1nLTcwZDgyMzg=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzQ4NDUyL29yaWdpbmFsLzEvMjAyNC0wOC0yOVQxOCUzQ=
+TEyJTNBMTIuNzY5OTMyJTJCMDAlM0EwMC80ODQ1Ml8xLmpwZw=3D=3D.jpg" style=3D"displ=
+ay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,nVPYA1Kxu3VOkJ0R1RHCDg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vYmF0b24ta29sb21lbnNraXktcHNoZW5pY2hueXktdi1uYXJle=
+mtlLTQwMC1nLTcwZDgyMzg=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=91=D0=
+=B0=D1=82=D0=BE=D0=BD =D0=9A=D0=BE=D0=BB=D0=BE=D0=BC=D0=B5=D0=BD=D1=81=D0=
+=BA=D0=B8=D0=B9 =D0=BF=D1=88=D0=B5=D0=BD=D0=B8=D1=87=D0=BD=D1=8B=D0=B9 =D0=
+=B2 =D0=BD=D0=B0=D1=80=D0=B5=D0=B7=D0=BA=D0=B5 400 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+2 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+79,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+159,98 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+400 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,Uu6AHqv_vm5a9qUHBzpsUw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc29rLWRvYnJ5eS10b21hdC0xLWwtMWEyZTdkYQ=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzEyMjc1L29yaWdpbmFsLzEvMjAyNS0xMC0zMCUyMDE0J=
+TNBNDUlM0EzMC4zODY3NTklMkIwMCUzQTAwLzEyMjc1XzEuanBn.jpg" style=3D"display: =
+block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,Uu6AHqv_vm5a9qUHBzpsUw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc29rLWRvYnJ5eS10b21hdC0xLWwtMWEyZTdkYQ=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A1=D0=
+=BE=D0=BA =D0=94=D0=BE=D0=B1=D1=80=D1=8B=D0=B9 =D1=82=D0=BE=D0=BC=D0=B0=D1=
+=82 1 =D0=BB</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+119,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+1 =D0=BB
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,A8fh1Dm8KVzawjldzdGCqQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va29uZmV0eS1zaG9rb2xhZG55ZS1ha2tvbmQtcHRpdHNhLWRpd=
+m5heWEtcy1zdWZsZXlub3ktbmFjaGlua295LTBmODE3NGQ=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzExMDQzMjgvb3JpZ2luYWwvMS8yMDIyLTA4LTIzVDE2J=
+TNBNDQlM0EzNy4xNzcwMDAlMkIwMCUzQTAwLzExMDQzMjhfMS5qcGVn.jpeg" style=3D"disp=
+lay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,A8fh1Dm8KVzawjldzdGCqQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4va29uZmV0eS1zaG9rb2xhZG55ZS1ha2tvbmQtcHRpdHNhLWRpd=
+m5heWEtcy1zdWZsZXlub3ktbmFjaGlua295LTBmODE3NGQ=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9A=D0=
+=BE=D0=BD=D1=84=D0=B5=D1=82=D1=8B =D1=88=D0=BE=D0=BA=D0=BE=D0=BB=D0=B0=D0=
+=B4=D0=BD=D1=8B=D0=B5 =D0=90=D0=BA=D0=BA=D0=BE=D0=BD=D0=B4 =D0=9F=D1=82=D0=
+=B8=D1=86=D0=B0 =D0=B4=D0=B8=D0=B2=D0=BD=D0=B0=D1=8F =D1=81 =D1=81=D1=83=D1=
+=84=D0=BB=D0=B5=D0=B9=D0=BD=D0=BE=D0=B9 =D0=BD=D0=B0=D1=87=D0=B8=D0=BD=D0=
+=BA=D0=BE=D0=B9</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+0.224 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+649,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+145,60 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.224=D0=BA=D0=B3. =D0=B8=D0=B7 =
+0.2=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,TMQTaHLmtCb-9c19fxnJtA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbW9sb2tvLTEtNS1wYXN0ZXJpem92YW5ub2UtOTMwLW1sLXByb=
+3N0b2t2YXNoaW5vLWJ6bXpoLTUxYjMyYTU=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzMxMTQ5L29yaWdpbmFsLzEvMjAyNC0wNi0xOFQxMyUzQ=
+TUzJTNBMDMuNTgxNDYwJTJCMDAlM0EwMC8zMTE0OV8xLmpwZw=3D=3D.jpg" style=3D"displ=
+ay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,TMQTaHLmtCb-9c19fxnJtA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbW9sb2tvLTEtNS1wYXN0ZXJpem92YW5ub2UtOTMwLW1sLXByb=
+3N0b2t2YXNoaW5vLWJ6bXpoLTUxYjMyYTU=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9C=D0=
+=BE=D0=BB=D0=BE=D0=BA=D0=BE 1,5% =D0=BF=D0=B0=D1=81=D1=82=D0=B5=D1=80=D0=B8=
+=D0=B7=D0=BE=D0=B2=D0=B0=D0=BD=D0=BD=D0=BE=D0=B5 930 =D0=BC=D0=BB =D0=9F=D1=
+=80=D0=BE=D1=81=D1=82=D0=BE=D0=BA=D0=B2=D0=B0=D1=88=D0=B8=D0=BD=D0=BE =D0=
+=91=D0=97=D0=9C=D0=96</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+4 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+93,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+375,96 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+930 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,NTAIVzpG6USDf9mQ1jCI-A/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc2FoYXItcGVzb2stMS1rZy0wYWQ4NjUz"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzMyNzI1OTcwL29yaWdpbmFsLzEvMjAyNC0wNS0wM1QwO=
+CUzQTE3JTNBNDguMDMzMDMwJTJCMDAlM0EwMC8zMjcyNTk3MF8xLmpwZw=3D=3D.jpg" style=
+=3D"display: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,NTAIVzpG6USDf9mQ1jCI-A/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc2FoYXItcGVzb2stMS1rZy0wYWQ4NjUz"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A1=D0=
+=B0=D1=85=D0=B0=D1=80 =D0=BF=D0=B5=D1=81=D0=BE=D0=BA 1 =D0=BA=D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+52,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+1 =D0=BA=D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,b32CLaPi7pJxDpJhtwG0sA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vb2d1cmV0cy1zcmVkbmVwbG9kbnl5LTE4MC1nLWYyN2NjY2I=
+=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzM5Mjk4NTEyL29yaWdpbmFsLzEvMjAyNC0xMC0yMSUyM=
+DEyJTNBNDMlM0EzNi45NjE1MDAlMkIwMCUzQTAwLzM5Mjk4NTEyXzEuanBn.jpg" style=3D"d=
+isplay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,b32CLaPi7pJxDpJhtwG0sA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vb2d1cmV0cy1zcmVkbmVwbG9kbnl5LTE4MC1nLWYyN2NjY2I=
+=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9E=D0=
+=B3=D1=83=D1=80=D0=B5=D1=86 =D1=81=D1=80=D0=B5=D0=B4=D0=BD=D0=B5=D0=BF=D0=
+=BB=D0=BE=D0=B4=D0=BD=D1=8B=D0=B9 180 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+6 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+69,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+419,94 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+1 =D1=88=D1=82.
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,6gDWDfD7TR_HtSneVkYy2A/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc3lyLXBvbHV0dmVyZHl5LWJyZXN0LWxpdG92c2stZmluc2tpe=
+S00NS1iem16aC0yMDAtZy1jOGE5ODc5"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzI0OTQ5OC9vcmlnaW5hbC8xLzIwMjUtMTEtMDElMjAwO=
+CUzQTM5JTNBMzcuNzg4MzExJTJCMDAlM0EwMC8yNDk0OThfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,6gDWDfD7TR_HtSneVkYy2A/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc3lyLXBvbHV0dmVyZHl5LWJyZXN0LWxpdG92c2stZmluc2tpe=
+S00NS1iem16aC0yMDAtZy1jOGE5ODc5"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A1=D1=
+=8B=D1=80 =D0=BF=D0=BE=D0=BB=D1=83=D1=82=D0=B2=D0=B5=D1=80=D0=B4=D1=8B=D0=
+=B9 =D0=91=D1=80=D0=B5=D1=81=D1=82-=D0=9B=D0=B8=D1=82=D0=BE=D0=B2=D1=81=D0=
+=BA =D0=A4=D0=B8=D0=BD=D1=81=D0=BA=D0=B8=D0=B9 45% =D0=91=D0=97=D0=9C=D0=96=
+ 200 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+179,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+200 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,U5-UF8FGBA1_LDLrw6PyGw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4veWF5dHNvLWt1cmlub2UtZWtzdHJhLXNvLWtvcmljaG5ldm9lL=
+TEwLXNodA=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzc0MzAwL29yaWdpbmFsLzEvMjAyMi0wOC0yMlQxOCUzQ=
+TEzJTNBMDYuMDIzMDAwJTJCMDAlM0EwMC83NDMwMF8xLmpwZw=3D=3D.jpg" style=3D"displ=
+ay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,U5-UF8FGBA1_LDLrw6PyGw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4veWF5dHNvLWt1cmlub2UtZWtzdHJhLXNvLWtvcmljaG5ldm9lL=
+TEwLXNodA=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=AF=D0=
+=B9=D1=86=D0=BE =D0=BA=D1=83=D1=80=D0=B8=D0=BD=D0=BE=D0=B5 =D0=AD=D0=BA=D1=
+=81=D1=82=D1=80=D0=B0 =D0=A1=D0=9E =D0=BA=D0=BE=D1=80=D0=B8=D1=87=D0=BD=D0=
+=B5=D0=B2=D0=BE=D0=B5 10 =D1=88=D1=82</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+139,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+700 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,FLmKihNbPCI6pwe1ZvvFtg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbHVrLXJlcGNoYXR5eS02YTIyNWRh"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzExNTAzNDQvb3JpZ2luYWwvMS8yMDIyLTA4LTIyVDE3J=
+TNBMTUlM0EyNC45MTEwMDAlMkIwMCUzQTAwLzExNTAzNDRfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,FLmKihNbPCI6pwe1ZvvFtg/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vbHVrLXJlcGNoYXR5eS02YTIyNWRh"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9B=D1=
+=83=D0=BA =D1=80=D0=B5=D0=BF=D1=87=D0=B0=D1=82=D1=8B=D0=B9</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+0.594 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+36,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+21,97 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.594=D0=BA=D0=B3. =D0=B8=D0=B7 =
+0.5=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,4DxfY-xtl42rbImfTvnymw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc3Zla2xhLTllZThlMzk=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzEyNDg4NDkvb3JpZ2luYWwvMS8yMDIyLTExLTEwVDExJ=
+TNBNDQlM0EzNC4xNjM1NjclMkIwMCUzQTAwLzEyNDg4NDlfMS5qcGc=3D.jpg" style=3D"dis=
+play: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,4DxfY-xtl42rbImfTvnymw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc3Zla2xhLTllZThlMzk=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A1=D0=
+=B2=D0=B5=D0=BA=D0=BB=D0=B0</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+0.568 =D0=BA=D0=B3 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block;">
+30,99 =E2=82=BD
+</span>
+<span style=3D"display: block; font-weight: bold;">
+17,60 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE 0.568=D0=BA=D0=B3. =D0=B8=D0=B7 =
+0.5=D0=BA=D0=B3.
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,GTbZ9K-Xbxxby6rK9WbIkQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vZ29yb3NoZWstYXNoYW4ta3Jhc25heWEtcHRpdHNhLXplbGVue=
+Xkta29uc2Vydmlyb3Zhbm55eS00MDAtZw=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzQyNTUwNTU4L29yaWdpbmFsLzEvMjAyNC0xMi0wOSUyM=
+DEzJTNBMzAlM0EyOS4wMjc0NDAlMkIwMCUzQTAwLzQyNTUwNTU4XzEuanBn.jpg" style=3D"d=
+isplay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,GTbZ9K-Xbxxby6rK9WbIkQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vZ29yb3NoZWstYXNoYW4ta3Jhc25heWEtcHRpdHNhLXplbGVue=
+Xkta29uc2Vydmlyb3Zhbm55eS00MDAtZw=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=93=D0=
+=BE=D1=80=D0=BE=D1=88=D0=B5=D0=BA =D0=90=D0=A8=D0=90=D0=9D =D0=9A=D1=80=D0=
+=B0=D1=81=D0=BD=D0=B0=D1=8F =D0=BF=D1=82=D0=B8=D1=86=D0=B0 =D0=B7=D0=B5=D0=
+=BB=D0=B5=D0=BD=D1=8B=D0=B9 =D0=BA=D0=BE=D0=BD=D1=81=D0=B5=D1=80=D0=B2=D0=
+=B8=D1=80=D0=BE=D0=B2=D0=B0=D0=BD=D0=BD=D1=8B=D0=B9 400 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+69,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+400 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,8MpOuBnF_hNAIaPb18PH5g/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vb2d1cnRzeS1rYXpoZHl5LWRlbi1tYXJpbm92YW5ueWUtNjgwL=
+WctNTFmMjYzZg=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzE4MDU3MjkwL29yaWdpbmFsLzEvMjAyNC0wNC0yNFQxN=
+yUzQTMxJTNBMjMuNjMxOTY1JTJCMDAlM0EwMC8xODA1NzI5MF8xLmpwZw=3D=3D.jpg" style=
+=3D"display: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,8MpOuBnF_hNAIaPb18PH5g/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vb2d1cnRzeS1rYXpoZHl5LWRlbi1tYXJpbm92YW5ueWUtNjgwL=
+WctNTFmMjYzZg=3D=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=9E=D0=
+=B3=D1=83=D1=80=D1=86=D1=8B =D0=9A=D0=B0=D0=B6=D0=B4=D1=8B=D0=B9 =D0=94=D0=
+=B5=D0=BD=D1=8C =D0=BC=D0=B0=D1=80=D0=B8=D0=BD=D0=BE=D0=B2=D0=B0=D0=BD=D0=
+=BD=D1=8B=D0=B5 680 =D0=B3</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+119,98 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+680 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,cJa2MX8MQNvC1gKfkl-1FQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc29rLWo3LWFwZWwtc2lub3Z5eS05NzAtbWwtYWRkOWU4Nw=3D=
+=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzMxODEyL29yaWdpbmFsLzEvMjAyNS0xMS0xMSUyMDA5J=
+TNBMTYlM0EyMC40MjU4MjklMkIwMCUzQTAwLzMxODEyXzEuanBn.jpg" style=3D"display: =
+block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,cJa2MX8MQNvC1gKfkl-1FQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vc29rLWo3LWFwZWwtc2lub3Z5eS05NzAtbWwtYWRkOWU4Nw=3D=
+=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A1=D0=
+=BE=D0=BA J7 =D0=B0=D0=BF=D0=B5=D0=BB=D1=8C=D1=81=D0=B8=D0=BD=D0=BE=D0=B2=
+=D1=8B=D0=B9 970 =D0=BC=D0=BB</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+303,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+970 =D0=BC=D0=BB
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-top-color: #=
+ece9e9; border-top-style: solid; height: 97px; margin: 0; padding: 18px 0; =
+border-width: 1px 0 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody style=3D"vertical-align: top;">
+<tr>
+<td style=3D"width: 84px;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,z23L__hJ38JiZDxLKJF1Kw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vcmlzLXV2ZWxrYS1idXJ5eS12LXZhcm9jaG55aC1wYWtldGlrY=
+WgtODAtZy1oLTUtc2h0LWZjZDFkODQ=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;"><img alt=
+=3D"" src=3D"https://imgproxy.kuper.ru/imgproxy/size-170-170/czM6Ly9jb250ZW=
+50LWltYWdlcy1wcm9kL3Byb2R1Y3RzLzQ0NzczL29yaWdpbmFsLzEvMjAyMi0wOC0yM1QwOSUzQ=
+TI2JTNBMjMuNjIwMDAwJTJCMDAlM0EwMC80NDc3M18xLmpwZw=3D=3D.jpg" style=3D"displ=
+ay: block; max-height: 72px; max-width: 100%; margin: 0 auto;"></a>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: center; margin: 0 0 10px; p=
+adding: 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"padding-right: 5px; width: 100%;" align=3D"left" valign=3D"top=
+">
+<span style=3D"display: block; max-width: 320px; overflow-wrap: break-word;=
+ word-wrap: break-word; word-break: break-word;">
+<a target=3D"_blank"
+href=3D"https://link.sendsay.ru/kuper/smtpgate,z23L__hJ38JiZDxLKJF1Kw/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9rdXBlci5ydS9hdWNoYW4vcmlzLXV2ZWxrYS1idXJ5eS12LXZhcm9jaG55aC1wYWtldGlrY=
+WgtODAtZy1oLTUtc2h0LWZjZDFkODQ=3D"
+ style=3D"display: block; color: inherit; text-decoration: none;">=D0=A0=D0=
+=B8=D1=81 =D0=A3=D0=B2=D0=B5=D0=BB=D0=BA=D0=B0 =D0=B1=D1=83=D1=80=D1=8B=D0=
+=B9 =D0=B2 =D0=B2=D0=B0=D1=80=D0=BE=D1=87=D0=BD=D1=8B=D1=85 =D0=BF=D0=B0=D0=
+=BA=D0=B5=D1=82=D0=B8=D0=BA=D0=B0=D1=85 80 =D0=B3 =D1=85 5 =D1=88=D1=82</a>
+</span>
+</td>
+<td style=3D"color: #9f9f9f; white-space: nowrap; padding: 0 5px;" valign=
+=3D"top">
+1 =D1=88=D1=82 =C3=97=20
+</td>
+<td style=3D"white-space: nowrap; min-width: 80px;" align=3D"right" valign=
+=3D"top">
+<span style=3D"display: block; font-weight: bold;">
+139,99 =E2=82=BD
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; margin: 0; padding:=
+ 0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; color: #9f9f9f; text-align: left;">
+400 =D0=B3
+</span>
+</td>
+<td style=3D"padding-left: 15px;">
+<table style=3D"position: relative; text-align: right; margin: 0; padding: =
+0; border: 0;" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td>
+<span style=3D"display: block; font-weight: 500; color: #3db114;">
+=D0=A1=D0=BE=D0=B1=D1=80=D0=B0=D0=BD=D0=BE
+</span>
+</td>
+<td style=3D"" width=3D"30">
+<img src=3D"https://kuper.ru/statics/downloads/mailers/ok.png" style=3D"dis=
+play: inline-block; max-height: 100%; max-width: 100%; height: 24px; width:=
+ 24px;">
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+</span>
+<span style=3D"display: block; background-color: #ece9e9; height: 2px; marg=
+in-top: 20px;"></span>
+<span style=3D"display: block; padding: 0 20px;">
+<table style=3D"position: relative; text-align: center; border-collapse: co=
+llapse; margin: 0 0 20px; padding: 0; border: 0;" width=3D"100%" cellpaddin=
+g=3D"0" cellspacing=3D"0">
+<tbody>
+<tr style=3D"height: 57px; font-size: 22px;">
+<td style=3D"" align=3D"left">
+<strong>
+=D0=9E=D0=BF=D0=BB=D0=B0=D1=82=D0=B0
+</strong>
+</td>
+<td style=3D"" align=3D"right">
+<span style=3D"display: inline-block; background-color: #c8f5ba; border-rad=
+ius: 8px; color: #3db21b; font-size: 12px; font-weight: 500; padding: 6px 1=
+4px;">
+=D0=9A=D0=B0=D1=80=D1=82=D0=BE=D0=B9 =D0=BE=D0=BD=D0=BB=D0=B0=D0=B9=D0=BD
+</span>
+</td>
+</tr>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid; height: 57px;">
+<td style=3D"" align=3D"left">
+=D0=9F=D1=80=D0=BE=D0=B4=D1=83=D0=BA=D1=82=D1=8B
+</td>
+<td style=3D"" align=3D"right">
+6 129,81 =E2=82=BD
+</td>
+</tr>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid; height: 57px;">
+<td style=3D"" align=3D"left">
+=D0=A1=D0=B1=D0=BE=D1=80=D0=BA=D0=B0
+</td>
+<td style=3D"" align=3D"right">
+89,00 =E2=82=BD
+</td>
+</tr>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid; height: 57px;">
+<td style=3D"" align=3D"left">
+=D0=94=D0=BE=D1=81=D1=82=D0=B0=D0=B2=D0=BA=D0=B0
+</td>
+<td style=3D"" align=3D"right">
+<span style=3D"display: inline-block; color: #fc4c04; margin-left: 3px;">
+=D0=B1=D0=B5=D1=81=D0=BF=D0=BB=D0=B0=D1=82=D0=BD=D0=BE
+</span>
+</td>
+</tr>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid; height: 57px;">
+<td style=3D"" align=3D"left">
+=D0=A1=D0=B5=D1=80=D0=B2=D0=B8=D1=81=D0=BD=D1=8B=D0=B9 =D1=81=D0=B1=D0=BE=
+=D1=80
+</td>
+<td style=3D"" align=3D"right">
+69,00 =E2=82=BD
+</td>
+</tr>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid; height: 57px; font-size: 22px;">
+<td style=3D"font-size: 22px; color: #3db21b;" align=3D"left">
+<strong>
+=D0=98=D1=82=D0=BE=D0=B3=D0=BE:
+</strong>
+</td>
+<td style=3D"" align=3D"right">
+<strong>
+6 287,81 =E2=82=BD
+</strong>
+</td>
+</tr>
+</tbody>
+</table>
+
+</span>
+<span style=3D"display: block; background-color: #ece9e9; height: 2px; marg=
+in-top: 20px;"></span>
+<span style=3D"display: block; padding: 0 20px;">
+<strong style=3D"display: block; font-size: 22px; text-align: left; margin:=
+ 28px 0 20px;">
+=D0=94=D0=BE=D1=81=D1=82=D0=B0=D0=B2=D0=BA=D0=B0
+</strong>
+<table style=3D"position: relative; text-align: center; border-collapse: co=
+llapse; margin: 0 0 20px; padding: 0; border: 0;" width=3D"100%" cellpaddin=
+g=3D"0" cellspacing=3D"0">
+<tbody>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid;">
+<td style=3D"width: 18px;">
+<img alt=3D"" src=3D"https://kuper.ru/statics/downloads/mailers/clock.png" =
+style=3D"display: inline-block; max-height: 100%; max-width: 100%; height: =
+18px; width: 18px;">
+</td>
+<td style=3D"padding: 20px 0 20px 20px;" align=3D"left">
+ 3 =D0=B4=D0=B5=D0=BA=D0=B0=D0=B1=D1=80=D1=8F,=20
+19:00=E2=80=9321:00
+</td>
+</tr>
+<tr style=3D"border-top-width: 1px; border-top-color: #ece9e9; border-top-s=
+tyle: solid;">
+<td style=3D"width: 18px;">
+<img alt=3D"" src=3D"https://kuper.ru/statics/downloads/mailers/address.png=
+" style=3D"display: inline-block; max-height: 100%; max-width: 100%; height=
+: 22px; width: 18px;">
+</td>
+<td style=3D"padding: 20px 0 20px 20px;" align=3D"left">
+=D0=9D=D0=BE=D0=B2=D1=8B=D0=B5 =D0=A5=D0=B8=D0=BC=D0=BA=D0=B8=C2=A0=D0=BC-=
+=D0=BD, =D0=A5=D0=B8=D0=BC=D0=BA=D0=B8, =D1=83=D0=BB=D0=B8=D1=86=D0=B0 =D0=
+=9F=D0=B0=D0=BD=D1=84=D0=B8=D0=BB=D0=BE=D0=B2=D0=B0, 1, =D0=BA=D0=B2. 129
+</td>
+</tr>
+</tbody>
+</table>
+</span>
+
+
+
+</td>
+</tr>
+</tbody>
+</table>
+<table style=3D"position: relative; text-align: center; border-radius: 10px=
+; line-height: 1.43; margin: 0 0 8px; padding: 0; border: 0;" bgcolor=3D"#f=
+ff" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+<tbody>
+<tr>
+<td style=3D"border-bottom-width: 1px; border-bottom-color: #ece9e9; border=
+-bottom-style: solid; line-height: 1.43; padding: 30px 0 25px;" align=3D"le=
+ft">
+<span style=3D"display: block; padding: 0 20px;">
+<strong style=3D"display: block; margin-bottom: 6px;">
+=D0=A1=D0=BB=D1=83=D0=B6=D0=B1=D0=B0 =D0=B7=D0=B0=D0=B1=D0=BE=D1=82=D1=8B
+</strong>
+<span style=3D"display: block;">
+<a href=3D"tel:+78002221100" style=3D"display: inline; color: #fc4c04; text=
+-decoration: underline;">+7 800 222-11-00</a>
+=D0=B4=D0=BB=D1=8F =D0=BA=D0=BB=D0=B8=D0=B5=D0=BD=D1=82=D0=BE=D0=B2
+<br>
+<a href=3D"tel:+78005509411" style=3D"display: inline; color: #fc4c04; text=
+-decoration: underline;">+7 800 550-94-11</a>
+=D0=B4=D0=BB=D1=8F =D0=BA=D0=BE=D1=80=D0=BF=D0=BE=D1=80=D0=B0=D1=82=D0=B8=
+=D0=B2=D0=BD=D1=8B=D1=85 =D0=BA=D0=BB=D0=B8=D0=B5=D0=BD=D1=82=D0=BE=D0=B2
+<br>
+=D0=97=D0=B2=D0=BE=D0=BD=D0=BE=D0=BA =D0=BF=D0=BE =D0=A0=D0=BE=D1=81=D1=81=
+=D0=B8=D0=B8 =D0=B1=D0=B5=D1=81=D0=BF=D0=BB=D0=B0=D1=82=D0=BD=D1=8B=D0=B9
+</span>
+
+</span>
+</td>
+</tr>
+<tr>
+<td style=3D"padding: 30px 0;">
+<span style=3D"display: block; padding: 0 20px;">
+<span style=3D"display: inline-block; margin: 3px 0;">
+<a
+href=3D"https://link.sendsay.ru/kuper/smtpgate,qKXBIRVmx0gtdZ_urGVdkQ/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9qYTZ3LmFkai5zdC9tYWluX3BhZ2U/YWRqX3Q9MWQyNXhiZ2w=3D"
+ target=3D"_blank" style=3D"display: inline-block; color: inherit; text-dec=
+oration: none; height: 48px; width: 162px; border-radius: 10px; margin-righ=
+t: 6px;">
+<img alt=3D"" src=3D"https://kuper.ru/statics/downloads/mailers/app_store.p=
+ng" style=3D"display: block; max-height: 100%; max-width: 100%;">
+</a>
+<a
+href=3D"https://link.sendsay.ru/kuper/smtpgate,aOzIv3v3xHcpgylIvFpnwA/17647=
+7734527218Vfd0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE,?aHR0cH=
+M6Ly9qYTZ3LmFkai5zdC9tYWluX3BhZ2U/YWRqX3Q9MWRiN3ZrNjM=3D"
+ target=3D"_blank" style=3D"display: inline-block; color: inherit; text-dec=
+oration: none; height: 48px; width: 162px; border-radius: 10px; margin: 0 1=
+7px 0 6px;">
+<img alt=3D"" src=3D"https://kuper.ru/statics/downloads/mailers/google_play=
+.png" style=3D"display: block; max-height: 100%; max-width: 100%;">
+</a>
+</span>
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+
+</center>
+</td>
+</tr>
+</tbody>
+</table>
+<!--[if !mso]><!-- -->
+<img src=3D"https://read.sendsay.ru/1.gif/kuper,smtpgate,176477734527218Vfd=
+0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE," alt=3D"" height=3D=
+"0" width=3D"0" border=3D"0" onerror=3D"this.style.display=3D'none'">
+<!--<![endif]-->
+<!--[if mso]>
+<img src=3D"https://read.sendsay.ru/1.gif/kuper,smtpgate,176477734527218Vfd=
+0aI1bc8048M47092,hssparrow%40ya.ru,20251203185545,NONE," alt=3D"" height=3D=
+"1" width=3D"1" border=3D"0" onerror=3D"this.style.display=3D'none'">
+<![endif]-->
+</body>
+</html>
+
+----==_mimepart_69305d7d8560e_19968a6c2251229--
