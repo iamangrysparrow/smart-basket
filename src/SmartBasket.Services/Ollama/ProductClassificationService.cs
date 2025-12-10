@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Ollama;
@@ -43,8 +44,8 @@ public class ProductClassificationService : IProductClassificationService
                 return result;
             }
 
-            // Получаем текущий провайдер
-            var provider = _providerFactory.GetCurrentProvider();
+            // Получаем провайдер для классификации
+            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Classification);
             progress?.Report($"  [Classify] Using provider: {provider.Name}");
             progress?.Report($"  [Classify] Classifying {itemNames.Count} items with {existingProducts.Count} existing products...");
 

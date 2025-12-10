@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Ollama;
@@ -52,8 +53,8 @@ public class CategoryService : ICategoryService
                 return result;
             }
 
-            // Получаем текущий провайдер
-            var provider = _providerFactory.GetCurrentProvider();
+            // Получаем провайдер для классификации (Category использует тот же что и Classification)
+            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Classification);
             progress?.Report($"  [Category] Using provider: {provider.Name}");
 
             var examplesCount = examples?.Count ?? 0;

@@ -142,43 +142,47 @@ public class ReceiptProcessingService
             if (string.IsNullOrWhiteSpace(cp.Name))
                 continue;
 
+            // Нормализовать название (убрать лишние пробелы)
+            var normalizedName = cp.Name.Trim();
+
             // Проверить существующий
-            if (existingProducts.TryGetValue(cp.Name, out var existing))
+            if (existingProducts.TryGetValue(normalizedName, out var existing))
             {
-                productMap[cp.Name] = (existing, false);
-                progress?.Report($"  [Product] Found existing: {cp.Name}");
+                productMap[normalizedName] = (existing, false);
+                progress?.Report($"  [Product] Found existing: {normalizedName}");
                 continue;
             }
 
             // Создать новый
-            var newProduct = new Product { Name = cp.Name };
+            var newProduct = new Product { Name = normalizedName };
 
             // Найти parent если указан
             if (!string.IsNullOrWhiteSpace(cp.Parent))
             {
+                var normalizedParent = cp.Parent.Trim();
                 // Сначала ищем в уже обработанных
-                if (productMap.TryGetValue(cp.Parent, out var parentTuple))
+                if (productMap.TryGetValue(normalizedParent, out var parentTuple))
                 {
                     newProduct.ParentId = parentTuple.Item1.Id;
                 }
                 // Потом в существующих
-                else if (existingProducts.TryGetValue(cp.Parent, out var parentProduct))
+                else if (existingProducts.TryGetValue(normalizedParent, out var parentProduct))
                 {
                     newProduct.ParentId = parentProduct.Id;
                 }
                 else
                 {
-                    progress?.Report($"  [Product] Warning: parent '{cp.Parent}' not found for '{cp.Name}'");
+                    progress?.Report($"  [Product] Warning: parent '{normalizedParent}' not found for '{normalizedName}'");
                 }
             }
 
             _dbContext.Products.Add(newProduct);
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            productMap[cp.Name] = (newProduct, true);
-            existingProducts[cp.Name] = newProduct; // Добавить в локальный кэш
+            productMap[normalizedName] = (newProduct, true);
+            existingProducts[normalizedName] = newProduct; // Добавить в локальный кэш
 
-            progress?.Report($"  [Product] Created: {cp.Name}" + (newProduct.ParentId.HasValue ? $" (parent: {cp.Parent})" : ""));
+            progress?.Report($"  [Product] Created: {normalizedName}" + (newProduct.ParentId.HasValue ? $" (parent: {cp.Parent?.Trim()})" : ""));
         }
 
         return productMap;
@@ -209,11 +213,14 @@ public class ReceiptProcessingService
             if (string.IsNullOrWhiteSpace(parsedItem.Name))
                 continue;
 
+            // Нормализовать название товара
+            var normalizedItemName = parsedItem.Name.Trim();
+
             // Найти продукт для этого товара
             string? productName = null;
-            if (classificationLookup.TryGetValue(parsedItem.Name, out var pn))
+            if (classificationLookup.TryGetValue(normalizedItemName, out var pn))
             {
-                productName = pn;
+                productName = pn?.Trim(); // Нормализовать название продукта
             }
 
             Product? product = null;
@@ -224,7 +231,7 @@ public class ReceiptProcessingService
 
             if (product == null)
             {
-                progress?.Report($"  [Item] Warning: no product for '{parsedItem.Name}', creating default");
+                progress?.Report($"  [Item] Warning: no product for '{normalizedItemName}', creating default");
                 // Создать дефолтный продукт "Не категоризировано"
                 product = await GetOrCreateUncategorizedProductAsync(cancellationToken);
                 if (!productMap.ContainsKey(product.Name))
@@ -236,7 +243,7 @@ public class ReceiptProcessingService
             // Найти или создать Item
             var item = await _dbContext.Items
                 .Include(i => i.ItemLabels)
-                .FirstOrDefaultAsync(i => i.Name == parsedItem.Name, cancellationToken)
+                .FirstOrDefaultAsync(i => i.Name == normalizedItemName, cancellationToken)
                 .ConfigureAwait(false);
 
             var isNewItem = item == null;
@@ -245,7 +252,7 @@ public class ReceiptProcessingService
             {
                 item = new Item
                 {
-                    Name = parsedItem.Name,
+                    Name = normalizedItemName,
                     ProductId = product.Id,
                     UnitOfMeasure = parsedItem.UnitOfMeasure ?? parsedItem.Unit ?? "шт",
                     UnitQuantity = parsedItem.UnitQuantity ?? 1,

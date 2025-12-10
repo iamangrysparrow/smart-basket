@@ -9,6 +9,7 @@ using SmartBasket.Data;
 using SmartBasket.Services.Email;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Products;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
@@ -90,6 +91,11 @@ public partial class App : Application
         services.AddSingleton<IProductClassificationService, ProductClassificationService>();
         services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
         services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
+
+        // Regex-парсеры чеков (без LLM)
+        services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();
+        services.AddSingleton<ReceiptTextParserFactory>();
+
         services.AddSingleton<IReceiptParsingService, ReceiptParsingService>();
         services.AddSingleton<SettingsService>();
 

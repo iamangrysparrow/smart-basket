@@ -65,24 +65,44 @@
                 </StackPanel>
             </Border>
 
-            <!-- LLM Provider Selection -->
+            <!-- LLM Provider Selection (per operation) -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,6">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Path Data="{StaticResource IconSettings}" Fill="#881798" Width="14" Height="14" Stretch="Uniform"/>
-                        <TextBlock Text="LLM Provider" Style="{StaticResource H2}" Margin="6,0,0,0"/>
+                        <TextBlock Text="LLM Providers" Style="{StaticResource H2}" Margin="6,0,0,0"/>
                     </StackPanel>
+                    <TextBlock Text="Выберите провайдер для каждой операции:" Style="{StaticResource TextSecondary}" Margin="0,0,0,6" FontSize="10"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="90"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Column="0" Text="Provider" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Column="1" SelectedIndex="{Binding SelectedLlmProviderIndex}"
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Парсинг" Style="{StaticResource TextSecondary}" VerticalAlignment="Center" ToolTip="Извлечение товаров из текста чека"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1" SelectedIndex="{Binding ParsingProviderIndex}"
+                                  FontSize="12" Padding="4,3" Margin="0,0,0,3">
+                            <ComboBoxItem Content="Ollama"/>
+                            <ComboBoxItem Content="YandexGPT"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Классификация" Style="{StaticResource TextSecondary}" VerticalAlignment="Center" ToolTip="Распределение товаров по категориям"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" SelectedIndex="{Binding ClassificationProviderIndex}"
+                                  FontSize="12" Padding="4,3" Margin="0,0,0,3">
+                            <ComboBoxItem Content="Ollama"/>
+                            <ComboBoxItem Content="YandexGPT"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Метки" Style="{StaticResource TextSecondary}" VerticalAlignment="Center" ToolTip="Назначение меток товарам"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" SelectedIndex="{Binding LabelsProviderIndex}"
                                   FontSize="12" Padding="4,3">
-                            <ComboBoxItem Content="Ollama (локальный)"/>
-                            <ComboBoxItem Content="YandexGPT (облако)"/>
+                            <ComboBoxItem Content="Ollama"/>
+                            <ComboBoxItem Content="YandexGPT"/>
                         </ComboBox>
                     </Grid>
                 </StackPanel>
@@ -90,7 +110,7 @@
 
             <!-- Ollama Settings -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,6"
-                    Visibility="{Binding IsOllamaSelected, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding IsOllamaUsed, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Path Data="{StaticResource IconSettings}" Fill="#107C10" Width="14" Height="14" Stretch="Uniform"/>
@@ -124,7 +144,7 @@
 
             <!-- YandexGPT Settings -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,6"
-                    Visibility="{Binding IsYandexGptSelected, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding IsYandexGptUsed, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Path Data="{StaticResource IconSettings}" Fill="#FF0000" Width="14" Height="14" Stretch="Uniform"/>

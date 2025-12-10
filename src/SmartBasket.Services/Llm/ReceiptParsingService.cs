@@ -5,15 +5,17 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Parsing;
 
 namespace SmartBasket.Services.Llm;
 
 /// <summary>
-/// Сервис парсинга чеков, использующий выбранный LLM провайдер через фабрику
+/// Сервис парсинга чеков. Сначала пробует regex-парсеры, при неудаче — LLM.
 /// </summary>
 public class ReceiptParsingService : IReceiptParsingService
 {
     private readonly ILlmProviderFactory _providerFactory;
+    private readonly ReceiptTextParserFactory? _textParserFactory;
     private readonly AppSettings _settings;
     private readonly ILogger<ReceiptParsingService> _logger;
     private string? _promptTemplate;
@@ -22,9 +24,11 @@ public class ReceiptParsingService : IReceiptParsingService
     public ReceiptParsingService(
         ILlmProviderFactory providerFactory,
         AppSettings settings,
-        ILogger<ReceiptParsingService> logger)
+        ILogger<ReceiptParsingService> logger,
+        ReceiptTextParserFactory? textParserFactory = null)
     {
         _providerFactory = providerFactory;
+        _textParserFactory = textParserFactory;
         _settings = settings;
         _logger = logger;
     }
@@ -45,18 +49,34 @@ public class ReceiptParsingService : IReceiptParsingService
 
         try
         {
-            // Получаем текущий провайдер
-            var provider = _providerFactory.GetCurrentProvider();
-            progress?.Report($"  [LLM] Using provider: {provider.Name}");
-
-            progress?.Report("  [LLM] Cleaning email body...");
+            progress?.Report("  [Parsing] Cleaning email body...");
 
             // Очистить HTML теги
             var cleanedBody = CleanHtmlTags(emailBody);
             var originalLength = emailBody.Length;
             var cleanedLength = cleanedBody.Length;
 
-            progress?.Report($"  [LLM] Body: {originalLength} -> {cleanedLength} chars after HTML cleanup");
+            progress?.Report($"  [Parsing] Body: {originalLength} -> {cleanedLength} chars after HTML cleanup");
+
+            // Сначала пробуем regex-парсеры
+            if (_textParserFactory != null)
+            {
+                progress?.Report("  [Parsing] Trying regex parsers...");
+                var regexResult = _textParserFactory.TryParse(cleanedBody, emailDate);
+
+                if (regexResult != null && regexResult.IsSuccess)
+                {
+                    progress?.Report($"  [Parsing] Success! Regex parser found {regexResult.Items.Count} items from {regexResult.Shop}");
+                    return regexResult;
+                }
+
+                progress?.Report("  [Parsing] No regex parser matched, falling back to LLM...");
+            }
+
+            // Fallback на LLM
+            // Получаем провайдер для парсинга
+            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Parsing);
+            progress?.Report($"  [Parsing] Using LLM provider: {provider.Name}");
 
             // Обрезать слишком длинные тексты
             if (cleanedBody.Length > 8000)

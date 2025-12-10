@@ -9,9 +9,9 @@ namespace SmartBasket.Services.Llm;
 public interface ILlmProviderFactory
 {
     /// <summary>
-    /// Получить текущий активный провайдер на основе настроек
+    /// Получить провайдер для указанной операции
     /// </summary>
-    ILlmProvider GetCurrentProvider();
+    ILlmProvider GetProviderForOperation(LlmOperationType operation);
 
     /// <summary>
     /// Получить провайдер по типу
@@ -43,9 +43,10 @@ public class LlmProviderFactory : ILlmProviderFactory
         _settings = settings;
     }
 
-    public ILlmProvider GetCurrentProvider()
+    public ILlmProvider GetProviderForOperation(LlmOperationType operation)
     {
-        return GetProvider(_settings.Llm.Provider);
+        var providerType = _settings.Llm.GetProviderForOperation(operation);
+        return GetProvider(providerType);
     }
 
     public ILlmProvider GetProvider(LlmProviderType providerType)

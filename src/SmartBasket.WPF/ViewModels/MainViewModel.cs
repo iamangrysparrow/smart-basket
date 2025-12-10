@@ -107,8 +107,10 @@ public partial class MainViewModel : ObservableObject
         YandexApiKey = settings.YandexGpt.ApiKey;
         YandexModel = settings.YandexGpt.Model;
 
-        // LLM Provider selection
-        SelectedLlmProviderIndex = (int)settings.Llm.Provider;
+        // LLM Provider selection (per operation)
+        ParsingProviderIndex = (int)settings.Llm.ParsingProvider;
+        ClassificationProviderIndex = (int)settings.Llm.ClassificationProvider;
+        LabelsProviderIndex = (int)settings.Llm.LabelsProvider;
     }
 
     // Email Settings
@@ -130,14 +132,25 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _yandexApiKey = string.Empty;
     [ObservableProperty] private string _yandexModel = "yandexgpt-lite";
 
-    // LLM Provider Selection
+    // LLM Provider Selection (per operation)
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsOllamaSelected))]
-    [NotifyPropertyChangedFor(nameof(IsYandexGptSelected))]
-    private int _selectedLlmProviderIndex;
+    [NotifyPropertyChangedFor(nameof(IsOllamaUsed))]
+    [NotifyPropertyChangedFor(nameof(IsYandexGptUsed))]
+    private int _parsingProviderIndex;
 
-    public bool IsOllamaSelected => SelectedLlmProviderIndex == 0;
-    public bool IsYandexGptSelected => SelectedLlmProviderIndex == 1;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOllamaUsed))]
+    [NotifyPropertyChangedFor(nameof(IsYandexGptUsed))]
+    private int _classificationProviderIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOllamaUsed))]
+    [NotifyPropertyChangedFor(nameof(IsYandexGptUsed))]
+    private int _labelsProviderIndex;
+
+    // Helper properties for UI visibility
+    public bool IsOllamaUsed => ParsingProviderIndex == 0 || ClassificationProviderIndex == 0 || LabelsProviderIndex == 0;
+    public bool IsYandexGptUsed => ParsingProviderIndex == 1 || ClassificationProviderIndex == 1 || LabelsProviderIndex == 1;
 
     // State
     [ObservableProperty]
@@ -385,7 +398,6 @@ public partial class MainViewModel : ObservableObject
             // Validate settings first
             var emailSettings = GetCurrentEmailSettings();
             var ollamaSettings = GetCurrentOllamaSettings();
-            var llmProvider = _settings.Llm.Provider;
 
             if (string.IsNullOrWhiteSpace(emailSettings.ImapServer))
             {
@@ -401,25 +413,25 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
-            // Validate LLM provider settings
-            if (llmProvider == LlmProviderType.Ollama && string.IsNullOrWhiteSpace(ollamaSettings.BaseUrl))
+            // Validate LLM provider settings based on what's selected for each operation
+            if (IsOllamaUsed && string.IsNullOrWhiteSpace(ollamaSettings.BaseUrl))
             {
-                Log("ERROR: Ollama URL is not configured");
+                Log("ERROR: Ollama URL is not configured (used for some operations)");
                 StatusText = "Error: Configure Ollama URL";
                 return;
             }
 
-            if (llmProvider == LlmProviderType.YandexGpt)
+            if (IsYandexGptUsed)
             {
                 if (string.IsNullOrWhiteSpace(_settings.YandexGpt.ApiKey))
                 {
-                    Log("ERROR: YandexGPT API key is not configured");
+                    Log("ERROR: YandexGPT API key is not configured (used for some operations)");
                     StatusText = "Error: Configure YandexGPT API key";
                     return;
                 }
                 if (string.IsNullOrWhiteSpace(_settings.YandexGpt.FolderId))
                 {
-                    Log("ERROR: YandexGPT Folder ID is not configured");
+                    Log("ERROR: YandexGPT Folder ID is not configured (used for some operations)");
                     StatusText = "Error: Configure YandexGPT Folder ID";
                     return;
                 }
@@ -427,12 +439,15 @@ public partial class MainViewModel : ObservableObject
 
             Log($"Email: {emailSettings.ImapServer}:{emailSettings.ImapPort}, User: {emailSettings.Username}");
             Log($"Filters: Sender='{emailSettings.SenderFilter ?? "(none)"}', Subject='{emailSettings.SubjectFilter ?? "(none)"}', Days={emailSettings.SearchDaysBack}");
-            Log($"LLM Provider: {llmProvider}");
-            if (llmProvider == LlmProviderType.Ollama)
+            Log($"LLM Providers:");
+            Log($"  Parsing: {_settings.Llm.ParsingProvider}");
+            Log($"  Classification: {_settings.Llm.ClassificationProvider}");
+            Log($"  Labels: {_settings.Llm.LabelsProvider}");
+            if (IsOllamaUsed)
             {
                 Log($"  Ollama: {ollamaSettings.BaseUrl}, Model: {ollamaSettings.Model}");
             }
-            else
+            if (IsYandexGptUsed)
             {
                 Log($"  YandexGPT: Model: {_settings.YandexGpt.Model}");
             }
@@ -950,13 +965,15 @@ public partial class MainViewModel : ObservableObject
             _settings.YandexGpt.ApiKey = YandexApiKey;
             _settings.YandexGpt.Model = YandexModel;
 
-            // LLM Provider selection
-            _settings.Llm.Provider = (LlmProviderType)SelectedLlmProviderIndex;
+            // LLM Provider selection (per operation)
+            _settings.Llm.ParsingProvider = (LlmProviderType)ParsingProviderIndex;
+            _settings.Llm.ClassificationProvider = (LlmProviderType)ClassificationProviderIndex;
+            _settings.Llm.LabelsProvider = (LlmProviderType)LabelsProviderIndex;
 
             _settingsService.Save(_settings);
 
             Log($"Settings saved to: {_settingsService.SettingsPath}");
-            Log($"LLM Provider: {_settings.Llm.Provider}");
+            Log($"LLM Providers - Parsing: {_settings.Llm.ParsingProvider}, Classification: {_settings.Llm.ClassificationProvider}, Labels: {_settings.Llm.LabelsProvider}");
             StatusText = "Settings saved";
         }
         catch (Exception ex)

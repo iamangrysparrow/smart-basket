@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Ollama;
@@ -44,8 +45,8 @@ public class LabelAssignmentService : ILabelAssignmentService
                 return result;
             }
 
-            // Получаем текущий провайдер
-            var provider = _providerFactory.GetCurrentProvider();
+            // Получаем провайдер для меток
+            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Labels);
             progress?.Report($"  [Labels] Using provider: {provider.Name}");
 
             var prompt = BuildPrompt(itemName, productName, availableLabels, progress);
@@ -151,8 +152,8 @@ public class LabelAssignmentService : ILabelAssignmentService
                 return result;
             }
 
-            // Получаем текущий провайдер
-            var provider = _providerFactory.GetCurrentProvider();
+            // Получаем провайдер для меток
+            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Labels);
             progress?.Report($"  [Labels] Using provider: {provider.Name}");
 
             var prompt = BuildBatchPrompt(items, availableLabels);
