@@ -69,34 +69,8 @@ public partial class MainWindow : Window
     {
         LogPanel.Visibility = Visibility.Visible;
 
-        // Set password in SettingsView PasswordBox
-        var passwordBox = SettingsViewControl.GetPasswordBox();
-        passwordBox.Password = _viewModel.EmailPassword;
-        passwordBox.PasswordChanged += PasswordBox_PasswordChanged;
-
-        // Set YandexGPT API key in SettingsView PasswordBox
-        var yandexApiKeyBox = SettingsViewControl.GetYandexApiKeyBox();
-        yandexApiKeyBox.Password = _viewModel.YandexApiKey;
-        yandexApiKeyBox.PasswordChanged += YandexApiKeyBox_PasswordChanged;
-
         // Set DataContext for ProductsItemsView
         ProductsItemsViewControl.DataContext = _productsItemsViewModel;
-    }
-
-    private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
-    {
-        if (sender is System.Windows.Controls.PasswordBox pb)
-        {
-            _viewModel.EmailPassword = pb.Password;
-        }
-    }
-
-    private void YandexApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
-    {
-        if (sender is System.Windows.Controls.PasswordBox pb)
-        {
-            _viewModel.YandexApiKey = pb.Password;
-        }
     }
 
     private void ToggleLogPanel_Click(object sender, RoutedEventArgs e)

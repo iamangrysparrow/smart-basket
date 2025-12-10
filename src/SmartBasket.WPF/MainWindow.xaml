@@ -150,16 +150,6 @@
                 <views:ProductsItemsView x:Name="ProductsItemsViewControl"/>
             </TabItem>
 
-            <!-- Tab 3: Settings -->
-            <TabItem>
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <Path Data="{StaticResource IconSettings}" Fill="#881798" Width="12" Height="12" Stretch="Uniform" Margin="0,0,4,0"/>
-                        <TextBlock Text="Settings"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <views:SettingsView x:Name="SettingsViewControl"/>
-            </TabItem>
         </TabControl>
 
         <!-- Log Panel -->

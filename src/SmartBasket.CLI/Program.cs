@@ -43,21 +43,43 @@ var configuration = new ConfigurationBuilder()
 var settings = new AppSettings();
 configuration.Bind(settings);
 
+// Get default Ollama provider from AiProviders
+var ollamaProvider = settings.AiProviders.FirstOrDefault(p => p.Provider == AiProviderType.Ollama);
+if (ollamaProvider == null)
+{
+    Console.WriteLine("ERROR: No Ollama provider configured in AiProviders!");
+    Console.WriteLine("Please add an Ollama provider to appsettings.json");
+    return 1;
+}
+
+// Get first Email source from ReceiptSources
+var emailSource = settings.ReceiptSources.FirstOrDefault(s => s.Type == SourceType.Email && s.IsEnabled);
+
 switch (mode)
 {
     case "test-ollama":
     case "test":
-        return await TestOllamaAsync(settings, args.Length > 1 ? int.Parse(args[1]) : 3);
+        return await TestOllamaAsync(ollamaProvider, args.Length > 1 ? int.Parse(args[1]) : 3);
 
     case "email":
-        return await FetchEmailsAsync(settings);
+        if (emailSource?.Email == null)
+        {
+            Console.WriteLine("ERROR: No Email source configured in ReceiptSources!");
+            return 1;
+        }
+        return await FetchEmailsAsync(emailSource.Email);
 
     case "parse":
-        return await ParseEmailsAsync(settings);
+        if (emailSource?.Email == null)
+        {
+            Console.WriteLine("ERROR: No Email source configured in ReceiptSources!");
+            return 1;
+        }
+        return await ParseEmailsAsync(emailSource.Email, ollamaProvider);
 
     case "classify":
-        var model = args.Length > 1 ? args[1] : settings.Ollama.Model;
-        return await TestClassificationAsync(settings, model);
+        var model = args.Length > 1 ? args[1] : ollamaProvider.Model;
+        return await TestClassificationAsync(ollamaProvider, model);
 
     default:
         Console.WriteLine("=== SmartBasket CLI ===");
@@ -69,21 +91,29 @@ switch (mode)
         Console.WriteLine("  dotnet run -- classify [model]     - Test classification pipeline");
         Console.WriteLine();
         Console.WriteLine($"Settings: {settingsPath}");
-        Console.WriteLine($"Ollama: {settings.Ollama.BaseUrl}, Model: {settings.Ollama.Model}");
+        Console.WriteLine($"Ollama Provider: {ollamaProvider.Key}");
+        Console.WriteLine($"  BaseUrl: {ollamaProvider.BaseUrl}");
+        Console.WriteLine($"  Model: {ollamaProvider.Model}");
+        if (emailSource != null)
+        {
+            Console.WriteLine($"Email Source: {emailSource.Name}");
+            Console.WriteLine($"  Server: {emailSource.Email?.ImapServer}");
+        }
         return 0;
 }
 
 // ============= TEST OLLAMA MODE =============
-async Task<int> TestOllamaAsync(AppSettings settings, int runCount)
+async Task<int> TestOllamaAsync(AiProviderConfig provider, int runCount)
 {
     Console.WriteLine("=== Ollama Performance Test ===");
-    Console.WriteLine($"URL: {settings.Ollama.BaseUrl}");
-    Console.WriteLine($"Model: {settings.Ollama.Model}");
+    Console.WriteLine($"Provider: {provider.Key}");
+    Console.WriteLine($"URL: {provider.BaseUrl}");
+    Console.WriteLine($"Model: {provider.Model}");
     Console.WriteLine($"Runs: {runCount}");
     Console.WriteLine();
 
     using var httpClient = new HttpClient();
-    httpClient.Timeout = TimeSpan.FromSeconds(30);
+    httpClient.Timeout = TimeSpan.FromSeconds(provider.TimeoutSeconds);
 
     // Simple test prompt - short receipt
     var testPrompt = @"Ты помощник по распознаванию чеков. Извлеки данные из этого чека:
@@ -106,8 +136,8 @@ async Task<int> TestOllamaAsync(AppSettings settings, int runCount)
     var warmupSw = Stopwatch.StartNew();
     try
     {
-        var warmupReq = new { model = settings.Ollama.Model, prompt = "Hi", stream = false };
-        var warmupResp = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", warmupReq);
+        var warmupReq = new { model = provider.Model, prompt = "Hi", stream = false };
+        var warmupResp = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", warmupReq);
         warmupSw.Stop();
         Console.WriteLine($"Warmup: {warmupSw.Elapsed.TotalSeconds:F1}s - {warmupResp.StatusCode}");
     }
@@ -125,16 +155,16 @@ async Task<int> TestOllamaAsync(AppSettings settings, int runCount)
 
         var request = new
         {
-            model = settings.Ollama.Model,
+            model = provider.Model,
             prompt = testPrompt,
             stream = false,
-            options = new { temperature = 0.1, num_predict = 512 }
+            options = new { temperature = provider.Temperature, num_predict = 512 }
         };
 
         var sw = Stopwatch.StartNew();
         try
         {
-            var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", request);
+            var response = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", request);
             sw.Stop();
 
             if (response.IsSuccessStatusCode)
@@ -206,26 +236,39 @@ async Task<int> TestOllamaAsync(AppSettings settings, int runCount)
 }
 
 // ============= FETCH EMAILS MODE =============
-async Task<int> FetchEmailsAsync(AppSettings settings)
+async Task<int> FetchEmailsAsync(EmailSourceConfig emailConfig)
 {
     Console.WriteLine("=== Fetch Emails ===");
-    Console.WriteLine($"Server: {settings.Email.ImapServer}:{settings.Email.ImapPort}");
-    Console.WriteLine($"User: {settings.Email.Username}");
-    Console.WriteLine($"Filters: Sender='{settings.Email.SenderFilter}', Subject='{settings.Email.SubjectFilter}'");
+    Console.WriteLine($"Server: {emailConfig.ImapServer}:{emailConfig.ImapPort}");
+    Console.WriteLine($"User: {emailConfig.Username}");
+    Console.WriteLine($"Filters: Sender='{emailConfig.SenderFilter}', Subject='{emailConfig.SubjectFilter}'");
     Console.WriteLine();
+
+    // Convert EmailSourceConfig to legacy EmailSettings for EmailService
+    var emailSettings = new EmailSettings
+    {
+        ImapServer = emailConfig.ImapServer,
+        ImapPort = emailConfig.ImapPort,
+        UseSsl = emailConfig.UseSsl,
+        Username = emailConfig.Username,
+        Password = emailConfig.Password,
+        SenderFilter = emailConfig.SenderFilter,
+        SubjectFilter = emailConfig.SubjectFilter,
+        Folder = emailConfig.Folder,
+        SearchDaysBack = emailConfig.SearchDaysBack
+    };
 
     var services = new ServiceCollection();
     services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
-    services.AddSingleton(settings);
     services.AddSingleton<IEmailService, EmailService>();
     var provider = services.BuildServiceProvider();
     var emailService = provider.GetRequiredService<IEmailService>();
 
-    var (ok, msg) = await emailService.TestConnectionAsync(settings.Email);
+    var (ok, msg) = await emailService.TestConnectionAsync(emailSettings);
     Console.WriteLine($"Connection: {(ok ? "OK" : "FAILED")} - {msg}");
     if (!ok) return 1;
 
-    var emails = await emailService.FetchEmailsAsync(settings.Email, new Progress<string>(Console.WriteLine));
+    var emails = await emailService.FetchEmailsAsync(emailSettings, new Progress<string>(Console.WriteLine));
     Console.WriteLine($"Found: {emails.Count} emails");
 
     var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
@@ -248,25 +291,38 @@ async Task<int> FetchEmailsAsync(AppSettings settings)
 }
 
 // ============= PARSE EMAILS MODE =============
-async Task<int> ParseEmailsAsync(AppSettings settings)
+async Task<int> ParseEmailsAsync(EmailSourceConfig emailConfig, AiProviderConfig provider)
 {
     Console.WriteLine("=== Parse Emails with Ollama ===");
+    Console.WriteLine($"Provider: {provider.Key}");
 
-    // First fetch emails
+    // Convert EmailSourceConfig to legacy EmailSettings for EmailService
+    var emailSettings = new EmailSettings
+    {
+        ImapServer = emailConfig.ImapServer,
+        ImapPort = emailConfig.ImapPort,
+        UseSsl = emailConfig.UseSsl,
+        Username = emailConfig.Username,
+        Password = emailConfig.Password,
+        SenderFilter = emailConfig.SenderFilter,
+        SubjectFilter = emailConfig.SubjectFilter,
+        Folder = emailConfig.Folder,
+        SearchDaysBack = emailConfig.SearchDaysBack
+    };
+
     var services = new ServiceCollection();
     services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
-    services.AddSingleton(settings);
     services.AddSingleton<IEmailService, EmailService>();
-    var provider = services.BuildServiceProvider();
-    var emailService = provider.GetRequiredService<IEmailService>();
+    var serviceProvider = services.BuildServiceProvider();
+    var emailService = serviceProvider.GetRequiredService<IEmailService>();
 
-    var emails = await emailService.FetchEmailsAsync(settings.Email, new Progress<string>(s => { }));
+    var emails = await emailService.FetchEmailsAsync(emailSettings, new Progress<string>(s => { }));
     Console.WriteLine($"Found: {emails.Count} emails");
 
     if (emails.Count == 0) return 0;
 
     using var httpClient = new HttpClient();
-    httpClient.Timeout = TimeSpan.FromSeconds(120);
+    httpClient.Timeout = TimeSpan.FromSeconds(provider.TimeoutSeconds);
 
     var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
     Directory.CreateDirectory(outputDir);
@@ -287,16 +343,16 @@ async Task<int> ParseEmailsAsync(AppSettings settings)
 
         var request = new
         {
-            model = settings.Ollama.Model,
+            model = provider.Model,
             prompt = prompt,
             stream = false,
-            options = new { temperature = 0.1, num_predict = 4096 }
+            options = new { temperature = provider.Temperature, num_predict = provider.MaxTokens ?? 4096 }
         };
 
         var sw = Stopwatch.StartNew();
         try
         {
-            var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", request);
+            var response = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", request);
             sw.Stop();
 
             Console.WriteLine($"  Response: {sw.Elapsed.TotalSeconds:F1}s, {response.StatusCode}");
@@ -359,10 +415,11 @@ static string BuildPrompt(string body) => $@"Извлеки из чека JSON. 
 {body}";
 
 // ============= CLASSIFY TEST MODE =============
-async Task<int> TestClassificationAsync(AppSettings settings, string model)
+async Task<int> TestClassificationAsync(AiProviderConfig provider, string model)
 {
     Console.WriteLine("=== Classification Pipeline Test ===");
-    Console.WriteLine($"URL: {settings.Ollama.BaseUrl}");
+    Console.WriteLine($"Provider: {provider.Key}");
+    Console.WriteLine($"URL: {provider.BaseUrl}");
     Console.WriteLine($"Model: {model}");
     Console.WriteLine();
 
@@ -419,7 +476,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
     };
 
     using var httpClient = new HttpClient();
-    httpClient.Timeout = TimeSpan.FromSeconds(180);
+    httpClient.Timeout = TimeSpan.FromSeconds(provider.TimeoutSeconds);
 
     var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
     Directory.CreateDirectory(outputDir);
@@ -438,7 +495,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
     Console.WriteLine();
 
     var sw = Stopwatch.StartNew();
-    var existingHierarchy = new List<string>(); // Накапливаем иерархию между батчами
+    var existingHierarchy = new List<string>(); // Accumulate hierarchy between batches
     var batchSize = 5;
     var batches = testItems.Chunk(batchSize).ToList();
     var totalProducts = 0;
@@ -485,14 +542,14 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
             model = model,
             prompt = classifyPrompt,
             stream = false,
-            options = new { temperature = 0.1, num_predict = 2048 }
+            options = new { temperature = provider.Temperature, num_predict = 2048 }
         };
 
         sw.Restart();
 
         try
         {
-            var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", classifyRequest);
+            var response = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", classifyRequest);
             sw.Stop();
             Console.WriteLine($"Response: {sw.Elapsed.TotalSeconds:F1}s");
 
@@ -514,7 +571,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
                     if (parsed.TryGetProperty("products", out var products))
                     {
                         totalProducts += products.GetArrayLength();
-                        // Добавить новые продукты в иерархию для следующих батчей
+                        // Add new products to hierarchy for next batches
                         foreach (var p in products.EnumerateArray())
                         {
                             var name = p.TryGetProperty("name", out var n) ? n.GetString() : null;
@@ -580,7 +637,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
         model = model,
         prompt = unitPrompt,
         stream = false,
-        options = new { temperature = 0.1, num_predict = 1024 }
+        options = new { temperature = provider.Temperature, num_predict = 1024 }
     };
 
     Console.WriteLine("Sending unit extraction request...");
@@ -588,7 +645,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
 
     try
     {
-        var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", unitRequest);
+        var response = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", unitRequest);
         sw.Stop();
         Console.WriteLine($"Response: {sw.Elapsed.TotalSeconds:F1}s");
 
@@ -651,7 +708,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
             model = model,
             prompt = labelPrompt,
             stream = false,
-            options = new { temperature = 0.1, num_predict = 256 }
+            options = new { temperature = provider.Temperature, num_predict = 256 }
         };
 
         Console.Write($"  {item.Substring(0, Math.Min(40, item.Length))}... ");
@@ -659,7 +716,7 @@ async Task<int> TestClassificationAsync(AppSettings settings, string model)
 
         try
         {
-            var response = await httpClient.PostAsJsonAsync($"{settings.Ollama.BaseUrl}/api/generate", labelRequest);
+            var response = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", labelRequest);
             sw.Stop();
 
             if (response.IsSuccessStatusCode)
