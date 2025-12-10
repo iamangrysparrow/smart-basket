@@ -100,15 +100,25 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Theme Toggle - YELLOW -->
-                <Button Grid.Column="1" x:Name="ThemeToggleButton"
-                        Style="{StaticResource ToolbarButton}"
-                        Click="ToggleTheme_Click"
-                        ToolTip="Toggle light/dark theme">
-                    <Path x:Name="ThemeIcon"
-                          Data="{StaticResource IconMoon}"
-                          Fill="#FFB900" Width="14" Height="14" Stretch="Uniform"/>
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- Advanced Settings - PURPLE -->
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Click="OpenSettingsWindow_Click"
+                            ToolTip="Advanced settings">
+                        <Path Data="{StaticResource IconSettings}"
+                              Fill="#881798" Width="14" Height="14" Stretch="Uniform"/>
+                    </Button>
+
+                    <!-- Theme Toggle - YELLOW -->
+                    <Button x:Name="ThemeToggleButton"
+                            Style="{StaticResource ToolbarButton}"
+                            Click="ToggleTheme_Click"
+                            ToolTip="Toggle light/dark theme">
+                        <Path x:Name="ThemeIcon"
+                              Data="{StaticResource IconMoon}"
+                              Fill="#FFB900" Width="14" Height="14" Stretch="Uniform"/>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -1,11 +1,14 @@
 using System.Collections.Specialized;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Media;
 using SmartBasket.Core.Configuration;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
+using SmartBasket.WPF.ViewModels.Settings;
 using SmartBasket.WPF.Views;
+using SmartBasket.WPF.Views.Settings;
 
 namespace SmartBasket.WPF;
 
@@ -15,19 +18,22 @@ public partial class MainWindow : Window
     private readonly ProductsItemsViewModel _productsItemsViewModel;
     private readonly AppSettings _appSettings;
     private readonly SettingsService _settingsService;
+    private readonly IHttpClientFactory _httpClientFactory;
     private LogWindow? _logWindow;
 
     public MainWindow(
         MainViewModel viewModel,
         ProductsItemsViewModel productsItemsViewModel,
         AppSettings appSettings,
-        SettingsService settingsService)
+        SettingsService settingsService,
+        IHttpClientFactory httpClientFactory)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _productsItemsViewModel = productsItemsViewModel;
         _appSettings = appSettings;
         _settingsService = settingsService;
+        _httpClientFactory = httpClientFactory;
         DataContext = viewModel;
 
         // Enable thread-safe collection access BEFORE any async operations
@@ -145,6 +151,22 @@ public partial class MainWindow : Window
         // Save to settings
         _appSettings.Theme = ThemeManager.CurrentTheme.ToString();
         _ = _settingsService.SaveSettingsAsync(_appSettings);
+    }
+
+    private void OpenSettingsWindow_Click(object sender, RoutedEventArgs e)
+    {
+        // Передаем логгер через BeginInvoke чтобы не блокировать диалог
+        Action<string> log = message =>
+        {
+            Dispatcher.BeginInvoke(() => _viewModel.AddLogEntry(message));
+        };
+
+        var settingsVm = new SettingsViewModel(_appSettings, _settingsService, log, _httpClientFactory);
+        var settingsWindow = new SettingsWindow(settingsVm)
+        {
+            Owner = this
+        };
+        settingsWindow.ShowDialog();
     }
 
     private void UpdateThemeIcon()

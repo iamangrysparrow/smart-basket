@@ -17,7 +17,9 @@
             <!-- Global Converters -->
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
             <converters:StringToColorConverter x:Key="StringToColor"/>
+            <converters:DoubleToStringConverter x:Key="DoubleToString"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -4,7 +4,7 @@
 
 ## Overview
 
-SmartBasket - приложение для автоматического парсинга чеков из email с использованием локального LLM (Ollama).
+SmartBasket — приложение для автоматического сбора и анализа чеков из различных источников с использованием AI для категоризации.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -21,10 +21,13 @@ SmartBasket - приложение для автоматического пар�
 │ SmartBasket     │   │ SmartBasket     │   │ SmartBasket     │
 │   .Services     │   │   .Data         │   │   .Core         │
 │                 │   │                 │   │                 │
-│ • EmailService  │   │ • DbContext     │   │ • Entities      │
-│ • OllamaService │   │ • PostgreSQL    │   │ • Configuration │
+│ • Sources       │   │ • DbContext     │   │ • Entities      │
+│ • Parsers       │   │ • PostgreSQL    │   │ • Configuration │
+│ • AI Providers  │   │                 │   │                 │
 └─────────────────┘   └─────────────────┘   └─────────────────┘
 ```
+
+---
 
 ## Domain Concepts (Доменные понятия)
 
@@ -83,6 +86,204 @@ SmartBasket - приложение для автоматического пар�
 - Product: "Свекла" (категория)
 - Item: Name="Свекла", UnitOfMeasure="кг", UnitQuantity=1 (нет отдельной характеристики)
 - ReceiptItem: Quantity=0.524, Price=30.99, Amount=16.24
+```
+
+---
+
+## System Architecture
+
+### Sources (Источники чеков)
+
+Источник — это канал получения **сырых данных** (текст письма, файл, JSON от API).
+Источник НЕ знает о парсере — он только доставляет данные.
+
+```
+ReceiptSource
+├── Name: string              // Уникальный идентификатор
+├── Type: SourceType          // Email, REST, FileSystem
+├── Parser: string            // Имя парсера для обработки
+├── IsEnabled: bool
+└── Config: {}                // Специфичные настройки типа
+```
+
+**Типы источников:**
+
+| Type | Description | Config |
+|------|-------------|--------|
+| **Email** | IMAP почтовый ящик | Server, Port, Credentials, Filters |
+| **REST** | API стороннего сервиса | Endpoint, Auth, Headers |
+| **FileSystem** | Папка с файлами/фото | Path, FilePattern |
+
+**Пример конфигурации:**
+```json
+{
+  "ReceiptSources": [
+    {
+      "Name": "Instamart-Main",
+      "Type": "Email",
+      "Parser": "Instamart",
+      "Email": {
+        "ImapServer": "imap.yandex.ru",
+        "Username": "user@yandex.ru",
+        "SenderFilter": "noreply@instamart.ru"
+      }
+    }
+  ]
+}
+```
+
+---
+
+### Parsers (Парсеры)
+
+Парсер извлекает структурированные данные (Items, ReceiptItems) из сырых данных источника.
+Парсер публикует свою **потребность в AI**.
+
+```
+ReceiptParser
+├── Name: string              // "Instamart", "Auchan", "GenericLLM"
+├── Type: ParserType          // Regex, LLM
+├── RequiresAI: bool          // Публикует потребность в AI
+└── AiProvider: string?       // Ссылка на AI провайдера (если RequiresAI=true)
+```
+
+**Зарегистрированные парсеры:**
+
+| Parser | Type | RequiresAI | Description |
+|--------|------|------------|-------------|
+| **Instamart** | Regex | false | Чеки Instamart/СберМаркет |
+| **GenericLLM** | LLM | true | Универсальный парсер через AI |
+
+**Конфигурация:**
+```json
+{
+  "Parsers": [
+    { "Name": "Instamart", "Type": "Regex", "RequiresAI": false },
+    { "Name": "GenericLLM", "Type": "LLM", "RequiresAI": true, "AiProvider": "Ollama/qwen2.5:1.5b" }
+  ]
+}
+```
+
+---
+
+### AI Providers (Поставщики AI)
+
+AI Provider — конкретная конфигурация доступа к AI-модели.
+Ключ: `Provider/Model` (например `Ollama/qwen2.5:1.5b`).
+
+```
+AiProviderConfig
+├── Key: string               // "Ollama/qwen2.5:1.5b"
+├── Provider: ProviderType    // Ollama, YandexGPT, OpenAI
+├── Model: string
+├── Temperature: decimal
+├── Timeout: int
+└── ... специфичные настройки
+```
+
+**Конфигурация:**
+```json
+{
+  "AiProviders": [
+    {
+      "Key": "Ollama/qwen2.5:1.5b",
+      "Provider": "Ollama",
+      "BaseUrl": "http://localhost:11434",
+      "Model": "qwen2.5-coder:1.5b",
+      "Temperature": 0.1
+    },
+    {
+      "Key": "Ollama/llama3.2:3b",
+      "Provider": "Ollama",
+      "BaseUrl": "http://localhost:11434",
+      "Model": "llama3.2:3b",
+      "Temperature": 0.2
+    },
+    {
+      "Key": "YandexGPT/lite",
+      "Provider": "YandexGPT",
+      "Model": "yandexgpt-lite",
+      "FolderId": "...",
+      "ApiKey": "..."
+    }
+  ]
+}
+```
+
+---
+
+### AI Operations (Операции AI)
+
+Связка системных операций пост-обработки с AI провайдерами.
+Парсинг управляется через `Parser.AiProvider`, не здесь.
+
+```json
+{
+  "AiOperations": {
+    "Classification": "Ollama/llama3.2:3b",
+    "Labels": "YandexGPT/lite"
+  }
+}
+```
+
+| Operation | Description |
+|-----------|-------------|
+| **Classification** | Связывание Item → Product |
+| **Labels** | Присвоение меток Items |
+
+---
+
+## Workflow (Процесс обработки)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    1. СБОР СЫРЫХ ДАННЫХ                         │
+│                                                                 │
+│  Source #1 (Email)     Source #2 (Email)     Source #3 (REST)  │
+│        │                     │                     │            │
+│        ▼                     ▼                     ▼            │
+│   RawReceipt            RawReceipt            RawReceipt       │
+│   (text/html)           (text/html)           (json)           │
+└────────┬─────────────────────┬─────────────────────┬────────────┘
+         │                     │                     │
+         ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    2. ПАРСИНГ                                   │
+│                                                                 │
+│  Parser: Instamart     Parser: GenericLLM    Parser: RestJson  │
+│  (RequiresAI: false)   (RequiresAI: true)    (RequiresAI: false)│
+│        │                     │                     │            │
+│        │               ┌─────┴─────┐               │            │
+│        │               │ AI Provider│               │            │
+│        │               └─────┬─────┘               │            │
+│        ▼                     ▼                     ▼            │
+│   ParsedReceipt         ParsedReceipt         ParsedReceipt    │
+└────────┬─────────────────────┬─────────────────────┬────────────┘
+         │                     │                     │
+         └──────────────────── ┼ ────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              3. СОХРАНЕНИЕ В БД                                 │
+│         Receipt + Items + ReceiptItems → DB                     │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              4. КАТЕГОРИЗАЦИЯ (AI)                              │
+│         Item → Product (AiOperations.Classification)           │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              5. ПОМЕТКИ (AI)                                    │
+│         Item → Labels (AiOperations.Labels)                    │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              6. ОЧИСТКА                                         │
+│         DELETE Products WHERE нет Items и нет Children         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -153,6 +354,8 @@ SmartBasket - приложение для автоматического пар�
 | **ItemLabel** | Связь Item ↔ Label (many-to-many). |
 | **EmailHistory** | История обработки писем для дедупликации. |
 
+---
+
 ## Projects
 
 ### SmartBasket.Core
@@ -169,9 +372,10 @@ SmartBasket - приложение для автоматического пар�
 
 **Configuration:**
 - `AppSettings` - корневой класс настроек
-- `EmailSettings` - IMAP сервер, фильтры
-- `OllamaSettings` - URL, модель, температура
-- `DatabaseSettings` - провайдер, connection string
+- `ReceiptSourceConfig` - конфигурация источников
+- `ParserConfig` - конфигурация парсеров
+- `AiProviderConfig` - конфигурация AI провайдеров
+- `AiOperationsConfig` - связка операций с провайдерами
 
 ### SmartBasket.Data
 Entity Framework Core DbContext.
@@ -195,47 +399,39 @@ public class SmartBasketDbContext : DbContext
 - SQLite (for testing)
 
 ### SmartBasket.Services
-Бизнес-логика. HTTP клиенты, IMAP.
+Бизнес-логика.
 
-**EmailService** (`IEmailService`):
-```csharp
-Task<(bool Success, string Message)> TestConnectionAsync(EmailSettings settings);
-Task<IReadOnlyList<EmailMessage>> FetchEmailsAsync(EmailSettings settings, IProgress<string>? progress);
-```
+**Sources:**
+- `IReceiptSource` - интерфейс источника данных
+- `EmailReceiptSource` - получение чеков из IMAP
 
-**OllamaService** (`IOllamaService`):
-```csharp
-void SetPromptTemplatePath(string path);  // Внешний шаблон prompt
-Task<(bool Success, string Message)> TestConnectionAsync(OllamaSettings settings);
-Task<ParsedReceipt> ParseReceiptAsync(OllamaSettings settings, string emailBody, DateTime emailDate, IProgress<string>? progress);
-```
-- Поддержка streaming (построчный вывод ответа модели)
-- Внешний шаблон `prompt_template.txt` с плейсхолдерами `{{YEAR}}`, `{{RECEIPT_TEXT}}`
+**Parsers:**
+- `IReceiptTextParser` - интерфейс парсера
+- `InstamartReceiptParser` - regex-парсер для Instamart
+- `LlmReceiptParser` - универсальный парсер через AI
+
+**AI Providers:**
+- `ILlmProvider` - интерфейс AI провайдера
+- `OllamaLlmProvider` - локальная Ollama
+- `YandexGptLlmProvider` - Yandex GPT
+
+**Services:**
+- `ReceiptCollectionService` - оркестрация сбора чеков
+- `ProductClassificationService` - категоризация через AI
+- `LabelAssignmentService` - назначение меток через AI
+- `ProductCleanupService` - удаление осиротевших Products
 
 ### SmartBasket.WPF
 WPF приложение с MVVM (CommunityToolkit.Mvvm).
 
-**App.xaml.cs** - DI контейнер, exception handlers
-**MainWindow.xaml** - UI layout
-**MainViewModel** - команды, состояние
-
 **UI Features:**
 - Современный card-based дизайн с тенями и градиентами
 - Master-Detail: список чеков → детали с позициями
-- Фильтры: дата, магазин (с поиском через ComboBox)
-- Поиск по позициям в выбранном чеке
-- Управление категориями (Products)
-- Назначение меток (Labels)
-
-**Key Commands:**
-- `TestEmailConnectionCommand` - тест IMAP
-- `TestOllamaConnectionCommand` - тест Ollama
-- `FetchAndParseEmailsCommand` - полный пайплайн
-- `LoadReceiptsCommand` - загрузка из БД с фильтрами
-- `ApplyFiltersCommand` / `ClearFiltersCommand` - фильтрация
-- `SaveSettingsCommand` - сохранение настроек
-- `SaveLogCommand` - сохранение лога в файл
-- `LoadCategoryTreeCommand` - загрузка дерева категорий
+- Настройки с древовидной навигацией:
+  - Источники чеков
+  - Парсеры
+  - Поставщики AI
+  - Операции AI
 
 ### SmartBasket.CLI
 Консольные утилиты для тестирования.
@@ -246,39 +442,39 @@ dotnet run -- email                # Скачать письма
 dotnet run -- parse                # Скачать и распарсить
 ```
 
-## Data Flow
+---
+
+## Settings UI Structure
 
 ```
-1. Email (IMAP)
-   │
-   ▼
-2. EmailService.FetchEmailsAsync()
-   │  - Connect to IMAP server
-   │  - Search by filters (sender, subject, date)
-   │  - Download message bodies
-   │
-   ▼
-3. OllamaService.ParseReceiptAsync()
-   │  - Clean HTML to text
-   │  - Build prompt with JSON schema
-   │  - Call Ollama API
-   │  - Extract JSON from response
-   │
-   ▼
-4. Receipt + Items + ReceiptItems
-   │  - Find or create Product (via AI)
-   │  - Find or create Item (unique name)
-   │  - Create ReceiptItem
-   │  - Save to PostgreSQL
-   │  - Mark email as processed
-   │
-   ▼
-5. UI (MainViewModel)
-   - Отображение в Master-Detail с фильтрами и поиском
-   - Управление категориями и метками
+Настройки
+│
+├── Источники чеков
+│   ├── [+] Добавить
+│   └── MyEmail-Instamart
+│         Type: Email
+│         Parser: Instamart
+│         IMAP: imap.yandex.ru
+│         ...
+│
+├── Парсеры
+│   ├── Instamart (Regex) — AI не требуется
+│   └── GenericLLM (LLM)
+│         AI Provider: [выбор ▼]
+│
+├── Поставщики AI
+│   ├── [+] Добавить
+│   ├── Ollama/qwen2.5:1.5b
+│   └── YandexGPT/lite
+│
+└── Операции AI
+    ├── Категоризация: [выбор провайдера ▼]
+    └── Пометки: [выбор провайдера ▼]
 ```
 
-## Configuration
+---
+
+## Configuration Example
 
 **appsettings.json:**
 ```json
@@ -287,24 +483,50 @@ dotnet run -- parse                # Скачать и распарсить
     "Provider": "PostgreSQL",
     "ConnectionString": "Host=localhost;Database=smart_basket;..."
   },
-  "Email": {
-    "ImapServer": "imap.yandex.com",
-    "ImapPort": 993,
-    "UseSsl": true,
-    "Username": "user@yandex.ru",
-    "Password": "app-password",
-    "SenderFilter": "info@shop.ru",
-    "SubjectFilter": "заказ",
-    "SearchDaysBack": 30
-  },
-  "Ollama": {
-    "BaseUrl": "http://localhost:11434",
-    "Model": "qwen2.5-coder:1.5b",
-    "Temperature": 0.1,
-    "TimeoutSeconds": 30
+
+  "ReceiptSources": [
+    {
+      "Name": "Instamart-Main",
+      "Type": "Email",
+      "Parser": "Instamart",
+      "IsEnabled": true,
+      "Email": {
+        "ImapServer": "imap.yandex.com",
+        "ImapPort": 993,
+        "UseSsl": true,
+        "Username": "user@yandex.ru",
+        "Password": "app-password",
+        "SenderFilter": "noreply@instamart.ru",
+        "SubjectFilter": "заказ",
+        "SearchDaysBack": 30
+      }
+    }
+  ],
+
+  "Parsers": [
+    { "Name": "Instamart", "Type": "Regex", "RequiresAI": false },
+    { "Name": "GenericLLM", "Type": "LLM", "RequiresAI": true, "AiProvider": "Ollama/qwen2.5:1.5b" }
+  ],
+
+  "AiProviders": [
+    {
+      "Key": "Ollama/qwen2.5:1.5b",
+      "Provider": "Ollama",
+      "BaseUrl": "http://localhost:11434",
+      "Model": "qwen2.5-coder:1.5b",
+      "Temperature": 0.1,
+      "TimeoutSeconds": 30
+    }
+  ],
+
+  "AiOperations": {
+    "Classification": "Ollama/qwen2.5:1.5b",
+    "Labels": "Ollama/qwen2.5:1.5b"
   }
 }
 ```
+
+---
 
 ## Dependencies
 
@@ -318,6 +540,8 @@ dotnet run -- parse                # Скачать и распарсить
 | Microsoft.Extensions.Configuration.Json | JSON config |
 | Microsoft.Extensions.Logging | Logging abstractions |
 
+---
+
 ## Threading Model
 
 ```
@@ -325,21 +549,27 @@ dotnet run -- parse                # Скачать и распарсить
 │     UI Thread       │     │    ThreadPool       │
 │                     │     │                     │
 │  MainWindow         │     │  Task.Run(() =>     │
-│  MainViewModel      │     │    EmailService     │
-│  ObservableCollect  │◀───│    OllamaService    │
-│  (with lock)        │     │    DbContext)       │
-│                     │     │                     │
+│  MainViewModel      │     │    ReceiptSource    │
+│  ObservableCollect  │◀───│    Parser           │
+│  (with lock)        │     │    AI Provider      │
+│                     │     │    DbContext)       │
 └─────────────────────┘     └─────────────────────┘
 
 BindingOperations.EnableCollectionSynchronization
 позволяет безопасно модифицировать коллекции из ThreadPool
 ```
 
-## TODO (Refactoring in Progress)
+---
+
+## TODO
 
 - [x] Реализовать создание Items и ReceiptItems при парсинге чеков
 - [x] AI категоризация товаров → Product (ProductClassificationService)
 - [x] Иерархия продуктов (Product.ParentId)
 - [x] AI назначение меток (LabelAssignmentService)
+- [x] Regex-парсер для Instamart (без AI)
+- [ ] Рефакторинг конфигурации (Sources, Parsers, AI Providers)
+- [ ] Новый UI настроек с древовидной навигацией
+- [ ] Очистка осиротевших Products
 - [ ] UI для управления метками (Labels)
 - [ ] Аналитика по меткам и категориям

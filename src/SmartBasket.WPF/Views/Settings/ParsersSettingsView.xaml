@@ -1,0 +1,236 @@
+<UserControl x:Class="SmartBasket.WPF.Views.Settings.ParsersSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="clr-namespace:SmartBasket.WPF.ViewModels.Settings"
+             xmlns:core="clr-namespace:SmartBasket.Core.Configuration;assembly=SmartBasket.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="600">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Парсеры чеков" Style="{StaticResource H1}"/>
+            <TextBlock Text="Парсеры извлекают структурированные данные из сырого текста чеков"
+                       Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Parser List -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Список парсеров" Style="{StaticResource H3}" Margin="0,0,0,8"/>
+
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding Parsers}"
+                         SelectedItem="{Binding SelectedParser}"
+                         Height="140"
+                         Background="Transparent"
+                         BorderThickness="1"
+                         BorderBrush="{DynamicResource BorderBrush}"
+                         ScrollViewer.IsDeferredScrollingEnabled="False"
+                         VirtualizingPanel.ScrollUnit="Pixel">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ParserViewModel}">
+                            <Grid Margin="4,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Icon for built-in -->
+                                <TextBlock Grid.Column="0" Grid.RowSpan="2" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           FontSize="16">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value=""/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                    <Setter Property="Text" Value="&#x1F512;"/>
+                                                    <Setter Property="ToolTip" Value="Встроенный парсер"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Name and Type -->
+                                <StackPanel Grid.Column="1" Grid.Row="0" Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
+                                            Visibility="{Binding RequiresAI, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="AI" FontSize="9" Foreground="White"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding Type, StringFormat=' [{0}]'}" Style="{StaticResource TextSecondary}"
+                                               VerticalAlignment="Center" FontSize="10"/>
+                                </StackPanel>
+
+                                <!-- Description -->
+                                <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Description}"
+                                           Style="{StaticResource TextSecondary}" FontSize="10" TextTrimming="CharacterEllipsis"/>
+
+                                <!-- Enabled/Disabled indicator -->
+                                <StackPanel Grid.Column="2" Grid.RowSpan="2" VerticalAlignment="Center" Margin="8,0,0,0">
+                                    <Ellipse Width="8" Height="8">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                                                <Setter Property="ToolTip" Value="Включен"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                        <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}"/>
+                                                        <Setter Property="ToolTip" Value="Отключен"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Button Grid.Row="2" Style="{StaticResource SecondaryButton}"
+                        Command="{Binding AddParserCommand}"
+                        HorizontalAlignment="Left" Margin="0,8,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="+" FontWeight="Bold" Margin="0,0,4,0"/>
+                        <TextBlock Text="Добавить парсер"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Parser Editor -->
+        <Border Grid.Row="2" Style="{StaticResource Card}"
+                Visibility="{Binding HasSelectedParser, Converter={StaticResource BoolToVis}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding SelectedParser}">
+                    <!-- Header with built-in indicator -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Настройки парсера" Style="{StaticResource H3}"/>
+                        <Border Background="{DynamicResource WarningBrush}" CornerRadius="3" Padding="6,2" Margin="12,0,0,0"
+                                Visibility="{Binding IsBuiltIn, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Встроенный (только чтение)" FontSize="10" Foreground="White"/>
+                        </Border>
+                    </StackPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Name -->
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Название" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextInput}" Margin="0,0,0,6"
+                                 IsReadOnly="{Binding IsBuiltIn}"/>
+
+                        <!-- Type -->
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Тип" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" SelectedValue="{Binding Type}"
+                                  SelectedValuePath="Tag" FontSize="12" Padding="4,3" Margin="0,0,0,6"
+                                  IsEnabled="{Binding CanEdit}">
+                            <ComboBoxItem Content="Regex (быстрый, без AI)" Tag="{x:Static core:ParserType.Regex}"/>
+                            <ComboBoxItem Content="LLM (универсальный, требует AI)" Tag="{x:Static core:ParserType.LLM}"/>
+                        </ComboBox>
+
+                        <!-- Description -->
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Описание" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextInput}" Margin="0,0,0,6"
+                                 IsReadOnly="{Binding IsBuiltIn}"/>
+
+                        <!-- Supported Shops -->
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Магазины" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SupportedShopsDisplay}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" VerticalAlignment="Center"/>
+
+                        <!-- Supported Formats -->
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Форматы" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SupportedFormatsDisplay}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" VerticalAlignment="Center"/>
+
+                        <!-- Requires AI -->
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Требует AI" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding RequiresAI}"
+                                  Content="Использовать AI провайдер для парсинга"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  VerticalAlignment="Center" Margin="0,0,0,6" FontSize="11"
+                                  IsEnabled="{Binding CanEdit}"/>
+
+                        <!-- AI Provider -->
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="AI Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                                   Visibility="{Binding ShowAiProviderSelection, Converter={StaticResource BoolToVis}}"/>
+                        <ComboBox Grid.Row="6" Grid.Column="1" Text="{Binding AiProvider, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  IsEditable="True" FontSize="12" Padding="4,3" Margin="0,0,0,6"
+                                  Visibility="{Binding ShowAiProviderSelection, Converter={StaticResource BoolToVis}}"/>
+
+                        <!-- Enabled -->
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Включен" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="7" Grid.Column="1" IsChecked="{Binding IsEnabled}"
+                                  Content="Парсер активен"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  VerticalAlignment="Center" Margin="0,0,0,6" FontSize="11"/>
+                    </Grid>
+
+                    <!-- Action Buttons (only for non-built-in) -->
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0"
+                                Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}">
+                        <Button Style="{StaticResource DangerButton}"
+                                Command="{Binding DataContext.DeleteParserCommand, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}" Width="10" Height="10" Stretch="Uniform"/>
+                                <TextBlock Text="Удалить" Margin="4,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Empty State - small hint under list, not center of screen -->
+        <TextBlock Grid.Row="2"
+                   Text="Выберите парсер из списка для просмотра настроек"
+                   Style="{StaticResource TextSecondary}"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top"
+                   Margin="0,8,0,0"
+                   FontSize="11"
+                   Visibility="{Binding HasSelectedParser, Converter={StaticResource InverseBoolToVis}}"/>
+    </Grid>
+</UserControl>

@@ -6,14 +6,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Data;
+using SmartBasket.Services;
 using SmartBasket.Services.Email;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Products;
+using SmartBasket.Services.Sources;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
+using SmartBasket.WPF.ViewModels.Settings;
 
 namespace SmartBasket.WPF;
 
@@ -44,6 +47,16 @@ public partial class App : Application
 
         _appSettings = new AppSettings();
         configuration.Bind(_appSettings);
+
+        // Decrypt secrets after loading
+        SettingsService.DecryptSecrets(_appSettings);
+
+        // Migrate legacy configuration to new format if needed (Phase 4)
+        var migrationService = new ConfigurationMigrationService();
+        if (migrationService.MigrateIfNeeded(_appSettings))
+        {
+            System.Diagnostics.Debug.WriteLine("Legacy configuration migrated to new format");
+        }
 
         // Apply saved theme before showing UI
         var themeName = _appSettings.Theme ?? "Light";
@@ -92,11 +105,21 @@ public partial class App : Application
         services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
         services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
 
-        // Regex-парсеры чеков (без LLM)
+        // Sources (Phase 2)
+        services.AddSingleton<IReceiptSourceFactory, ReceiptSourceFactory>();
+
+        // Parsers (Phase 2)
         services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();
         services.AddSingleton<ReceiptTextParserFactory>();
-
         services.AddSingleton<IReceiptParsingService, ReceiptParsingService>();
+
+        // AI Providers (Phase 2)
+        services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
+
+        // Orchestration (Phase 4)
+        services.AddScoped<IReceiptCollectionService, ReceiptCollectionService>();
+        services.AddScoped<IProductCleanupService, ProductCleanupService>();
+
         services.AddSingleton<SettingsService>();
 
         // Product/Item/Label services
@@ -107,6 +130,7 @@ public partial class App : Application
         // ViewModels
         services.AddTransient<MainViewModel>();
         services.AddTransient<ProductsItemsViewModel>();
+        services.AddTransient<SettingsViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

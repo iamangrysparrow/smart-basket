@@ -10,9 +10,11 @@ using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
+using SmartBasket.Services;
 using SmartBasket.Services.Email;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Products;
 using SmartBasket.WPF.Services;
 
 namespace SmartBasket.WPF.ViewModels;
@@ -45,6 +47,8 @@ public partial class MainViewModel : ObservableObject
     private readonly ICategoryService _categoryService;
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
+    private readonly IReceiptCollectionService _receiptCollectionService;
+    private readonly IProductCleanupService _productCleanupService;
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
     private readonly ReceiptProcessingService _receiptProcessingService;
@@ -58,6 +62,8 @@ public partial class MainViewModel : ObservableObject
         ICategoryService categoryService,
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
+        IReceiptCollectionService receiptCollectionService,
+        IProductCleanupService productCleanupService,
         AppSettings settings,
         SettingsService settingsService)
     {
@@ -68,6 +74,8 @@ public partial class MainViewModel : ObservableObject
         _categoryService = categoryService;
         _classificationService = classificationService;
         _labelAssignmentService = labelAssignmentService;
+        _receiptCollectionService = receiptCollectionService;
+        _productCleanupService = productCleanupService;
         _settings = settings;
         _settingsService = settingsService;
         _receiptProcessingService = new ReceiptProcessingService(dbContext, labelAssignmentService);
@@ -89,28 +97,42 @@ public partial class MainViewModel : ObservableObject
         var userLabelsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "user_labels.txt");
         _receiptProcessingService.SetUserLabelsPath(userLabelsPath);
 
-        // Initialize from settings
-        ImapServer = settings.Email.ImapServer;
-        ImapPort = settings.Email.ImapPort;
-        UseSsl = settings.Email.UseSsl;
-        EmailUsername = settings.Email.Username;
-        EmailPassword = settings.Email.Password;
-        SenderFilter = settings.Email.SenderFilter ?? string.Empty;
-        SubjectFilter = settings.Email.SubjectFilter ?? string.Empty;
-        SearchDaysBack = settings.Email.SearchDaysBack;
+        // Initialize from settings (legacy, null-safe)
+#pragma warning disable CS0618 // Type or member is obsolete
+        if (settings.Email != null)
+        {
+            ImapServer = settings.Email.ImapServer;
+            ImapPort = settings.Email.ImapPort;
+            UseSsl = settings.Email.UseSsl;
+            EmailUsername = settings.Email.Username;
+            EmailPassword = settings.Email.Password;
+            SenderFilter = settings.Email.SenderFilter ?? string.Empty;
+            SubjectFilter = settings.Email.SubjectFilter ?? string.Empty;
+            SearchDaysBack = settings.Email.SearchDaysBack;
+        }
 
-        OllamaBaseUrl = settings.Ollama.BaseUrl;
-        OllamaModel = settings.Ollama.Model;
+        if (settings.Ollama != null)
+        {
+            OllamaBaseUrl = settings.Ollama.BaseUrl;
+            OllamaModel = settings.Ollama.Model;
+        }
 
         // YandexGPT settings
-        YandexFolderId = settings.YandexGpt.FolderId;
-        YandexApiKey = settings.YandexGpt.ApiKey;
-        YandexModel = settings.YandexGpt.Model;
+        if (settings.YandexGpt != null)
+        {
+            YandexFolderId = settings.YandexGpt.FolderId;
+            YandexApiKey = settings.YandexGpt.ApiKey;
+            YandexModel = settings.YandexGpt.Model;
+        }
 
         // LLM Provider selection (per operation)
-        ParsingProviderIndex = (int)settings.Llm.ParsingProvider;
-        ClassificationProviderIndex = (int)settings.Llm.ClassificationProvider;
-        LabelsProviderIndex = (int)settings.Llm.LabelsProvider;
+        if (settings.Llm != null)
+        {
+            ParsingProviderIndex = (int)settings.Llm.ParsingProvider;
+            ClassificationProviderIndex = (int)settings.Llm.ClassificationProvider;
+            LabelsProviderIndex = (int)settings.Llm.LabelsProvider;
+        }
+#pragma warning restore CS0618
     }
 
     // Email Settings
@@ -251,6 +273,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Публичный метод для добавления записей в лог из других компонентов
+    /// </summary>
+    public void AddLogEntry(string message)
+    {
+        Log(message);
+    }
+
+    /// <summary>
     /// Логирует исключение с полной информацией: Message, InnerException, StackTrace
     /// </summary>
     private void LogException(Exception ex, string context = "")
@@ -296,13 +326,18 @@ public partial class MainViewModel : ObservableObject
         SearchDaysBack = SearchDaysBack
     };
 
-    private OllamaSettings GetCurrentOllamaSettings() => new()
+    private OllamaSettings GetCurrentOllamaSettings()
     {
-        BaseUrl = OllamaBaseUrl,
-        Model = OllamaModel,
-        Temperature = _settings.Ollama.Temperature,
-        TimeoutSeconds = _settings.Ollama.TimeoutSeconds
-    };
+#pragma warning disable CS0618 // Type or member is obsolete
+        return new OllamaSettings
+        {
+            BaseUrl = OllamaBaseUrl,
+            Model = OllamaModel,
+            Temperature = _settings.Ollama?.Temperature ?? 0.1,
+            TimeoutSeconds = _settings.Ollama?.TimeoutSeconds ?? 60
+        };
+#pragma warning restore CS0618
+    }
 
     [RelayCommand]
     private async Task TestEmailConnectionAsync()
@@ -421,15 +456,16 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
+#pragma warning disable CS0618 // Type or member is obsolete
             if (IsYandexGptUsed)
             {
-                if (string.IsNullOrWhiteSpace(_settings.YandexGpt.ApiKey))
+                if (string.IsNullOrWhiteSpace(_settings.YandexGpt?.ApiKey))
                 {
                     Log("ERROR: YandexGPT API key is not configured (used for some operations)");
                     StatusText = "Error: Configure YandexGPT API key";
                     return;
                 }
-                if (string.IsNullOrWhiteSpace(_settings.YandexGpt.FolderId))
+                if (string.IsNullOrWhiteSpace(_settings.YandexGpt?.FolderId))
                 {
                     Log("ERROR: YandexGPT Folder ID is not configured (used for some operations)");
                     StatusText = "Error: Configure YandexGPT Folder ID";
@@ -440,17 +476,18 @@ public partial class MainViewModel : ObservableObject
             Log($"Email: {emailSettings.ImapServer}:{emailSettings.ImapPort}, User: {emailSettings.Username}");
             Log($"Filters: Sender='{emailSettings.SenderFilter ?? "(none)"}', Subject='{emailSettings.SubjectFilter ?? "(none)"}', Days={emailSettings.SearchDaysBack}");
             Log($"LLM Providers:");
-            Log($"  Parsing: {_settings.Llm.ParsingProvider}");
-            Log($"  Classification: {_settings.Llm.ClassificationProvider}");
-            Log($"  Labels: {_settings.Llm.LabelsProvider}");
+            Log($"  Parsing: {_settings.Llm?.ParsingProvider}");
+            Log($"  Classification: {_settings.Llm?.ClassificationProvider}");
+            Log($"  Labels: {_settings.Llm?.LabelsProvider}");
             if (IsOllamaUsed)
             {
                 Log($"  Ollama: {ollamaSettings.BaseUrl}, Model: {ollamaSettings.Model}");
             }
             if (IsYandexGptUsed)
             {
-                Log($"  YandexGPT: Model: {_settings.YandexGpt.Model}");
+                Log($"  YandexGPT: Model: {_settings.YandexGpt?.Model}");
             }
+#pragma warning restore CS0618
 
             // Use ThreadSafeProgress instead of Progress<T> to avoid SynchronizationContext capture deadlock
             var progress = new ThreadSafeProgress<string>(msg => Log(msg));
@@ -686,6 +723,164 @@ public partial class MainViewModel : ObservableObject
 
         _dbContext.EmailHistory.Add(history);
         await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Собрать чеки из всех настроенных источников (Phase 4: новый API)
+    /// Использует ReceiptCollectionService для оркестрации
+    /// </summary>
+    [RelayCommand]
+    private async Task CollectReceiptsAsync()
+    {
+        if (IsProcessing)
+        {
+            Log("Operation already in progress, please wait...");
+            return;
+        }
+
+        // Проверить наличие настроенных источников
+        if (_settings.ReceiptSources == null || _settings.ReceiptSources.Count == 0)
+        {
+            Log("No receipt sources configured. Please configure sources in Settings.");
+            StatusText = "No sources configured";
+            return;
+        }
+
+        var enabledSources = _settings.ReceiptSources.Where(s => s.IsEnabled).ToList();
+        if (enabledSources.Count == 0)
+        {
+            Log("No enabled receipt sources. Please enable at least one source in Settings.");
+            StatusText = "No enabled sources";
+            return;
+        }
+
+        IsProcessing = true;
+        _cts = new CancellationTokenSource();
+        StatusText = "Collecting receipts...";
+        Log("=== Starting receipt collection (Phase 4) ===");
+        Log($"Enabled sources: {string.Join(", ", enabledSources.Select(s => s.Name))}");
+
+        try
+        {
+            var progress = new ThreadSafeProgress<string>(msg => Log(msg));
+
+            var result = await Task.Run(async () =>
+                await _receiptCollectionService.CollectAsync(
+                    sourceNames: null, // все enabled источники
+                    progress: progress,
+                    cancellationToken: _cts.Token));
+
+            // Очистка осиротевших Products после обработки
+            if (result.ReceiptsSaved > 0)
+            {
+                Log("");
+                Log("=== Cleaning up orphaned products ===");
+                var cleanedUp = await Task.Run(async () =>
+                    await _productCleanupService.CleanupOrphanedProductsAsync(_cts.Token));
+                if (cleanedUp > 0)
+                {
+                    Log($"Removed {cleanedUp} orphaned products");
+                }
+            }
+
+            StatusText = $"Done: {result.ReceiptsSaved} saved, {result.ReceiptsSkipped} skipped, {result.Errors} errors";
+
+            // Обновить UI
+            if (result.ReceiptsSaved > 0 && !_cts.Token.IsCancellationRequested)
+            {
+                Log("");
+                Log("Reloading receipts...");
+                await LoadReceiptsAsync();
+                await LoadCategoryTreeAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Log("Cancelled by user");
+            StatusText = "Cancelled";
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "CollectReceipts");
+            StatusText = "Error occurred - see log";
+        }
+        finally
+        {
+            IsProcessing = false;
+            _cts?.Dispose();
+            _cts = null;
+        }
+    }
+
+    /// <summary>
+    /// Очистить осиротевшие Products (без Items и без дочерних)
+    /// </summary>
+    [RelayCommand]
+    private async Task CleanupOrphanedProductsAsync()
+    {
+        if (IsProcessing)
+        {
+            Log("Operation already in progress, please wait...");
+            return;
+        }
+
+        IsProcessing = true;
+        StatusText = "Cleaning up orphaned products...";
+        Log("=== Cleanup Orphaned Products ===");
+
+        try
+        {
+            // Сначала показать что будет удалено
+            var orphaned = await Task.Run(async () =>
+                await _productCleanupService.GetOrphanedProductsAsync());
+
+            if (orphaned.Count == 0)
+            {
+                Log("No orphaned products found");
+                StatusText = "No orphaned products";
+                return;
+            }
+
+            Log($"Found {orphaned.Count} orphaned products:");
+            foreach (var p in orphaned.Take(20))
+            {
+                Log($"  - {p.Name}" + (p.ParentName != null ? $" (parent: {p.ParentName})" : ""));
+            }
+            if (orphaned.Count > 20)
+            {
+                Log($"  ... and {orphaned.Count - 20} more");
+            }
+
+            var result = MessageBox.Show(
+                $"Delete {orphaned.Count} orphaned products?\n\nOrphaned products have no associated items and no child products.",
+                "Confirm Cleanup",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+            {
+                Log("Cleanup cancelled by user");
+                StatusText = "Cleanup cancelled";
+                return;
+            }
+
+            var deleted = await Task.Run(async () =>
+                await _productCleanupService.CleanupOrphanedProductsAsync());
+
+            Log($"Deleted {deleted} orphaned products");
+            StatusText = $"Deleted {deleted} products";
+
+            await LoadCategoryTreeAsync();
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "CleanupOrphanedProducts");
+            StatusText = "Cleanup failed - see log";
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
     }
 
     [RelayCommand]
@@ -948,6 +1143,13 @@ public partial class MainViewModel : ObservableObject
         Log("=== Saving Settings ===");
         try
         {
+#pragma warning disable CS0618 // Type or member is obsolete
+            // Ensure legacy objects exist for backward compatibility
+            _settings.Email ??= new EmailSettings();
+            _settings.Ollama ??= new OllamaSettings();
+            _settings.YandexGpt ??= new YandexGptSettings();
+            _settings.Llm ??= new LlmSettings();
+
             _settings.Email.ImapServer = ImapServer;
             _settings.Email.ImapPort = ImapPort;
             _settings.Email.UseSsl = UseSsl;
@@ -969,11 +1171,11 @@ public partial class MainViewModel : ObservableObject
             _settings.Llm.ParsingProvider = (LlmProviderType)ParsingProviderIndex;
             _settings.Llm.ClassificationProvider = (LlmProviderType)ClassificationProviderIndex;
             _settings.Llm.LabelsProvider = (LlmProviderType)LabelsProviderIndex;
+#pragma warning restore CS0618
 
             _settingsService.Save(_settings);
 
             Log($"Settings saved to: {_settingsService.SettingsPath}");
-            Log($"LLM Providers - Parsing: {_settings.Llm.ParsingProvider}, Classification: {_settings.Llm.ClassificationProvider}, Labels: {_settings.Llm.LabelsProvider}");
             StatusText = "Settings saved";
         }
         catch (Exception ex)

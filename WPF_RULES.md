@@ -63,23 +63,40 @@ await client.ConnectAsync(server, port, ssl, token).ConfigureAwait(false);
 await _dbContext.SaveChangesAsync(token).ConfigureAwait(false);
 ```
 
-### 6. Prevent concurrent command execution
+### 6. Prevent concurrent command execution (PROPER WAY)
 ```csharp
-[ObservableProperty]
-[NotifyPropertyChangedFor(nameof(IsNotProcessing))]
-private bool _isProcessing;
-
-public bool IsNotProcessing => !IsProcessing;
-
+// BAD - manual check, button stays enabled
 [RelayCommand]
 private async Task DoWorkAsync()
 {
-    if (IsProcessing) return;
+    if (IsProcessing) return;  // Button still clickable!
     IsProcessing = true;
     try { /* work */ }
     finally { IsProcessing = false; }
 }
+
+// GOOD - CanExecute auto-disables button
+[ObservableProperty]
+[NotifyCanExecuteChangedFor(nameof(DoWorkCommand))]  // <-- CRITICAL!
+private bool _isProcessing;
+
+private bool CanDoWork() => !IsProcessing;
+
+[RelayCommand(CanExecute = nameof(CanDoWork))]
+private async Task DoWorkAsync()
+{
+    try
+    {
+        IsProcessing = true;
+        // work...
+    }
+    finally { IsProcessing = false; }
+}
 ```
+**Key points:**
+- `NotifyCanExecuteChangedFor` tells the command to re-evaluate CanExecute when property changes
+- Button auto-disables when `IsProcessing = true`
+- No need for manual `if (IsProcessing) return` check
 
 ### 7. Global exception handlers
 ```csharp
@@ -95,35 +112,194 @@ private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledEx
 }
 ```
 
-### 8. Exception Logging - ALWAYS use DEBUG level with full details
-```csharp
-// BAD
-Log($"ERROR: {ex.Message}");
+### 8. Comprehensive Logging - MANDATORY for all operations
 
-// GOOD - full info: type, message, InnerException chain, StackTrace
+**Logging Levels (default: DEBUG):**
+- `DEBUG` - Detailed flow: method entry/exit, parameters, intermediate values
+- `INFO` - Key operations: user actions, successful completions, state changes
+- `WARNING` - Recoverable issues: retries, fallbacks, missing optional config
+- `ERROR` - Failures: exceptions, validation errors, API errors
+
+```csharp
+// Log level enum
+public enum LogLevel { DEBUG, INFO, WARNING, ERROR }
+
+// Log method with level
+private void Log(string message, LogLevel level = LogLevel.DEBUG)
+{
+    var prefix = level switch
+    {
+        LogLevel.DEBUG => "[DEBUG]",
+        LogLevel.INFO => "[INFO]",
+        LogLevel.WARNING => "[WARN]",
+        LogLevel.ERROR => "[ERROR]",
+        _ => "[LOG]"
+    };
+    AddLogEntry($"{prefix} {message}");
+}
+```
+
+**EVERY operation MUST log:**
+```csharp
+// BAD - silent operation, impossible to debug
+private async Task SaveAsync()
+{
+    await _service.SaveAsync(_settings);
+}
+
+// GOOD - full traceability
+private async Task SaveAsync()
+{
+    Log($"SaveAsync called", LogLevel.DEBUG);
+    Log($"Saving {Sources.Count} sources, {Parsers.Count} parsers", LogLevel.DEBUG);
+
+    try
+    {
+        Log($"Writing to: {_settingsService.SettingsPath}", LogLevel.DEBUG);
+        await _service.SaveAsync(_settings);
+        Log($"Save completed successfully", LogLevel.INFO);
+    }
+    catch (Exception ex)
+    {
+        Log($"Save failed: {ex.Message}", LogLevel.ERROR);
+        LogException(ex, "SaveAsync");
+        throw;
+    }
+}
+```
+
+**What to log:**
+- Method entry with key parameters (mask passwords/keys!)
+- Decision points: `if/else` branches taken
+- External calls: API requests/responses, file I/O
+- State changes: before/after values
+- Completion status: success/failure with details
+
+**Exception Logging - full details:**
+```csharp
 private void LogException(Exception ex, string context = "")
 {
-    var prefix = string.IsNullOrEmpty(context) ? "ERROR" : $"ERROR [{context}]";
-    Log($"{prefix}: {ex.GetType().Name}: {ex.Message}");
+    Log($"[{context}] {ex.GetType().Name}: {ex.Message}", LogLevel.ERROR);
 
     var inner = ex.InnerException;
     var depth = 1;
     while (inner != null)
     {
-        var indent = new string(' ', depth * 2);
-        Log($"{indent}-> InnerException[{depth}]: {inner.GetType().Name}: {inner.Message}");
+        Log($"  -> Inner[{depth}]: {inner.GetType().Name}: {inner.Message}", LogLevel.ERROR);
         inner = inner.InnerException;
         depth++;
     }
 
     if (!string.IsNullOrEmpty(ex.StackTrace))
     {
-        Log("--- StackTrace ---");
+        Log("--- StackTrace ---", LogLevel.DEBUG);
         foreach (var line in ex.StackTrace.Split('\n').Take(15))
+            Log($"  {line.Trim()}", LogLevel.DEBUG);
+    }
+}
+```
+
+**Masking sensitive data:**
+```csharp
+// NEVER log passwords, API keys, tokens directly
+Log($"ApiKey: {apiKey}");  // BAD!
+
+// Mask sensitive values
+Log($"ApiKey: {(string.IsNullOrEmpty(apiKey) ? "NOT SET" : "***SET***")}");
+Log($"Password: {new string('*', password?.Length ?? 0)}");
+
+// For JSON with secrets
+json = Regex.Replace(json,
+    @"""(Password|ApiKey|Token)""\s*:\s*""[^""]+""",
+    @"""$1"": ""***MASKED***""");
+```
+
+---
+
+## CommunityToolkit.Mvvm - Critical Rules
+
+### 9. RelayCommand naming convention
+```csharp
+// Method name -> Generated command name
+private void Save() {}           // -> SaveCommand
+private async Task SaveAsync() {} // -> SaveCommand (Async stripped!)
+private void OnSave() {}         // -> OnSaveCommand
+
+// WRONG - trying to use SaveAsyncCommand
+Command="{Binding SaveAsyncCommand}"  // DOES NOT EXIST!
+
+// CORRECT
+Command="{Binding SaveCommand}"
+```
+
+### 10. Logging from modal dialogs (ShowDialog)
+```csharp
+// BAD - blocks if called from ShowDialog context
+Action<string> log = message => _viewModel.AddLogEntry(message);
+
+// GOOD - async dispatch, doesn't block modal dialog
+Action<string> log = message =>
+{
+    Dispatcher.BeginInvoke(() => _viewModel.AddLogEntry(message));
+};
+
+var dialog = new SettingsWindow(vm);
+dialog.ShowDialog();  // Log calls won't block now
+```
+
+### 11. ObservableCollection - don't Clear() if bound to ComboBox
+```csharp
+// BAD - clears selection in bound ComboBox/ListBox
+AvailableItems.Clear();
+foreach (var item in newItems)
+    AvailableItems.Add(item);
+
+// GOOD - sync without losing selection
+private void SyncCollection(IList<string> newItems)
+{
+    // Remove extra
+    while (Collection.Count > newItems.Count)
+        Collection.RemoveAt(Collection.Count - 1);
+
+    // Update existing, add new
+    for (int i = 0; i < newItems.Count; i++)
+    {
+        if (i < Collection.Count)
         {
-            Log($"  {line.Trim()}");
+            if (Collection[i] != newItems[i])
+                Collection[i] = newItems[i];
+        }
+        else
+        {
+            Collection.Add(newItems[i]);
         }
     }
+}
+```
+
+### 12. Track renames for cascading updates
+```csharp
+// When entity Key can be renamed, track original for updates
+public class EntityViewModel
+{
+    private string _originalKey = string.Empty;
+
+    public string OriginalKey => _originalKey;
+    public bool WasRenamed => !string.IsNullOrEmpty(_originalKey) && _originalKey != Key;
+
+    public void CommitKey() => _originalKey = Key;  // Call after save
+}
+
+// In Save command - update references
+foreach (var entity in Entities)
+{
+    if (entity.WasRenamed)
+    {
+        // Update all references from OldKey to NewKey
+        if (Settings.Reference == entity.OriginalKey)
+            Settings.Reference = entity.Key;
+    }
+    entity.CommitKey();
 }
 ```
 
@@ -415,6 +591,48 @@ private void PopOutLog_Click(object sender, RoutedEventArgs e)
 }
 ```
 
+## UI Development Checklist
+
+### Before implementing any Button with Command:
+- [ ] Method `DoWorkAsync()` generates `DoWorkCommand` (not `DoWorkAsyncCommand`)
+- [ ] Add `CanExecute` method if button should be disabled during operation
+- [ ] Add `[NotifyCanExecuteChangedFor(nameof(DoWorkCommand))]` to state property
+- [ ] Test: click button rapidly 10 times - should execute only once
+
+### Before implementing Settings/Editor with Save:
+- [ ] Track `_originalKey` for entities that can be renamed
+- [ ] After Save: update all references to renamed entities
+- [ ] After Save: call `CommitKey()` on all entities
+- [ ] After Save: sync collections WITHOUT `Clear()` (use index-based update)
+- [ ] Test: rename entity, save, check all references updated
+
+### Before opening modal dialogs (ShowDialog):
+- [ ] Wrap any callback to main window in `Dispatcher.BeginInvoke()`
+- [ ] Especially logging callbacks - they will deadlock otherwise
+- [ ] Test: perform action in dialog that logs, verify main window responsive
+
+### Before adding editable ComboBox bound to collection:
+- [ ] `IsEditable="True"` + `Text="{Binding Value}"` + `ItemsSource="{Binding Options}"`
+- [ ] Never `Clear()` the ItemsSource collection - it resets Text binding
+- [ ] Test: select value, trigger refresh, verify selection preserved
+
+### TextBox for decimal values (Temperature, etc):
+- [ ] Use `UpdateSourceTrigger=LostFocus` (not PropertyChanged)
+- [ ] Create converter that handles both `.` and `,` as decimal separator
+- [ ] Use `CultureInfo.InvariantCulture` for parsing
+- [ ] Test: enter "0.5" and "0,5" - both should work
+
+### Logging - MANDATORY for every new method/feature:
+- [ ] Log method entry with key parameters (DEBUG level)
+- [ ] Log decision branches taken (DEBUG level)
+- [ ] Log external calls: URL, request summary (DEBUG level)
+- [ ] Log success completion (INFO level)
+- [ ] Log failures with full exception details (ERROR level)
+- [ ] NEVER log passwords, API keys, tokens - mask them!
+- [ ] Test: perform operation, verify log shows complete flow
+
+---
+
 ## Quick Start Prompt
 
 ```
@@ -426,6 +644,13 @@ Key rules:
 3. Use ThreadSafeProgress<T> instead of Progress<T>
 4. Always ConfigureAwait(false) in services
 5. Never use lock inside Dispatcher.Invoke
+6. [RelayCommand] on SaveAsync() generates SaveCommand (not SaveAsyncCommand!)
+7. Use CanExecute + NotifyCanExecuteChangedFor to disable buttons during operations
+8. Use Dispatcher.BeginInvoke for callbacks from modal dialogs
+9. Don't Clear() ObservableCollection bound to ComboBox - sync by index instead
+10. LOG EVERYTHING! Every method must log: entry, parameters, decisions, results
+    - Levels: DEBUG (default), INFO, WARNING, ERROR
+    - Mask passwords/API keys in logs
 
 Theme system:
 - Use DynamicResource for colors (theme switching)

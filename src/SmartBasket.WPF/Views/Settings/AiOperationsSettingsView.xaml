@@ -1,0 +1,82 @@
+<UserControl x:Class="SmartBasket.WPF.Views.Settings.AiOperationsSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="400" d:DesignWidth="600">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="AI Операции" Style="{StaticResource H1}"/>
+            <TextBlock Text="Связка AI операций с провайдерами. Выберите провайдер для каждой операции."
+                       Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Operations Configuration -->
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <StackPanel DataContext="{Binding AiOperations}">
+
+                <!-- Classification -->
+                <GroupBox Header="Классификация товаров" Style="{StaticResource ModernGroupBox}">
+                    <StackPanel>
+                        <TextBlock Text="Автоматическое распределение товаров (Item) по продуктам (Product)"
+                                   Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Column="1" Text="{Binding Classification, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                      IsEditable="True" FontSize="12" Padding="4,3"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Labels -->
+                <GroupBox Header="Назначение меток" Style="{StaticResource ModernGroupBox}">
+                    <StackPanel>
+                        <TextBlock Text="Автоматическое присвоение меток (Labels) товарам"
+                                   Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Column="1" Text="{Binding Labels, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                      IsEditable="True" FontSize="12" Padding="4,3"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Info -->
+                <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap">
+                            <Run FontWeight="SemiBold">Подсказка:</Run>
+                            <LineBreak/>
+                            Выберите провайдер из списка доступных или введите ключ вручную в формате "Provider/Model".
+                            <LineBreak/>
+                            Например: Ollama/llama3.2:3b или YandexGPT/yandexgpt-lite
+                            <LineBreak/>
+                            <LineBreak/>
+                            Оставьте поле пустым, чтобы отключить операцию.
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

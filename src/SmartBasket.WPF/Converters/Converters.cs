@@ -33,6 +33,30 @@ public class InverseBooleanToVisibilityConverter : IValueConverter
 }
 
 /// <summary>
+/// Inverts boolean value (true = false, false = true)
+/// </summary>
+public class InverseBoolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool boolValue)
+        {
+            return !boolValue;
+        }
+        return true;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool boolValue)
+        {
+            return !boolValue;
+        }
+        return false;
+    }
+}
+
+/// <summary>
 /// Converts null to Visibility (null = Collapsed, not null = Visible)
 /// </summary>
 public class NullToVisibilityConverter : IValueConverter
@@ -45,6 +69,35 @@ public class NullToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts double to string with invariant culture (supports both . and , as input)
+/// </summary>
+public class DoubleToStringConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is double d)
+        {
+            return d.ToString("0.##", CultureInfo.InvariantCulture);
+        }
+        return "0";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is string s && !string.IsNullOrWhiteSpace(s))
+        {
+            // Support both comma and dot as decimal separator
+            s = s.Replace(',', '.');
+            if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+            {
+                return result;
+            }
+        }
+        return 0.0;
     }
 }
 

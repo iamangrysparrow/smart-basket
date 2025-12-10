@@ -1,0 +1,193 @@
+<UserControl x:Class="SmartBasket.WPF.Views.Settings.SourcesSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="clr-namespace:SmartBasket.WPF.ViewModels.Settings"
+             xmlns:core="clr-namespace:SmartBasket.Core.Configuration;assembly=SmartBasket.Core"
+             xmlns:controls="clr-namespace:SmartBasket.WPF.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="600">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Источники чеков" Style="{StaticResource H1}"/>
+            <TextBlock Text="Настройка каналов получения чеков (Email, REST API, файловая система)"
+                       Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Source List -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Список источников" Style="{StaticResource H3}" Margin="0,0,0,8"/>
+
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding Sources}"
+                         SelectedItem="{Binding SelectedSource}"
+                         Height="100"
+                         Background="Transparent"
+                         BorderThickness="1"
+                         BorderBrush="{DynamicResource BorderBrush}"
+                         ScrollViewer.IsDeferredScrollingEnabled="False"
+                         VirtualizingPanel.ScrollUnit="Pixel">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ReceiptSourceViewModel}">
+                            <StackPanel Orientation="Horizontal" Margin="4,2">
+                                <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBlock Text=" - " Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Type}" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <!-- Source Editor -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <Border Style="{StaticResource Card}"
+                    Visibility="{Binding HasSelectedSource, Converter={StaticResource BoolToVis}}">
+                <StackPanel DataContext="{Binding SelectedSource}">
+
+                    <!-- Basic Info -->
+                    <TextBlock Text="Основные настройки" Style="{StaticResource H3}" Margin="0,0,0,8"/>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Название" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextInput}" Margin="0,0,0,6"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Тип" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" SelectedValue="{Binding Type}"
+                                  SelectedValuePath="Tag" FontSize="12" Padding="4,3" Margin="0,0,0,6">
+                            <ComboBoxItem Content="Email (IMAP)" Tag="{x:Static core:SourceType.Email}"/>
+                            <ComboBoxItem Content="REST API" Tag="{x:Static core:SourceType.REST}"/>
+                            <ComboBoxItem Content="Файловая система" Tag="{x:Static core:SourceType.FileSystem}"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Парсер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" Text="{Binding Parser, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding DataContext.AvailableParsers, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  IsEditable="True" FontSize="12" Padding="4,3" Margin="0,0,0,6"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Активен" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Email Settings (conditional) -->
+                    <StackPanel Visibility="{Binding IsEmailSource, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Email настройки" Style="{StaticResource H3}" Margin="0,0,0,8"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="IMAP сервер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ImapServer, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextInput}" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Порт" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBox Text="{Binding ImapPort, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextInput}" Width="60"/>
+                                <CheckBox Content="SSL" IsChecked="{Binding UseSsl}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" FontSize="11"/>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Пользователь" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextInput}" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Пароль" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <controls:PasswordBoxWithReveal Grid.Row="3" Grid.Column="1"
+                                                            Password="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+                                                            Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Папка" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Folder, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextInput}" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Отправитель" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding SenderFilter, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextInput}" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Тема" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SubjectFilter, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextInput}" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Дней назад" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding SearchDaysBack, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextInput}" Width="60" HorizontalAlignment="Left"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Action Buttons -->
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Command="{Binding DataContext.TestSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconPlug}" Fill="{DynamicResource TextPrimaryBrush}" Width="10" Height="10" Stretch="Uniform"/>
+                                <TextBlock Text="Тест" Margin="4,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource DangerButton}"
+                                Command="{Binding DataContext.DeleteSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}" Width="10" Height="10" Stretch="Uniform"/>
+                                <TextBlock Text="Удалить" Margin="4,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- Empty State -->
+        <TextBlock Grid.Row="2"
+                   Text="Выберите источник из списка или добавьте новый"
+                   Style="{StaticResource TextSecondary}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Visibility="{Binding HasSelectedSource, Converter={StaticResource InverseBoolToVis}}"/>
+    </Grid>
+</UserControl>
