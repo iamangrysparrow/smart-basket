@@ -1,5 +1,3 @@
-using SmartBasket.Core.Configuration;
-
 namespace SmartBasket.Services.Ollama;
 
 /// <summary>
@@ -35,7 +33,7 @@ public class CategorizationResult
 }
 
 /// <summary>
-/// Сервис категоризации товаров через Ollama
+/// Сервис категоризации товаров через LLM (Ollama, YandexGPT и др.)
 /// </summary>
 public interface ICategoryService
 {
@@ -47,7 +45,6 @@ public interface ICategoryService
     /// <summary>
     /// Категоризировать партию товаров
     /// </summary>
-    /// <param name="settings">Настройки Ollama</param>
     /// <param name="itemNames">Названия товаров для категоризации</param>
     /// <param name="categories">Список доступных категорий пользователя</param>
     /// <param name="examples">Примеры категоризации для few-shot learning (до 2 на категорию)</param>
@@ -55,7 +52,6 @@ public interface ICategoryService
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Результат категоризации</returns>
     Task<CategorizationResult> CategorizeItemsAsync(
-        OllamaSettings settings,
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string> categories,
         IReadOnlyList<CategoryExample>? examples = null,

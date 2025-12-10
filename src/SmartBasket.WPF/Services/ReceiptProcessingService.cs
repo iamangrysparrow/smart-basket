@@ -1,6 +1,5 @@
 using System.IO;
 using Microsoft.EntityFrameworkCore;
-using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
 using SmartBasket.Services.Ollama;
@@ -27,21 +26,12 @@ public class ReceiptProcessingService
 {
     private readonly SmartBasketDbContext _dbContext;
     private readonly ILabelAssignmentService? _labelService;
-    private OllamaSettings? _ollamaSettings;
     private string? _userLabelsPath;
 
     public ReceiptProcessingService(SmartBasketDbContext dbContext, ILabelAssignmentService? labelService = null)
     {
         _dbContext = dbContext;
         _labelService = labelService;
-    }
-
-    /// <summary>
-    /// Установить настройки Ollama для назначения меток
-    /// </summary>
-    public void SetOllamaSettings(OllamaSettings settings)
-    {
-        _ollamaSettings = settings;
     }
 
     /// <summary>
@@ -107,7 +97,7 @@ public class ReceiptProcessingService
             result.ItemsCreated = itemsCreated;
 
             // 3. Назначить метки для новых товаров
-            if (newItems.Count > 0 && _labelService != null && _ollamaSettings != null)
+            if (newItems.Count > 0 && _labelService != null)
             {
                 var labelsAssigned = await AssignLabelsToNewItemsAsync(newItems, productMap, progress, cancellationToken);
                 result.LabelsAssigned = labelsAssigned;
@@ -360,7 +350,7 @@ public class ReceiptProcessingService
     }
 
     /// <summary>
-    /// Назначить метки для новых товаров через Ollama
+    /// Назначить метки для новых товаров через LLM (batch - все товары за один вызов)
     /// </summary>
     private async Task<int> AssignLabelsToNewItemsAsync(
         List<Item> newItems,
@@ -368,7 +358,10 @@ public class ReceiptProcessingService
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
-        if (_labelService == null || _ollamaSettings == null)
+        if (_labelService == null)
+            return 0;
+
+        if (newItems.Count == 0)
             return 0;
 
         // Получить все доступные метки
@@ -388,28 +381,44 @@ public class ReceiptProcessingService
             .ToDictionaryAsync(l => l.Name, l => l, StringComparer.OrdinalIgnoreCase, cancellationToken)
             .ConfigureAwait(false);
 
+        // Подготовить batch-запрос
+        var batchItems = newItems.Select(item =>
+        {
+            var product = productMap.Values
+                .FirstOrDefault(p => p.Item1.Id == item.ProductId);
+            var productName = product.Item1?.Name ?? "Не категоризировано";
+
+            return new BatchItemInput
+            {
+                ItemName = item.Name,
+                ProductName = productName
+            };
+        }).ToList();
+
+        progress?.Report($"  [Labels] Starting batch classification for {batchItems.Count} items...");
+
         var totalLabelsAssigned = 0;
 
-        foreach (var item in newItems)
+        try
         {
-            try
+            // Один batch-вызов для всех товаров (использует выбранный LLM провайдер)
+            var batchResult = await _labelService.AssignLabelsBatchAsync(
+                batchItems,
+                availableLabels,
+                progress,
+                cancellationToken);
+
+            if (batchResult.IsSuccess && batchResult.Results.Count > 0)
             {
-                // Найти название продукта для этого товара
-                var product = productMap.Values
-                    .FirstOrDefault(p => p.Item1.Id == item.ProductId);
-                var productName = product.Item1?.Name ?? "Не категоризировано";
+                // Создать lookup для Items по имени
+                var itemsLookup = newItems.ToDictionary(i => i.Name, i => i, StringComparer.OrdinalIgnoreCase);
 
-                var result = await _labelService.AssignLabelsAsync(
-                    _ollamaSettings,
-                    item.Name,
-                    productName,
-                    availableLabels,
-                    progress,
-                    cancellationToken);
-
-                if (result.IsSuccess && result.AssignedLabels.Count > 0)
+                foreach (var itemResult in batchResult.Results)
                 {
-                    foreach (var labelName in result.AssignedLabels)
+                    if (!itemsLookup.TryGetValue(itemResult.ItemName, out var item))
+                        continue;
+
+                    foreach (var labelName in itemResult.Labels)
                     {
                         if (labelsLookup.TryGetValue(labelName, out var label))
                         {
@@ -422,13 +431,20 @@ public class ReceiptProcessingService
                         }
                     }
 
-                    progress?.Report($"  [Labels] {item.Name}: {string.Join(", ", result.AssignedLabels)}");
+                    if (itemResult.Labels.Count > 0)
+                    {
+                        progress?.Report($"  [Labels] {item.Name}: {string.Join(", ", itemResult.Labels)}");
+                    }
                 }
             }
-            catch (Exception ex)
+            else
             {
-                progress?.Report($"  [Labels] Error assigning labels to '{item.Name}': {ex.Message}");
+                progress?.Report($"  [Labels] Batch classification failed: {batchResult.Message}");
             }
+        }
+        catch (Exception ex)
+        {
+            progress?.Report($"  [Labels] Error in batch label assignment: {ex.Message}");
         }
 
         if (totalLabelsAssigned > 0)

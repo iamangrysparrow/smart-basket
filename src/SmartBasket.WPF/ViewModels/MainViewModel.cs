@@ -1,14 +1,17 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
 using SmartBasket.Services.Email;
+using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
 using SmartBasket.WPF.Services;
 
@@ -38,6 +41,7 @@ public partial class MainViewModel : ObservableObject
     private readonly SmartBasketDbContext _dbContext;
     private readonly IEmailService _emailService;
     private readonly IOllamaService _ollamaService;
+    private readonly IReceiptParsingService _receiptParsingService;
     private readonly ICategoryService _categoryService;
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
@@ -50,6 +54,7 @@ public partial class MainViewModel : ObservableObject
         SmartBasketDbContext dbContext,
         IEmailService emailService,
         IOllamaService ollamaService,
+        IReceiptParsingService receiptParsingService,
         ICategoryService categoryService,
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
@@ -59,6 +64,7 @@ public partial class MainViewModel : ObservableObject
         _dbContext = dbContext;
         _emailService = emailService;
         _ollamaService = ollamaService;
+        _receiptParsingService = receiptParsingService;
         _categoryService = categoryService;
         _classificationService = classificationService;
         _labelAssignmentService = labelAssignmentService;
@@ -69,6 +75,7 @@ public partial class MainViewModel : ObservableObject
         // Set prompt template paths
         var promptTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_template.txt");
         _ollamaService.SetPromptTemplatePath(promptTemplatePath);
+        _receiptParsingService.SetPromptTemplatePath(promptTemplatePath);
 
         var categoriesTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_categories.txt");
         _categoryService.SetPromptTemplatePath(categoriesTemplatePath);
@@ -94,6 +101,14 @@ public partial class MainViewModel : ObservableObject
 
         OllamaBaseUrl = settings.Ollama.BaseUrl;
         OllamaModel = settings.Ollama.Model;
+
+        // YandexGPT settings
+        YandexFolderId = settings.YandexGpt.FolderId;
+        YandexApiKey = settings.YandexGpt.ApiKey;
+        YandexModel = settings.YandexGpt.Model;
+
+        // LLM Provider selection
+        SelectedLlmProviderIndex = (int)settings.Llm.Provider;
     }
 
     // Email Settings
@@ -110,6 +125,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _ollamaBaseUrl = "http://localhost:11434";
     [ObservableProperty] private string _ollamaModel = "mistral:latest";
 
+    // YandexGPT Settings
+    [ObservableProperty] private string _yandexFolderId = string.Empty;
+    [ObservableProperty] private string _yandexApiKey = string.Empty;
+    [ObservableProperty] private string _yandexModel = "yandexgpt-lite";
+
+    // LLM Provider Selection
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOllamaSelected))]
+    [NotifyPropertyChangedFor(nameof(IsYandexGptSelected))]
+    private int _selectedLlmProviderIndex;
+
+    public bool IsOllamaSelected => SelectedLlmProviderIndex == 0;
+    public bool IsYandexGptSelected => SelectedLlmProviderIndex == 1;
+
     // State
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNotProcessing))]
@@ -122,6 +151,10 @@ public partial class MainViewModel : ObservableObject
     // Log - thread-safe via BindingOperations.EnableCollectionSynchronization
     public ObservableCollection<string> LogEntries { get; } = new();
     private readonly object _logEntriesLock = new();
+
+    // Full log for saving (not truncated)
+    private readonly List<string> _fullLog = new();
+    private readonly object _fullLogLock = new();
 
     // Results - thread-safe via BindingOperations.EnableCollectionSynchronization
     public ObservableCollection<ReceiptViewModel> Receipts { get; } = new();
@@ -185,12 +218,18 @@ public partial class MainViewModel : ObservableObject
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
         var entry = $"[{timestamp}] {message}";
 
+        // Save to full log (never truncated) for file export
+        lock (_fullLogLock)
+        {
+            _fullLog.Add(entry);
+        }
+
         // With EnableCollectionSynchronization, we can safely modify from any thread
         // The lock is handled internally by WPF's binding system
         lock (_logEntriesLock)
         {
             LogEntries.Add(entry);
-            // Keep only last 500 entries
+            // Keep only last 500 entries in UI for performance
             while (LogEntries.Count > 500)
             {
                 LogEntries.RemoveAt(0);
@@ -346,6 +385,7 @@ public partial class MainViewModel : ObservableObject
             // Validate settings first
             var emailSettings = GetCurrentEmailSettings();
             var ollamaSettings = GetCurrentOllamaSettings();
+            var llmProvider = _settings.Llm.Provider;
 
             if (string.IsNullOrWhiteSpace(emailSettings.ImapServer))
             {
@@ -361,16 +401,41 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(ollamaSettings.BaseUrl))
+            // Validate LLM provider settings
+            if (llmProvider == LlmProviderType.Ollama && string.IsNullOrWhiteSpace(ollamaSettings.BaseUrl))
             {
                 Log("ERROR: Ollama URL is not configured");
                 StatusText = "Error: Configure Ollama URL";
                 return;
             }
 
+            if (llmProvider == LlmProviderType.YandexGpt)
+            {
+                if (string.IsNullOrWhiteSpace(_settings.YandexGpt.ApiKey))
+                {
+                    Log("ERROR: YandexGPT API key is not configured");
+                    StatusText = "Error: Configure YandexGPT API key";
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(_settings.YandexGpt.FolderId))
+                {
+                    Log("ERROR: YandexGPT Folder ID is not configured");
+                    StatusText = "Error: Configure YandexGPT Folder ID";
+                    return;
+                }
+            }
+
             Log($"Email: {emailSettings.ImapServer}:{emailSettings.ImapPort}, User: {emailSettings.Username}");
             Log($"Filters: Sender='{emailSettings.SenderFilter ?? "(none)"}', Subject='{emailSettings.SubjectFilter ?? "(none)"}', Days={emailSettings.SearchDaysBack}");
-            Log($"Ollama: {ollamaSettings.BaseUrl}, Model: {ollamaSettings.Model}");
+            Log($"LLM Provider: {llmProvider}");
+            if (llmProvider == LlmProviderType.Ollama)
+            {
+                Log($"  Ollama: {ollamaSettings.BaseUrl}, Model: {ollamaSettings.Model}");
+            }
+            else
+            {
+                Log($"  YandexGPT: Model: {_settings.YandexGpt.Model}");
+            }
 
             // Use ThreadSafeProgress instead of Progress<T> to avoid SynchronizationContext capture deadlock
             var progress = new ThreadSafeProgress<string>(msg => Log(msg));
@@ -451,18 +516,18 @@ public partial class MainViewModel : ObservableObject
                         continue;
                     }
 
-                    // Parse with Ollama
+                    // Parse with LLM (uses selected provider: Ollama or YandexGPT)
                     ParsedReceipt parsedReceipt;
                     try
                     {
                         // Run on background thread to completely free UI thread
                         parsedReceipt = await Task.Run(async () =>
-                            await _ollamaService.ParseReceiptAsync(
-                                ollamaSettings, email.Body, email.Date, progress, _cts.Token));
+                            await _receiptParsingService.ParseReceiptAsync(
+                                email.Body, email.Date, progress, _cts.Token));
                     }
                     catch (Exception parseEx)
                     {
-                        Log($"  -> Ollama error: {parseEx.Message}");
+                        Log($"  -> LLM error: {parseEx.Message}");
                         await SaveEmailHistoryAsync(email, EmailProcessingStatus.Failed, parseEx.Message);
                         errors++;
                         continue;
@@ -476,7 +541,7 @@ public partial class MainViewModel : ObservableObject
                         continue;
                     }
 
-                    // Step 2: Classify products via Ollama
+                    // Step 2: Classify products via LLM (uses selected provider)
                     Log($"  -> Classifying {parsedReceipt.Items.Count} items...");
 
                     var existingProducts = await Task.Run(async () =>
@@ -489,7 +554,7 @@ public partial class MainViewModel : ObservableObject
                     {
                         classification = await Task.Run(async () =>
                             await _classificationService.ClassifyAsync(
-                                ollamaSettings, itemNames, existingProducts, progress, _cts.Token));
+                                itemNames, existingProducts, progress, _cts.Token));
                     }
                     catch (Exception classifyEx)
                     {
@@ -523,7 +588,6 @@ public partial class MainViewModel : ObservableObject
                     await _dbContext.SaveChangesAsync(_cts.Token).ConfigureAwait(false);
 
                     // Step 4: Process classification - create Products, Items, ReceiptItems, Labels
-                    _receiptProcessingService.SetOllamaSettings(ollamaSettings);
                     var processingResult = await Task.Run(async () =>
                         await _receiptProcessingService.ProcessClassificationAsync(
                             receipt,
@@ -823,6 +887,10 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ClearLog()
     {
+        lock (_fullLogLock)
+        {
+            _fullLog.Clear();
+        }
         lock (_logEntriesLock)
         {
             LogEntries.Clear();
@@ -842,14 +910,15 @@ public partial class MainViewModel : ObservableObject
             var logPath = Path.Combine(logsDir, $"smartbasket_{timestamp}.log");
 
             string[] entries;
-            lock (_logEntriesLock)
+            lock (_fullLogLock)
             {
-                entries = LogEntries.ToArray();
+                // Save full log (not truncated UI version)
+                entries = _fullLog.ToArray();
             }
 
             File.WriteAllLines(logPath, entries);
-            Log($"Log saved to: {logPath}");
-            StatusText = $"Log saved: {Path.GetFileName(logPath)}";
+            Log($"Log saved to: {logPath} ({entries.Length} entries)");
+            StatusText = $"Log saved: {Path.GetFileName(logPath)} ({entries.Length} entries)";
         }
         catch (Exception ex)
         {
@@ -876,15 +945,75 @@ public partial class MainViewModel : ObservableObject
             _settings.Ollama.BaseUrl = OllamaBaseUrl;
             _settings.Ollama.Model = OllamaModel;
 
+            // YandexGPT settings
+            _settings.YandexGpt.FolderId = YandexFolderId;
+            _settings.YandexGpt.ApiKey = YandexApiKey;
+            _settings.YandexGpt.Model = YandexModel;
+
+            // LLM Provider selection
+            _settings.Llm.Provider = (LlmProviderType)SelectedLlmProviderIndex;
+
             _settingsService.Save(_settings);
 
             Log($"Settings saved to: {_settingsService.SettingsPath}");
+            Log($"LLM Provider: {_settings.Llm.Provider}");
             StatusText = "Settings saved";
         }
         catch (Exception ex)
         {
             LogException(ex, "SaveSettings");
             StatusText = "Settings save FAILED";
+        }
+    }
+
+    [RelayCommand]
+    private async Task TestYandexGptConnectionAsync()
+    {
+        if (IsProcessing)
+        {
+            Log("Operation already in progress, please wait...");
+            return;
+        }
+
+        IsProcessing = true;
+        StatusText = "Testing YandexGPT connection...";
+        Log("=== Testing YandexGPT Connection ===");
+        Log($"Folder ID: {YandexFolderId}");
+        Log($"Model: {YandexModel}");
+
+        try
+        {
+            // Create temporary settings for test
+            var testSettings = new YandexGptSettings
+            {
+                FolderId = YandexFolderId,
+                ApiKey = YandexApiKey,
+                Model = YandexModel,
+                TimeoutSeconds = 30
+            };
+
+            var httpClientFactory = (IHttpClientFactory)App.Services.GetService(typeof(IHttpClientFactory))!;
+            var loggerFactory = (Microsoft.Extensions.Logging.ILoggerFactory)App.Services.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory))!;
+
+            var provider = new YandexGptLlmProvider(
+                httpClientFactory,
+                loggerFactory.CreateLogger<YandexGptLlmProvider>(),
+                testSettings);
+
+            var (success, message) = await Task.Run(async () =>
+                await provider.TestConnectionAsync());
+
+            Log(message);
+            StatusText = success ? "YandexGPT: OK" : "YandexGPT: FAILED";
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "TestYandexGptConnection");
+            StatusText = "YandexGPT: FAILED";
+        }
+        finally
+        {
+            IsProcessing = false;
         }
     }
 

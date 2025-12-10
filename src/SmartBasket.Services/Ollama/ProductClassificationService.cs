@@ -3,20 +3,20 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using SmartBasket.Core.Configuration;
+using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Ollama;
 
 public class ProductClassificationService : IProductClassificationService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILlmProviderFactory _providerFactory;
     private readonly ILogger<ProductClassificationService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public ProductClassificationService(IHttpClientFactory httpClientFactory, ILogger<ProductClassificationService> logger)
+    public ProductClassificationService(ILlmProviderFactory providerFactory, ILogger<ProductClassificationService> logger)
     {
-        _httpClientFactory = httpClientFactory;
+        _providerFactory = providerFactory;
         _logger = logger;
     }
 
@@ -27,7 +27,6 @@ public class ProductClassificationService : IProductClassificationService
     }
 
     public async Task<ProductClassificationResult> ClassifyAsync(
-        OllamaSettings settings,
         IReadOnlyList<string> itemNames,
         IReadOnlyList<ExistingProduct> existingProducts,
         IProgress<string>? progress = null,
@@ -44,6 +43,9 @@ public class ProductClassificationService : IProductClassificationService
                 return result;
             }
 
+            // Получаем текущий провайдер
+            var provider = _providerFactory.GetCurrentProvider();
+            progress?.Report($"  [Classify] Using provider: {provider.Name}");
             progress?.Report($"  [Classify] Classifying {itemNames.Count} items with {existingProducts.Count} existing products...");
 
             var prompt = BuildPrompt(itemNames, existingProducts, progress);
@@ -52,124 +54,31 @@ public class ProductClassificationService : IProductClassificationService
             progress?.Report(prompt);
             progress?.Report($"  [Classify] === PROMPT END ===");
 
-            var client = _httpClientFactory.CreateClient();
-            var timeoutSeconds = Math.Max(settings.TimeoutSeconds, 120);
-            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-
-            var request = new OllamaGenerateRequest
-            {
-                Model = settings.Model,
-                Prompt = prompt,
-                Stream = true,
-                Options = new OllamaOptions
-                {
-                    Temperature = 0.1
-                }
-            };
-
-            progress?.Report($"  [Classify] Sending STREAMING request to {settings.BaseUrl}/api/generate (model: {settings.Model}, timeout: {timeoutSeconds}s)...");
-
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            progress?.Report($"  [Classify] Sending request via {provider.Name}...");
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl}/api/generate")
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(request),
-                    Encoding.UTF8,
-                    "application/json")
-            };
-
-            HttpResponseMessage response;
-            try
-            {
-                response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                stopwatch.Stop();
-                progress?.Report($"  [Classify] TIMEOUT after {stopwatch.Elapsed.TotalSeconds:F1}s");
-                result.IsSuccess = false;
-                result.Message = $"Ollama timeout after {timeoutSeconds}s";
-                return result;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                progress?.Report($"  [Classify] Error: {errorContent}");
-                result.IsSuccess = false;
-                result.Message = $"Ollama returned {response.StatusCode}";
-                return result;
-            }
-
-            // Read streaming response
-            progress?.Report($"  [Classify] === STREAMING RESPONSE ===");
-            var fullResponse = new StringBuilder();
-            var lineBuffer = new StringBuilder(); // Buffer for accumulating text until newline
-
-            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
-            using var reader = new StreamReader(stream);
-
-            while (!reader.EndOfStream)
-            {
-                linkedCts.Token.ThrowIfCancellationRequested();
-
-                var line = await reader.ReadLineAsync(linkedCts.Token);
-                if (string.IsNullOrEmpty(line)) continue;
-
-                try
-                {
-                    var chunk = JsonSerializer.Deserialize<OllamaStreamChunk>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                    if (chunk?.Response != null)
-                    {
-                        fullResponse.Append(chunk.Response);
-
-                        // Buffer text and output line by line (like receipt parsing)
-                        foreach (var ch in chunk.Response)
-                        {
-                            if (ch == '\n')
-                            {
-                                progress?.Report($"  {lineBuffer}");
-                                lineBuffer.Clear();
-                            }
-                            else
-                            {
-                                lineBuffer.Append(ch);
-                            }
-                        }
-                    }
-
-                    if (chunk?.Done == true)
-                    {
-                        // Output any remaining text in buffer
-                        if (lineBuffer.Length > 0)
-                        {
-                            progress?.Report($"  {lineBuffer}");
-                            lineBuffer.Clear();
-                        }
-                        break;
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Skip malformed lines
-                }
-            }
+            var llmResult = await provider.GenerateAsync(
+                prompt,
+                maxTokens: 4000,
+                temperature: 0.1,
+                progress: progress,
+                cancellationToken: cancellationToken);
 
             stopwatch.Stop();
-            progress?.Report($"  [Classify] === END STREAMING ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
-            progress?.Report($"  [Classify] Total response: {fullResponse.Length} chars");
+            progress?.Report($"  [Classify] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
 
-            var ollamaResponse = fullResponse.ToString();
-            result.RawResponse = ollamaResponse;
+            if (!llmResult.IsSuccess || string.IsNullOrEmpty(llmResult.Response))
+            {
+                result.IsSuccess = false;
+                result.Message = llmResult.ErrorMessage ?? "Empty response from LLM";
+                return result;
+            }
+
+            result.RawResponse = llmResult.Response;
+            progress?.Report($"  [Classify] Total response: {llmResult.Response.Length} chars");
 
             // Extract JSON object from response
-            var jsonMatch = Regex.Match(ollamaResponse, @"\{[\s\S]*\}", RegexOptions.Multiline);
+            var jsonMatch = Regex.Match(llmResult.Response, @"\{[\s\S]*\}", RegexOptions.Multiline);
             if (jsonMatch.Success)
             {
                 try
@@ -208,17 +117,12 @@ public class ProductClassificationService : IProductClassificationService
             result.Message = "Operation cancelled by user";
             throw;
         }
-        catch (OperationCanceledException)
-        {
-            progress?.Report("  [Classify] Timed out");
-            result.IsSuccess = false;
-            result.Message = "Classification request timed out";
-        }
         catch (Exception ex)
         {
             progress?.Report($"  [Classify] Error: {ex.Message}");
             result.IsSuccess = false;
             result.Message = $"Error: {ex.Message}";
+            _logger.LogError(ex, "Classification error");
         }
 
         return result;
@@ -308,42 +212,5 @@ public class ProductClassificationService : IProductClassificationService
         }
 
         return sb.ToString().TrimEnd();
-    }
-
-    // DTOs for Ollama API
-    private class OllamaGenerateRequest
-    {
-        [JsonPropertyName("model")]
-        public string Model { get; set; } = string.Empty;
-
-        [JsonPropertyName("prompt")]
-        public string Prompt { get; set; } = string.Empty;
-
-        [JsonPropertyName("stream")]
-        public bool Stream { get; set; }
-
-        [JsonPropertyName("options")]
-        public OllamaOptions? Options { get; set; }
-    }
-
-    private class OllamaOptions
-    {
-        [JsonPropertyName("temperature")]
-        public double Temperature { get; set; }
-
-        [JsonPropertyName("num_predict")]
-        public int NumPredict { get; set; } = 4096;
-
-        [JsonPropertyName("num_ctx")]
-        public int NumCtx { get; set; } = 8192;
-    }
-
-    private class OllamaStreamChunk
-    {
-        [JsonPropertyName("response")]
-        public string? Response { get; set; }
-
-        [JsonPropertyName("done")]
-        public bool Done { get; set; }
     }
 }

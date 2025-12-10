@@ -12,14 +12,20 @@ namespace SmartBasket.WPF;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly ProductsItemsViewModel _productsItemsViewModel;
     private readonly AppSettings _appSettings;
     private readonly SettingsService _settingsService;
     private LogWindow? _logWindow;
 
-    public MainWindow(MainViewModel viewModel, AppSettings appSettings, SettingsService settingsService)
+    public MainWindow(
+        MainViewModel viewModel,
+        ProductsItemsViewModel productsItemsViewModel,
+        AppSettings appSettings,
+        SettingsService settingsService)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _productsItemsViewModel = productsItemsViewModel;
         _appSettings = appSettings;
         _settingsService = settingsService;
         DataContext = viewModel;
@@ -61,6 +67,14 @@ public partial class MainWindow : Window
         var passwordBox = SettingsViewControl.GetPasswordBox();
         passwordBox.Password = _viewModel.EmailPassword;
         passwordBox.PasswordChanged += PasswordBox_PasswordChanged;
+
+        // Set YandexGPT API key in SettingsView PasswordBox
+        var yandexApiKeyBox = SettingsViewControl.GetYandexApiKeyBox();
+        yandexApiKeyBox.Password = _viewModel.YandexApiKey;
+        yandexApiKeyBox.PasswordChanged += YandexApiKeyBox_PasswordChanged;
+
+        // Set DataContext for ProductsItemsView
+        ProductsItemsViewControl.DataContext = _productsItemsViewModel;
     }
 
     private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
@@ -68,6 +82,14 @@ public partial class MainWindow : Window
         if (sender is System.Windows.Controls.PasswordBox pb)
         {
             _viewModel.EmailPassword = pb.Password;
+        }
+    }
+
+    private void YandexApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.PasswordBox pb)
+        {
+            _viewModel.YandexApiKey = pb.Password;
         }
     }
 

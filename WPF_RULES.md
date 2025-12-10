@@ -283,6 +283,98 @@ Background="{StaticResource BackgroundBrush}"
 
 ---
 
+## MVVM Architecture
+
+### One ViewModel per View
+Each complex UserControl should have its **own dedicated ViewModel**. This is the recommended MVVM pattern.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ MainWindow                                                   │
+│   └─ DataContext: MainViewModel                             │
+│       ├─ HistoryView (UserControl)                          │
+│       │     └─ Inherits MainViewModel (simple, no own VM)   │
+│       ├─ ProductsItemsView (UserControl)                    │
+│       │     └─ DataContext: ProductsItemsViewModel          │
+│       └─ SettingsView (UserControl)                         │
+│             └─ Inherits MainViewModel (simple, no own VM)   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### When to create separate ViewModel:
+- Complex UserControl with its own business logic
+- Reusable components
+- Need for unit testing in isolation
+- Many commands and properties (>10-15)
+
+### When to inherit parent DataContext:
+- Simple visual components
+- Tightly coupled to parent
+- Few bindings, no commands
+
+### ViewModel instantiation in XAML
+```xml
+<UserControl x:Class="MyApp.Views.ProductsItemsView" ...>
+    <UserControl.DataContext>
+        <viewModels:ProductsItemsViewModel/>
+    </UserControl.DataContext>
+    <!-- Or via ViewModelLocator / DI -->
+</UserControl>
+```
+
+### Services for Business Logic
+- Extract DB operations into services (IProductService, ILabelService)
+- ViewModels call services, not DbContext directly
+- Services are injected via DI
+- Makes ViewModels testable
+
+```csharp
+public class ProductsItemsViewModel : ObservableObject
+{
+    private readonly IProductService _productService;
+    private readonly ILabelService _labelService;
+
+    public ProductsItemsViewModel(IProductService productService, ILabelService labelService)
+    {
+        _productService = productService;
+        _labelService = labelService;
+    }
+}
+```
+
+### Communication between ViewModels
+Use **WeakReferenceMessenger** from CommunityToolkit.Mvvm:
+
+```csharp
+// Define message
+public record ProductUpdatedMessage(Guid ProductId);
+
+// Send from one VM
+WeakReferenceMessenger.Default.Send(new ProductUpdatedMessage(product.Id));
+
+// Receive in another VM (register in constructor)
+WeakReferenceMessenger.Default.Register<ProductUpdatedMessage>(this, (r, m) =>
+{
+    // Handle message
+});
+```
+
+### Decompose Large Views
+Break down complex UI into smaller UserControls:
+
+```
+ProductsItemsView
+├── ProductTreePanel (UserControl) - TreeView with products
+├── ItemsGridPanel (UserControl) - DataGrid with items
+└── Toolbar (inline or UserControl)
+```
+
+Each sub-control can either:
+1. Have own ViewModel (if complex)
+2. Bind to parent's ViewModel properties (if simple)
+
+---
+
 ## Project Structure
 ```
 SmartBasket/

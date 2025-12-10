@@ -1,7 +1,8 @@
 <Application x:Class="SmartBasket.WPF.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:SmartBasket.WPF">
+             xmlns:local="clr-namespace:SmartBasket.WPF"
+             xmlns:converters="clr-namespace:SmartBasket.WPF.Converters">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -15,6 +16,8 @@
 
             <!-- Global Converters -->
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
+            <converters:StringToColorConverter x:Key="StringToColor"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

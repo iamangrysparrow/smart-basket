@@ -65,11 +65,35 @@
                 </StackPanel>
             </Border>
 
-            <!-- Ollama Settings -->
+            <!-- LLM Provider Selection -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,6">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Path Data="{StaticResource IconSettings}" Fill="#881798" Width="14" Height="14" Stretch="Uniform"/>
+                        <TextBlock Text="LLM Provider" Style="{StaticResource H2}" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="Provider" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Column="1" SelectedIndex="{Binding SelectedLlmProviderIndex}"
+                                  FontSize="12" Padding="4,3">
+                            <ComboBoxItem Content="Ollama (локальный)"/>
+                            <ComboBoxItem Content="YandexGPT (облако)"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Ollama Settings -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,6"
+                    Visibility="{Binding IsOllamaSelected, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Path Data="{StaticResource IconSettings}" Fill="#107C10" Width="14" Height="14" Stretch="Uniform"/>
                         <TextBlock Text="Ollama" Style="{StaticResource H2}" Margin="6,0,0,0"/>
                     </StackPanel>
                     <Grid>
@@ -89,6 +113,51 @@
                         <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OllamaModel, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextInput}"/>
                     </Grid>
                     <Button Style="{StaticResource SecondaryButton}" Command="{Binding TestOllamaConnectionCommand}"
+                            IsEnabled="{Binding IsNotProcessing}" HorizontalAlignment="Left" Margin="0,6,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconPlug}" Fill="{DynamicResource TextPrimaryBrush}" Width="10" Height="10" Stretch="Uniform"/>
+                            <TextBlock Text="Test" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- YandexGPT Settings -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,6"
+                    Visibility="{Binding IsYandexGptSelected, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Path Data="{StaticResource IconSettings}" Fill="#FF0000" Width="14" Height="14" Stretch="Uniform"/>
+                        <TextBlock Text="YandexGPT" Style="{StaticResource H2}" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder ID" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding YandexFolderId, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextInput}" Margin="0,0,0,3"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="API Key" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <PasswordBox Grid.Row="1" Grid.Column="1" x:Name="YandexApiKeyBox" Padding="4,2" Margin="0,0,0,3" FontSize="12"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Model" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" Text="{Binding YandexModel, UpdateSourceTrigger=PropertyChanged}"
+                                  FontSize="12" Padding="4,3" IsEditable="True">
+                            <ComboBoxItem Content="yandexgpt-lite"/>
+                            <ComboBoxItem Content="yandexgpt"/>
+                            <ComboBoxItem Content="yandexgpt-32k"/>
+                            <ComboBoxItem Content="llama-lite"/>
+                            <ComboBoxItem Content="llama"/>
+                        </ComboBox>
+                    </Grid>
+                    <Button Style="{StaticResource SecondaryButton}" Command="{Binding TestYandexGptConnectionCommand}"
                             IsEnabled="{Binding IsNotProcessing}" HorizontalAlignment="Left" Margin="0,6,0,0">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconPlug}" Fill="{DynamicResource TextPrimaryBrush}" Width="10" Height="10" Stretch="Uniform"/>

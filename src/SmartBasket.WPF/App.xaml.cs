@@ -7,7 +7,9 @@ using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Data;
 using SmartBasket.Services.Email;
+using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Products;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
@@ -18,6 +20,11 @@ public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
     private AppSettings? _appSettings;
+
+    /// <summary>
+    /// Provides access to the service provider for dependency injection
+    /// </summary>
+    public static IServiceProvider Services => ((App)Current)._serviceProvider!;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -82,10 +89,18 @@ public partial class App : Application
         services.AddSingleton<ICategoryService, CategoryService>();
         services.AddSingleton<IProductClassificationService, ProductClassificationService>();
         services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
+        services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
+        services.AddSingleton<IReceiptParsingService, ReceiptParsingService>();
         services.AddSingleton<SettingsService>();
+
+        // Product/Item/Label services
+        services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<ILabelService, LabelService>();
+        services.AddScoped<IItemService, ItemService>();
 
         // ViewModels
         services.AddTransient<MainViewModel>();
+        services.AddTransient<ProductsItemsViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

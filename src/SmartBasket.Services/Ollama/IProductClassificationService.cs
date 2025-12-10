@@ -1,5 +1,3 @@
-using SmartBasket.Core.Configuration;
-
 namespace SmartBasket.Services.Ollama;
 
 /// <summary>
@@ -14,7 +12,7 @@ public class ExistingProduct
 }
 
 /// <summary>
-/// Сервис классификации товаров по продуктам через Ollama
+/// Сервис классификации товаров по продуктам через LLM (Ollama, YandexGPT и др.)
 /// </summary>
 public interface IProductClassificationService
 {
@@ -26,14 +24,12 @@ public interface IProductClassificationService
     /// <summary>
     /// Классифицировать товары из чека по продуктам
     /// </summary>
-    /// <param name="settings">Настройки Ollama</param>
     /// <param name="itemNames">Названия товаров для классификации</param>
     /// <param name="existingProducts">Существующая иерархия продуктов из БД</param>
     /// <param name="progress">Отчёт о прогрессе</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Результат классификации с продуктами и привязками товаров</returns>
     Task<ProductClassificationResult> ClassifyAsync(
-        OllamaSettings settings,
         IReadOnlyList<string> itemNames,
         IReadOnlyList<ExistingProduct> existingProducts,
         IProgress<string>? progress = null,

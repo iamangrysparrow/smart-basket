@@ -129,15 +129,15 @@
                 <views:HistoryView/>
             </TabItem>
 
-            <!-- Tab 2: Categories -->
+            <!-- Tab 2: Products & Items -->
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{StaticResource IconProducts}" Fill="#CA5010" Width="12" Height="12" Stretch="Uniform" Margin="0,0,4,0"/>
-                        <TextBlock Text="Categories"/>
+                        <TextBlock Text="Products"/>
                     </StackPanel>
                 </TabItem.Header>
-                <views:CategoriesView/>
+                <views:ProductsItemsView x:Name="ProductsItemsViewControl"/>
             </TabItem>
 
             <!-- Tab 3: Settings -->

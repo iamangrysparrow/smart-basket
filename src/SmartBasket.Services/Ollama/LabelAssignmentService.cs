@@ -3,20 +3,20 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using SmartBasket.Core.Configuration;
+using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Ollama;
 
 public class LabelAssignmentService : ILabelAssignmentService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILlmProviderFactory _providerFactory;
     private readonly ILogger<LabelAssignmentService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public LabelAssignmentService(IHttpClientFactory httpClientFactory, ILogger<LabelAssignmentService> logger)
+    public LabelAssignmentService(ILlmProviderFactory providerFactory, ILogger<LabelAssignmentService> logger)
     {
-        _httpClientFactory = httpClientFactory;
+        _providerFactory = providerFactory;
         _logger = logger;
     }
 
@@ -27,7 +27,6 @@ public class LabelAssignmentService : ILabelAssignmentService
     }
 
     public async Task<LabelAssignmentResult> AssignLabelsAsync(
-        OllamaSettings settings,
         string itemName,
         string productName,
         IReadOnlyList<string> availableLabels,
@@ -45,129 +44,41 @@ public class LabelAssignmentService : ILabelAssignmentService
                 return result;
             }
 
+            // Получаем текущий провайдер
+            var provider = _providerFactory.GetCurrentProvider();
+            progress?.Report($"  [Labels] Using provider: {provider.Name}");
+
             var prompt = BuildPrompt(itemName, productName, availableLabels, progress);
             progress?.Report($"  [Labels] Assigning labels for: {itemName}");
             progress?.Report($"  [Labels] === PROMPT START ===");
             progress?.Report(prompt);
             progress?.Report($"  [Labels] === PROMPT END ===");
 
-            var client = _httpClientFactory.CreateClient();
-            var timeoutSeconds = Math.Max(settings.TimeoutSeconds, 60);
-            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-
-            var request = new OllamaGenerateRequest
-            {
-                Model = settings.Model,
-                Prompt = prompt,
-                Stream = true,
-                Options = new OllamaOptions
-                {
-                    Temperature = 0.1,
-                    NumPredict = 256 // Labels are short
-                }
-            };
-
-            progress?.Report($"  [Labels] Sending STREAMING request to {settings.BaseUrl}/api/generate (model: {settings.Model}, timeout: {timeoutSeconds}s)...");
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            progress?.Report($"  [Labels] Sending request via {provider.Name}...");
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl}/api/generate")
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(request),
-                    Encoding.UTF8,
-                    "application/json")
-            };
-
-            HttpResponseMessage response;
-            try
-            {
-                response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                progress?.Report($"  [Labels] TIMEOUT after {timeoutSeconds}s");
-                result.IsSuccess = false;
-                result.Message = $"Ollama timeout after {timeoutSeconds}s";
-                return result;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                progress?.Report($"  [Labels] Error: {errorContent}");
-                result.IsSuccess = false;
-                result.Message = $"Ollama returned {response.StatusCode}";
-                return result;
-            }
-
-            // Read streaming response
-            progress?.Report($"  [Labels] === STREAMING RESPONSE ===");
-            var fullResponse = new StringBuilder();
-            var lineBuffer = new StringBuilder(); // Buffer for accumulating text until newline
-
-            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
-            using var reader = new StreamReader(stream);
-
-            while (!reader.EndOfStream)
-            {
-                linkedCts.Token.ThrowIfCancellationRequested();
-
-                var line = await reader.ReadLineAsync(linkedCts.Token);
-                if (string.IsNullOrEmpty(line)) continue;
-
-                try
-                {
-                    var chunk = JsonSerializer.Deserialize<OllamaStreamChunk>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                    if (chunk?.Response != null)
-                    {
-                        fullResponse.Append(chunk.Response);
-
-                        // Buffer text and output line by line (like receipt parsing)
-                        foreach (var ch in chunk.Response)
-                        {
-                            if (ch == '\n')
-                            {
-                                progress?.Report($"  {lineBuffer}");
-                                lineBuffer.Clear();
-                            }
-                            else
-                            {
-                                lineBuffer.Append(ch);
-                            }
-                        }
-                    }
-
-                    if (chunk?.Done == true)
-                    {
-                        // Output any remaining text in buffer
-                        if (lineBuffer.Length > 0)
-                        {
-                            progress?.Report($"  {lineBuffer}");
-                            lineBuffer.Clear();
-                        }
-                        break;
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Skip malformed lines
-                }
-            }
+            var llmResult = await provider.GenerateAsync(
+                prompt,
+                maxTokens: 256, // Labels are short
+                temperature: 0.1,
+                progress: progress,
+                cancellationToken: cancellationToken);
 
             stopwatch.Stop();
-            progress?.Report($"  [Labels] === END STREAMING ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
+            progress?.Report($"  [Labels] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
 
-            var ollamaResponse = fullResponse.ToString();
-            result.RawResponse = ollamaResponse;
-            progress?.Report($"  [Labels] Total response: {fullResponse.Length} chars");
+            if (!llmResult.IsSuccess || string.IsNullOrEmpty(llmResult.Response))
+            {
+                result.IsSuccess = false;
+                result.Message = llmResult.ErrorMessage ?? "Empty response from LLM";
+                return result;
+            }
+
+            result.RawResponse = llmResult.Response;
+            progress?.Report($"  [Labels] Total response: {llmResult.Response.Length} chars");
 
             // Extract JSON array from response
-            var jsonMatch = Regex.Match(ollamaResponse, @"\[[\s\S]*?\]", RegexOptions.Multiline);
+            var jsonMatch = Regex.Match(llmResult.Response, @"\[[\s\S]*?\]", RegexOptions.Multiline);
             if (jsonMatch.Success)
             {
                 try
@@ -202,24 +113,172 @@ public class LabelAssignmentService : ILabelAssignmentService
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Only rethrow if the external token was cancelled (user cancel)
             result.IsSuccess = false;
             result.Message = "Operation cancelled by user";
             throw;
-        }
-        catch (OperationCanceledException)
-        {
-            // Internal timeout - don't throw, just return failure
-            result.IsSuccess = false;
-            result.Message = "Label assignment timed out";
         }
         catch (Exception ex)
         {
             result.IsSuccess = false;
             result.Message = $"Error: {ex.Message}";
+            _logger.LogError(ex, "Label assignment error");
         }
 
         return result;
+    }
+
+    public async Task<BatchLabelAssignmentResult> AssignLabelsBatchAsync(
+        IReadOnlyList<BatchItemInput> items,
+        IReadOnlyList<string> availableLabels,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new BatchLabelAssignmentResult();
+
+        try
+        {
+            if (availableLabels.Count == 0)
+            {
+                result.IsSuccess = true;
+                result.Message = "No labels available";
+                return result;
+            }
+
+            if (items.Count == 0)
+            {
+                result.IsSuccess = true;
+                result.Message = "No items to classify";
+                return result;
+            }
+
+            // Получаем текущий провайдер
+            var provider = _providerFactory.GetCurrentProvider();
+            progress?.Report($"  [Labels] Using provider: {provider.Name}");
+
+            var prompt = BuildBatchPrompt(items, availableLabels);
+            progress?.Report($"  [Labels] Assigning labels for {items.Count} items (batch)");
+            progress?.Report($"  [Labels] === PROMPT START ===");
+            progress?.Report(prompt);
+            progress?.Report($"  [Labels] === PROMPT END ===");
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            progress?.Report($"  [Labels] Sending request via {provider.Name}...");
+
+            var llmResult = await provider.GenerateAsync(
+                prompt,
+                maxTokens: 1024, // Больше токенов для batch
+                temperature: 0.1,
+                progress: progress,
+                cancellationToken: cancellationToken);
+
+            stopwatch.Stop();
+            progress?.Report($"  [Labels] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
+
+            if (!llmResult.IsSuccess || string.IsNullOrEmpty(llmResult.Response))
+            {
+                result.IsSuccess = false;
+                result.Message = llmResult.ErrorMessage ?? "Empty response from LLM";
+                return result;
+            }
+
+            result.RawResponse = llmResult.Response;
+            progress?.Report($"  [Labels] Total response: {llmResult.Response.Length} chars");
+
+            // Parse batch response
+            result.Results = ParseBatchResponse(llmResult.Response, items, availableLabels);
+            result.IsSuccess = true;
+            result.Message = $"Assigned labels for {result.Results.Count} items";
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            result.IsSuccess = false;
+            result.Message = "Operation cancelled by user";
+            throw;
+        }
+        catch (Exception ex)
+        {
+            result.IsSuccess = false;
+            result.Message = $"Error: {ex.Message}";
+            _logger.LogError(ex, "Batch label assignment error");
+        }
+
+        return result;
+    }
+
+    private List<BatchItemResult> ParseBatchResponse(
+        string response,
+        IReadOnlyList<BatchItemInput> items,
+        IReadOnlyList<string> availableLabels)
+    {
+        var results = new List<BatchItemResult>();
+
+        // Ищем JSON массив
+        var jsonMatch = Regex.Match(response, @"\[[\s\S]*\]", RegexOptions.Multiline);
+        if (!jsonMatch.Success)
+            return results;
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<BatchResponseItem>>(jsonMatch.Value,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (parsed == null)
+                return results;
+
+            // Создаем lookup для быстрого поиска
+            var availableLabelsSet = new HashSet<string>(availableLabels, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var parsedItem in parsed)
+            {
+                if (string.IsNullOrWhiteSpace(parsedItem.Item))
+                    continue;
+
+                // Фильтруем только валидные метки
+                var validLabels = parsedItem.Labels?
+                    .Where(l => availableLabelsSet.Contains(l))
+                    .ToList() ?? new List<string>();
+
+                results.Add(new BatchItemResult
+                {
+                    ItemName = parsedItem.Item,
+                    Labels = validLabels
+                });
+            }
+        }
+        catch (JsonException)
+        {
+            // Если не удалось распарсить - возвращаем пустой список
+        }
+
+        return results;
+    }
+
+    private string BuildBatchPrompt(
+        IReadOnlyList<BatchItemInput> items,
+        IReadOnlyList<string> availableLabels)
+    {
+        var labelsList = string.Join("\n", availableLabels.Select(l => $"- {l}"));
+        var itemsList = string.Join("\n", items.Select((item, i) =>
+            $"{i + 1}. \"{item.ItemName}\" (категория: {item.ProductName})"));
+
+        return $@"Назначь подходящие метки для каждого товара из списка.
+
+ДОСТУПНЫЕ МЕТКИ:
+{labelsList}
+
+ТОВАРЫ:
+{itemsList}
+
+ФОРМАТ ОТВЕТА (строго JSON массив объектов):
+[
+  {{""item"": ""название товара 1"", ""labels"": [""Метка1"", ""Метка2""]}},
+  {{""item"": ""название товара 2"", ""labels"": [""Метка3""]}}
+]
+
+Для каждого товара выбери наиболее подходящие метки из списка ДОСТУПНЫЕ МЕТКИ.
+Если ни одна метка не подходит, верни пустой массив labels: [].
+
+Назначь метки:";
     }
 
     private string BuildPrompt(
@@ -266,37 +325,13 @@ public class LabelAssignmentService : ILabelAssignmentService
 Назначь метки:";
     }
 
-    // DTOs
-    private class OllamaGenerateRequest
+    // DTO for batch response parsing
+    private class BatchResponseItem
     {
-        [JsonPropertyName("model")]
-        public string Model { get; set; } = string.Empty;
+        [JsonPropertyName("item")]
+        public string Item { get; set; } = string.Empty;
 
-        [JsonPropertyName("prompt")]
-        public string Prompt { get; set; } = string.Empty;
-
-        [JsonPropertyName("stream")]
-        public bool Stream { get; set; }
-
-        [JsonPropertyName("options")]
-        public OllamaOptions? Options { get; set; }
-    }
-
-    private class OllamaOptions
-    {
-        [JsonPropertyName("temperature")]
-        public double Temperature { get; set; }
-
-        [JsonPropertyName("num_predict")]
-        public int NumPredict { get; set; } = 256;
-    }
-
-    private class OllamaStreamChunk
-    {
-        [JsonPropertyName("response")]
-        public string? Response { get; set; }
-
-        [JsonPropertyName("done")]
-        public bool Done { get; set; }
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
     }
 }

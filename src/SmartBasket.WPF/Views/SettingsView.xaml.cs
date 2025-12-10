@@ -10,7 +10,12 @@ public partial class SettingsView : UserControl
     }
 
     /// <summary>
-    /// Gets the PasswordBox for password binding from code-behind
+    /// Gets the PasswordBox for email password binding from code-behind
     /// </summary>
     public PasswordBox GetPasswordBox() => PasswordBox;
+
+    /// <summary>
+    /// Gets the PasswordBox for YandexGPT API key binding from code-behind
+    /// </summary>
+    public PasswordBox GetYandexApiKeyBox() => YandexApiKeyBox;
 }

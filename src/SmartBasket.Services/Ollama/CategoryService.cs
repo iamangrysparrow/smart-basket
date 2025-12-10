@@ -1,24 +1,23 @@
 using System.IO;
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using SmartBasket.Core.Configuration;
+using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Ollama;
 
 public class CategoryService : ICategoryService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILlmProviderFactory _providerFactory;
     private readonly ILogger<CategoryService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public CategoryService(IHttpClientFactory httpClientFactory, ILogger<CategoryService> logger)
+    public CategoryService(ILlmProviderFactory providerFactory, ILogger<CategoryService> logger)
     {
-        _httpClientFactory = httpClientFactory;
+        _providerFactory = providerFactory;
         _logger = logger;
     }
 
@@ -29,7 +28,6 @@ public class CategoryService : ICategoryService
     }
 
     public async Task<CategorizationResult> CategorizeItemsAsync(
-        OllamaSettings settings,
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string> categories,
         IReadOnlyList<CategoryExample>? examples = null,
@@ -54,109 +52,45 @@ public class CategoryService : ICategoryService
                 return result;
             }
 
+            // Получаем текущий провайдер
+            var provider = _providerFactory.GetCurrentProvider();
+            progress?.Report($"  [Category] Using provider: {provider.Name}");
+
             var examplesCount = examples?.Count ?? 0;
             progress?.Report($"  [Category] Categorizing {itemNames.Count} items with {categories.Count} categories and {examplesCount} examples...");
 
             var prompt = BuildCategorizationPrompt(itemNames, categories, examples, progress);
-
             progress?.Report($"  [Category] Prompt ready: {prompt.Length} chars");
 
-            var client = _httpClientFactory.CreateClient();
-            var timeoutSeconds = Math.Max(settings.TimeoutSeconds, 120);
-            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-
-            var request = new OllamaGenerateRequest
-            {
-                Model = settings.Model,
-                Prompt = prompt,
-                Stream = true,
-                Options = new OllamaOptions
-                {
-                    Temperature = 0.1 // Low temperature for consistent categorization
-                }
-            };
-
-            progress?.Report($"  [Category] Sending request to {settings.BaseUrl}/api/generate...");
-
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            progress?.Report($"  [Category] Sending request via {provider.Name}...");
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl}/api/generate")
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(request),
-                    Encoding.UTF8,
-                    "application/json")
-            };
-
-            HttpResponseMessage response;
-            try
-            {
-                response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                stopwatch.Stop();
-                progress?.Report($"  [Category] TIMEOUT after {stopwatch.Elapsed.TotalSeconds:F1}s");
-                result.IsSuccess = false;
-                result.Message = $"Ollama timeout after {timeoutSeconds}s";
-                return result;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                progress?.Report($"  [Category] Error: {errorContent}");
-                result.IsSuccess = false;
-                result.Message = $"Ollama returned {response.StatusCode}";
-                return result;
-            }
-
-            // Read streaming response
-            var fullResponse = new StringBuilder();
-            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
-            using var reader = new StreamReader(stream);
-
-            while (!reader.EndOfStream)
-            {
-                linkedCts.Token.ThrowIfCancellationRequested();
-
-                var line = await reader.ReadLineAsync();
-                if (string.IsNullOrEmpty(line)) continue;
-
-                try
-                {
-                    var chunk = JsonSerializer.Deserialize<OllamaStreamChunk>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                    if (chunk?.Response != null)
-                    {
-                        fullResponse.Append(chunk.Response);
-                    }
-
-                    if (chunk?.Done == true) break;
-                }
-                catch (JsonException)
-                {
-                    // Skip malformed lines
-                }
-            }
+            var llmResult = await provider.GenerateAsync(
+                prompt,
+                maxTokens: 2048,
+                temperature: 0.1, // Low temperature for consistent categorization
+                progress: progress,
+                cancellationToken: cancellationToken);
 
             stopwatch.Stop();
             progress?.Report($"  [Category] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
 
-            var ollamaResponse = fullResponse.ToString();
-            result.RawResponse = ollamaResponse;
+            if (!llmResult.IsSuccess || string.IsNullOrEmpty(llmResult.Response))
+            {
+                result.IsSuccess = false;
+                result.Message = llmResult.ErrorMessage ?? "Empty response from LLM";
+                return result;
+            }
+
+            result.RawResponse = llmResult.Response;
 
             // Extract JSON array from response
-            var jsonMatch = Regex.Match(ollamaResponse, @"\[[\s\S]*\]", RegexOptions.Multiline);
+            var jsonMatch = Regex.Match(llmResult.Response, @"\[[\s\S]*\]", RegexOptions.Multiline);
             if (jsonMatch.Success)
             {
                 try
                 {
-                    var parsedItems = JsonSerializer.Deserialize<List<OllamaCategorizedItem>>(
+                    var parsedItems = JsonSerializer.Deserialize<List<LlmCategorizedItem>>(
                         jsonMatch.Value,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -200,17 +134,12 @@ public class CategoryService : ICategoryService
             result.Message = "Operation cancelled by user";
             throw;
         }
-        catch (OperationCanceledException)
-        {
-            progress?.Report("  [Category] Timed out");
-            result.IsSuccess = false;
-            result.Message = "Category request timed out";
-        }
         catch (Exception ex)
         {
             progress?.Report($"  [Category] Error: {ex.Message}");
             result.IsSuccess = false;
             result.Message = $"Error: {ex.Message}";
+            _logger.LogError(ex, "Categorization error");
         }
 
         return result;
@@ -301,34 +230,8 @@ public class CategoryService : ICategoryService
         return sb.ToString();
     }
 
-    // DTOs
-    private class OllamaGenerateRequest
-    {
-        public string Model { get; set; } = string.Empty;
-        public string Prompt { get; set; } = string.Empty;
-        public bool Stream { get; set; }
-        public OllamaOptions? Options { get; set; }
-    }
-
-    private class OllamaOptions
-    {
-        [JsonPropertyName("temperature")]
-        public double Temperature { get; set; }
-
-        [JsonPropertyName("num_predict")]
-        public int NumPredict { get; set; } = 2048;
-
-        [JsonPropertyName("num_ctx")]
-        public int NumCtx { get; set; } = 4096;
-    }
-
-    private class OllamaStreamChunk
-    {
-        public string? Response { get; set; }
-        public bool Done { get; set; }
-    }
-
-    private class OllamaCategorizedItem
+    // DTO for parsing LLM response
+    private class LlmCategorizedItem
     {
         [JsonPropertyName("item_name")]
         public string? ItemName { get; set; }
