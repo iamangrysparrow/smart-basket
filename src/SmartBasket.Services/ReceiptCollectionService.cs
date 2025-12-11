@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
-using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Llm;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Sources;
 
@@ -242,7 +242,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
             var parser = _parserFactory.GetParser(parserName);
             if (parser != null)
             {
-                progress?.Report($"  [Parse] Using parser: {parser.ShopName}");
+                progress?.Report($"  [Parse] Using parser: {parser.Name}");
 
                 // Для LLM парсера используем async метод
                 if (parser is LlmUniversalParser llmParser)

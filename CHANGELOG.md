@@ -8,6 +8,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Рефакторинг интерфейса парсеров (`IReceiptTextParser`)**:
+  - `ShopName` → `Name` — уникальный идентификатор для конфигурации
+  - Добавлен `SupportedShops: IReadOnlyList<string>` — магазины для будущего авто-определения
+  - `ReceiptTextParserFactory.GetParser()` теперь ищет по `Name`
+- **Удалены legacy классы конфигурации**:
+  - `OllamaSettings`, `YandexGptSettings`, `EmailSettings`, `LlmSettings` — удалены
+  - `ConfigurationMigrationService` — удалён (миграция завершена)
+  - `IOllamaService`, `OllamaService` — удалены (заменены на `ILlmProvider`)
+  - `AppSettings` теперь использует только новую архитектуру (без legacy свойств)
+- **Рефакторинг namespace**: классы перемещены из `SmartBasket.Services.Ollama` в `SmartBasket.Services.Llm`
+- **Рефакторинг кнопки Collect**: переключена на `CollectReceiptsCommand` (новая архитектура)
+- **Удалены #pragma warning disable CS0618**: заменён obsolete `TryParse()` на `TryParseWithRegex()`
+- **Удалён легаси код из MainViewModel**: ~450 строк (FetchAndParseEmailsAsync, legacy поля/методы)
+
+### Fixed
+- **Исправлена проблема шифрования секретов**: после сохранения настроек API ключи и пароли
+  оставались зашифрованными в памяти. Теперь `SettingsService.Save()` расшифровывает их обратно.
+- **Исправлен поиск парсера по имени**: конфигурация `Parser: "InstamartParser"` теперь корректно
+  находит `InstamartReceiptParser` (раньше искал по `ShopName = "Instamart"`)
+
+---
+
+## [0.4.0] - 2024-12-11
+
 ### Added
 - **Фаза 1: Классы конфигурации (Core)** — новая модульная архитектура конфигурации
   - `SourceType` — enum типов источников (Email, REST, FileSystem)
@@ -45,18 +70,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `IProductCleanupService` / `ProductCleanupService` — очистка осиротевших Products
     - Удаление Products без связанных Items
     - Удаление Products без дочерних Products
-  - `ConfigurationMigrationService` — автоматическая миграция legacy конфигурации
-    - Email → ReceiptSources
-    - Ollama → AiProviders
-    - YandexGpt → AiProviders
-    - Llm → AiOperations
   - Новые команды в MainViewModel:
     - `CollectReceiptsCommand` — сбор чеков через ReceiptCollectionService
     - `CleanupOrphanedProductsCommand` — ручная очистка осиротевших Products
 
 ### Changed
-- `AppSettings` теперь содержит новые секции: `ReceiptSources`, `Parsers`, `AiProviders`, `AiOperations`
-- Legacy свойства (`Email`, `Ollama`, `YandexGpt`, `Llm`) помечены как `[Obsolete]` для обратной совместимости
+- `AppSettings` теперь содержит секции: `ReceiptSources`, `Parsers`, `AiProviders`, `AiOperations`
 - DI регистрации обновлены для новых сервисов (Scoped lifecycle)
 
 ### Planned

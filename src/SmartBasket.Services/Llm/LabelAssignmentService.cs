@@ -4,9 +4,8 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
-using SmartBasket.Services.Llm;
 
-namespace SmartBasket.Services.Ollama;
+namespace SmartBasket.Services.Llm;
 
 public class LabelAssignmentService : ILabelAssignmentService
 {
@@ -284,6 +283,23 @@ public class LabelAssignmentService : ILabelAssignmentService
         var itemsList = string.Join("\n", items.Select((item, i) =>
             $"{i + 1}. \"{item.ItemName}\" (категория: {item.ProductName})"));
 
+        // Try to load template from file
+        if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
+        {
+            try
+            {
+                var template = File.ReadAllText(_promptTemplatePath);
+                return template
+                    .Replace("{{LABELS}}", labelsList)
+                    .Replace("{{ITEMS}}", itemsList);
+            }
+            catch
+            {
+                // Fall through to default prompt
+            }
+        }
+
+        // Default prompt (fallback)
         return $@"Назначь подходящие метки для каждого товара из списка.
 
 ДОСТУПНЫЕ МЕТКИ:

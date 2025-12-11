@@ -244,31 +244,17 @@ async Task<int> FetchEmailsAsync(EmailSourceConfig emailConfig)
     Console.WriteLine($"Filters: Sender='{emailConfig.SenderFilter}', Subject='{emailConfig.SubjectFilter}'");
     Console.WriteLine();
 
-    // Convert EmailSourceConfig to legacy EmailSettings for EmailService
-    var emailSettings = new EmailSettings
-    {
-        ImapServer = emailConfig.ImapServer,
-        ImapPort = emailConfig.ImapPort,
-        UseSsl = emailConfig.UseSsl,
-        Username = emailConfig.Username,
-        Password = emailConfig.Password,
-        SenderFilter = emailConfig.SenderFilter,
-        SubjectFilter = emailConfig.SubjectFilter,
-        Folder = emailConfig.Folder,
-        SearchDaysBack = emailConfig.SearchDaysBack
-    };
-
     var services = new ServiceCollection();
     services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
     services.AddSingleton<IEmailService, EmailService>();
     var provider = services.BuildServiceProvider();
     var emailService = provider.GetRequiredService<IEmailService>();
 
-    var (ok, msg) = await emailService.TestConnectionAsync(emailSettings);
+    var (ok, msg) = await emailService.TestConnectionAsync(emailConfig);
     Console.WriteLine($"Connection: {(ok ? "OK" : "FAILED")} - {msg}");
     if (!ok) return 1;
 
-    var emails = await emailService.FetchEmailsAsync(emailSettings, new Progress<string>(Console.WriteLine));
+    var emails = await emailService.FetchEmailsAsync(emailConfig, new Progress<string>(Console.WriteLine));
     Console.WriteLine($"Found: {emails.Count} emails");
 
     var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
@@ -291,24 +277,10 @@ async Task<int> FetchEmailsAsync(EmailSourceConfig emailConfig)
 }
 
 // ============= PARSE EMAILS MODE =============
-async Task<int> ParseEmailsAsync(EmailSourceConfig emailConfig, AiProviderConfig provider)
+async Task<int> ParseEmailsAsync(EmailSourceConfig emailConfig, AiProviderConfig aiProvider)
 {
     Console.WriteLine("=== Parse Emails with Ollama ===");
-    Console.WriteLine($"Provider: {provider.Key}");
-
-    // Convert EmailSourceConfig to legacy EmailSettings for EmailService
-    var emailSettings = new EmailSettings
-    {
-        ImapServer = emailConfig.ImapServer,
-        ImapPort = emailConfig.ImapPort,
-        UseSsl = emailConfig.UseSsl,
-        Username = emailConfig.Username,
-        Password = emailConfig.Password,
-        SenderFilter = emailConfig.SenderFilter,
-        SubjectFilter = emailConfig.SubjectFilter,
-        Folder = emailConfig.Folder,
-        SearchDaysBack = emailConfig.SearchDaysBack
-    };
+    Console.WriteLine($"Provider: {aiProvider.Key}");
 
     var services = new ServiceCollection();
     services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
@@ -316,13 +288,13 @@ async Task<int> ParseEmailsAsync(EmailSourceConfig emailConfig, AiProviderConfig
     var serviceProvider = services.BuildServiceProvider();
     var emailService = serviceProvider.GetRequiredService<IEmailService>();
 
-    var emails = await emailService.FetchEmailsAsync(emailSettings, new Progress<string>(s => { }));
+    var emails = await emailService.FetchEmailsAsync(emailConfig, new Progress<string>(s => { }));
     Console.WriteLine($"Found: {emails.Count} emails");
 
     if (emails.Count == 0) return 0;
 
     using var httpClient = new HttpClient();
-    httpClient.Timeout = TimeSpan.FromSeconds(provider.TimeoutSeconds);
+    httpClient.Timeout = TimeSpan.FromSeconds(aiProvider.TimeoutSeconds);
 
     var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
     Directory.CreateDirectory(outputDir);
@@ -343,16 +315,16 @@ async Task<int> ParseEmailsAsync(EmailSourceConfig emailConfig, AiProviderConfig
 
         var request = new
         {
-            model = provider.Model,
+            model = aiProvider.Model,
             prompt = prompt,
             stream = false,
-            options = new { temperature = provider.Temperature, num_predict = provider.MaxTokens ?? 4096 }
+            options = new { temperature = aiProvider.Temperature, num_predict = aiProvider.MaxTokens ?? 4096 }
         };
 
         var sw = Stopwatch.StartNew();
         try
         {
-            var response = await httpClient.PostAsJsonAsync($"{provider.BaseUrl}/api/generate", request);
+            var response = await httpClient.PostAsJsonAsync($"{aiProvider.BaseUrl}/api/generate", request);
             sw.Stop();
 
             Console.WriteLine($"  Response: {sw.Elapsed.TotalSeconds:F1}s, {response.StatusCode}");

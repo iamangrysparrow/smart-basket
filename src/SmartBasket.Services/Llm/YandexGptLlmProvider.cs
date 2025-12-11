@@ -16,30 +16,30 @@ public class YandexGptLlmProvider : ILlmProvider
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<YandexGptLlmProvider> _logger;
-    private readonly YandexGptSettings _settings;
+    private readonly AiProviderConfig _config;
 
-    public string Name => "YandexGPT";
+    public string Name => $"YandexGPT/{_config.Model}";
 
     public YandexGptLlmProvider(
         IHttpClientFactory httpClientFactory,
         ILogger<YandexGptLlmProvider> logger,
-        YandexGptSettings settings)
+        AiProviderConfig config)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-        _settings = settings;
+        _config = config;
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+            if (string.IsNullOrWhiteSpace(_config.ApiKey))
             {
                 return (false, "YandexGPT API key is not configured");
             }
 
-            if (string.IsNullOrWhiteSpace(_settings.FolderId))
+            if (string.IsNullOrWhiteSpace(_config.FolderId))
             {
                 return (false, "YandexGPT Folder ID is not configured");
             }
@@ -53,7 +53,7 @@ public class YandexGptLlmProvider : ILlmProvider
 
             if (result.IsSuccess)
             {
-                return (true, $"YandexGPT connected, model: {_settings.Model}");
+                return (true, $"YandexGPT connected, model: {_config.Model}");
             }
 
             return (false, $"YandexGPT test failed: {result.ErrorMessage}");
@@ -75,14 +75,14 @@ public class YandexGptLlmProvider : ILlmProvider
 
         try
         {
-            if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+            if (string.IsNullOrWhiteSpace(_config.ApiKey))
             {
                 result.IsSuccess = false;
                 result.ErrorMessage = "YandexGPT API key is not configured";
                 return result;
             }
 
-            if (string.IsNullOrWhiteSpace(_settings.FolderId))
+            if (string.IsNullOrWhiteSpace(_config.FolderId))
             {
                 result.IsSuccess = false;
                 result.ErrorMessage = "YandexGPT Folder ID is not configured";
@@ -90,22 +90,26 @@ public class YandexGptLlmProvider : ILlmProvider
             }
 
             var client = _httpClientFactory.CreateClient();
-            var timeoutSeconds = Math.Max(_settings.TimeoutSeconds, 60);
+            var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+
+            // Использовать настройки из конфига
+            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
+            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
 
             // Формируем modelUri
             // Для обычных моделей: gpt://{folder_id}/yandexgpt-lite/latest
             // Для Alice и других general моделей: gpt://{folder_id}/general:alice (без /latest)
             string modelUri;
-            if (_settings.Model.StartsWith("general:"))
+            if (_config.Model.StartsWith("general:"))
             {
                 // General модели (Alice и др.) - без /latest
-                modelUri = $"gpt://{_settings.FolderId}/{_settings.Model}";
+                modelUri = $"gpt://{_config.FolderId}/{_config.Model}";
             }
             else
             {
                 // Обычные YandexGPT модели - с /latest
-                modelUri = $"gpt://{_settings.FolderId}/{_settings.Model}/latest";
+                modelUri = $"gpt://{_config.FolderId}/{_config.Model}/latest";
             }
 
             var request = new YandexGptRequest
@@ -114,8 +118,8 @@ public class YandexGptLlmProvider : ILlmProvider
                 CompletionOptions = new YandexCompletionOptions
                 {
                     Stream = true, // Включаем стриминг
-                    Temperature = temperature,
-                    MaxTokens = maxTokens.ToString()
+                    Temperature = actualTemperature,
+                    MaxTokens = actualMaxTokens.ToString()
                 },
                 Messages = new[]
                 {
@@ -144,18 +148,18 @@ public class YandexGptLlmProvider : ILlmProvider
 
             // Добавляем авторизацию
             // Поддерживаем оба формата: IAM token и API key
-            if (_settings.ApiKey.StartsWith("t1.") || _settings.ApiKey.StartsWith("y"))
+            if (_config.ApiKey.StartsWith("t1.") || _config.ApiKey.StartsWith("y"))
             {
                 // IAM token
-                httpRequest.Headers.Add("Authorization", $"Bearer {_settings.ApiKey}");
+                httpRequest.Headers.Add("Authorization", $"Bearer {_config.ApiKey}");
             }
             else
             {
                 // API key
-                httpRequest.Headers.Add("Authorization", $"Api-Key {_settings.ApiKey}");
+                httpRequest.Headers.Add("Authorization", $"Api-Key {_config.ApiKey}");
             }
 
-            httpRequest.Headers.Add("x-folder-id", _settings.FolderId);
+            httpRequest.Headers.Add("x-folder-id", _config.FolderId);
 
             HttpResponseMessage response;
             try

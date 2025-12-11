@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Parsing;
 
@@ -24,30 +24,36 @@ public class ReceiptTextParserFactory
     }
 
     /// <summary>
-    /// Получить парсер по имени.
+    /// Получить парсер по имени (Name).
     /// </summary>
-    /// <param name="parserName">Имя парсера (ShopName или "LlmUniversalParser" / "Auto")</param>
+    /// <param name="parserName">Имя парсера (например "InstamartParser", "LlmUniversalParser")</param>
     /// <returns>Парсер или null, если не найден</returns>
     public IReceiptTextParser? GetParser(string parserName)
     {
         if (string.IsNullOrWhiteSpace(parserName))
             return null;
 
+        // "Auto" означает автоматический выбор - возвращаем null, чтобы вызвать TryParseWithRegex
+        if (parserName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Auto mode requested, returning null to trigger auto-detection");
+            return null;
+        }
+
         // Проверяем LLM парсер
-        if (parserName.Equals(LlmUniversalParser.ParserName, StringComparison.OrdinalIgnoreCase) ||
-            parserName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        if (parserName.Equals(_llmParser.Name, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogDebug("Returning LlmUniversalParser for name: {ParserName}", parserName);
             return _llmParser;
         }
 
-        // Ищем среди regex-парсеров
+        // Ищем среди regex-парсеров по Name
         var parser = _parsers.FirstOrDefault(p =>
-            p.ShopName.Equals(parserName, StringComparison.OrdinalIgnoreCase));
+            p.Name.Equals(parserName, StringComparison.OrdinalIgnoreCase));
 
         if (parser != null)
         {
-            _logger.LogDebug("Found parser {ParserName}", parser.ShopName);
+            _logger.LogDebug("Found parser {ParserName}", parser.Name);
             return parser;
         }
 
@@ -84,8 +90,9 @@ public class ReceiptTextParserFactory
     /// <summary>
     /// Пытается распарсить чек с помощью подходящего regex-парсера.
     /// Не включает LLM парсер в перебор.
+    /// Используется в режиме "Auto".
     /// </summary>
-    /// <param name="receiptText">Очищенный текст чека</param>
+    /// <param name="receiptText">Текст чека</param>
     /// <param name="emailDate">Дата письма</param>
     /// <returns>Результат парсинга или null, если ни один regex-парсер не подошёл</returns>
     public ParsedReceipt? TryParseWithRegex(string receiptText, DateTime emailDate)
@@ -98,7 +105,7 @@ public class ReceiptTextParserFactory
 
             if (parser.CanParse(receiptText))
             {
-                _logger.LogInformation("Using {ParserName} for receipt parsing", parser.ShopName);
+                _logger.LogInformation("Using {ParserName} for receipt parsing", parser.Name);
 
                 var result = parser.Parse(receiptText, emailDate);
 
@@ -113,7 +120,7 @@ public class ReceiptTextParserFactory
 
                 _logger.LogWarning(
                     "Parser {ParserName} matched but failed: {Message}",
-                    parser.ShopName,
+                    parser.Name,
                     result.Message);
             }
         }
@@ -123,25 +130,16 @@ public class ReceiptTextParserFactory
     }
 
     /// <summary>
-    /// Пытается распарсить чек с помощью подходящего regex-парсера (legacy метод).
-    /// </summary>
-    [Obsolete("Use TryParseWithRegex instead")]
-    public ParsedReceipt? TryParse(string receiptText, DateTime emailDate)
-    {
-        return TryParseWithRegex(receiptText, emailDate);
-    }
-
-    /// <summary>
     /// Возвращает список зарегистрированных парсеров (включая LLM).
     /// </summary>
     public IEnumerable<string> GetRegisteredParsers()
     {
         var names = _parsers
             .Where(p => p is not LlmUniversalParser)
-            .Select(p => p.ShopName)
+            .Select(p => p.Name)
             .ToList();
 
-        names.Add(LlmUniversalParser.ParserName);
+        names.Add(_llmParser.Name);
         return names;
     }
 
@@ -152,6 +150,6 @@ public class ReceiptTextParserFactory
     {
         return _parsers
             .Where(p => p is not LlmUniversalParser)
-            .Select(p => p.ShopName);
+            .Select(p => p.Name);
     }
 }

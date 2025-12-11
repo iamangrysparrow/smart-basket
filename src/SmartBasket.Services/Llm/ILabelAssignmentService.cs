@@ -1,4 +1,4 @@
-namespace SmartBasket.Services.Ollama;
+namespace SmartBasket.Services.Llm;
 
 /// <summary>
 /// Результат назначения меток для товара

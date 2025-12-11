@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
-using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Parsing;
 
@@ -9,10 +9,21 @@ namespace SmartBasket.Services.Parsing;
 /// </summary>
 public class InstamartReceiptParser : IReceiptTextParser
 {
-    public string ShopName => "Instamart";
+    /// <summary>
+    /// Уникальный идентификатор парсера для конфигурации
+    /// </summary>
+    public string Name => "InstamartParser";
 
-    // Маркеры для определения магазина
-    private static readonly string[] ShopMarkers = { "Instamart", "instamart", "INSTAMART" };
+    /// <summary>
+    /// Магазины, поддерживаемые этим парсером (для будущего авто-определения)
+    /// </summary>
+    public IReadOnlyList<string> SupportedShops { get; } = new[]
+    {
+        "Instamart", "СберМаркет", "sbermarket.ru", "kuper.ru", "Kuper"
+    };
+
+    // Маркеры для определения магазина в CanParse()
+    private static readonly string[] ShopMarkers = { "Instamart", "instamart", "INSTAMART", "kuper.ru", "Kuper" };
 
     // Паттерн номера заказа: H + 11 цифр
     private static readonly Regex OrderNumberRegex = new(@"H\d{11}", RegexOptions.Compiled);
@@ -46,7 +57,7 @@ public class InstamartReceiptParser : IReceiptTextParser
     {
         var result = new ParsedReceipt
         {
-            Shop = ShopName,
+            Shop = "Instamart",
             Date = emailDate
         };
 
@@ -85,7 +96,7 @@ public class InstamartReceiptParser : IReceiptTextParser
 
             result.IsSuccess = result.Items.Count > 0;
             result.Message = result.IsSuccess
-                ? $"Parsed {result.Items.Count} items from {ShopName}"
+                ? $"Parsed {result.Items.Count} items from {Name}"
                 : "No items found in receipt";
         }
         catch (Exception ex)

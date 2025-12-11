@@ -33,15 +33,15 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <!-- Fetch - BLUE -->
+                    <!-- Collect - BLUE -->
                     <Button Style="{StaticResource ToolbarButton}"
-                            Command="{Binding FetchAndParseEmailsCommand}"
+                            Command="{Binding CollectReceiptsCommand}"
                             IsEnabled="{Binding IsNotProcessing}"
-                            ToolTip="Fetch emails (Ctrl+F)">
+                            ToolTip="Collect receipts from all sources (Ctrl+F)">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconEmail}"
                                   Fill="#0078D4" Width="14" Height="14" Stretch="Uniform"/>
-                            <TextBlock Text="Fetch" Margin="4,0,0,0" Foreground="#0078D4" FontWeight="SemiBold"/>
+                            <TextBlock Text="Collect" Margin="4,0,0,0" Foreground="#0078D4" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
 

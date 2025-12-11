@@ -103,37 +103,17 @@ public class AiProviderFactory : IAiProviderFactory
 
     private ILlmProvider CreateOllamaProvider(AiProviderConfig config)
     {
-        // Convert to legacy OllamaSettings for compatibility
-        var settings = new OllamaSettings
-        {
-            BaseUrl = config.BaseUrl ?? "http://localhost:11434",
-            Model = config.Model,
-            Temperature = config.Temperature,
-            TimeoutSeconds = config.TimeoutSeconds
-        };
-
         return new OllamaLlmProvider(
             _httpClientFactory,
             _loggerFactory.CreateLogger<OllamaLlmProvider>(),
-            settings);
+            config);
     }
 
     private ILlmProvider CreateYandexGptProvider(AiProviderConfig config)
     {
-        // Convert to legacy YandexGptSettings for compatibility
-        var settings = new YandexGptSettings
-        {
-            ApiKey = config.ApiKey ?? string.Empty,
-            FolderId = config.FolderId ?? string.Empty,
-            Model = config.Model,
-            Temperature = config.Temperature,
-            TimeoutSeconds = config.TimeoutSeconds,
-            MaxTokens = config.MaxTokens ?? 2000
-        };
-
         return new YandexGptLlmProvider(
             _httpClientFactory,
             _loggerFactory.CreateLogger<YandexGptLlmProvider>(),
-            settings);
+            config);
     }
 }

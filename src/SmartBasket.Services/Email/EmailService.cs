@@ -16,7 +16,7 @@ public class EmailService : IEmailService
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(
-        EmailSettings settings,
+        EmailSourceConfig config,
         CancellationToken cancellationToken = default)
     {
         try
@@ -29,17 +29,17 @@ public class EmailService : IEmailService
             using var client = new ImapClient();
             client.Timeout = 15000; // 15 seconds socket timeout
 
-            _logger.LogInformation("Connecting to {Server}:{Port}...", settings.ImapServer, settings.ImapPort);
+            _logger.LogInformation("Connecting to {Server}:{Port}...", config.ImapServer, config.ImapPort);
 
             await client.ConnectAsync(
-                settings.ImapServer,
-                settings.ImapPort,
-                settings.UseSsl,
+                config.ImapServer,
+                config.ImapPort,
+                config.UseSsl,
                 token).ConfigureAwait(false);
 
-            _logger.LogInformation("Authenticating as {Username}...", settings.Username);
+            _logger.LogInformation("Authenticating as {Username}...", config.Username);
 
-            await client.AuthenticateAsync(settings.Username, settings.Password, token).ConfigureAwait(false);
+            await client.AuthenticateAsync(config.Username, config.Password, token).ConfigureAwait(false);
 
             var inbox = client.Inbox;
             await inbox.OpenAsync(FolderAccess.ReadOnly, token).ConfigureAwait(false);
@@ -64,7 +64,7 @@ public class EmailService : IEmailService
     }
 
     public async Task<IReadOnlyList<EmailMessage>> FetchEmailsAsync(
-        EmailSettings settings,
+        EmailSourceConfig config,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -75,24 +75,24 @@ public class EmailService : IEmailService
             using var client = new ImapClient();
             client.Timeout = 30000; // 30 seconds socket timeout
 
-            progress?.Report($"Connecting to {settings.ImapServer}:{settings.ImapPort}...");
-            _logger.LogInformation("Connecting to {Server}:{Port}...", settings.ImapServer, settings.ImapPort);
+            progress?.Report($"Connecting to {config.ImapServer}:{config.ImapPort}...");
+            _logger.LogInformation("Connecting to {Server}:{Port}...", config.ImapServer, config.ImapPort);
 
             await client.ConnectAsync(
-                settings.ImapServer,
-                settings.ImapPort,
-                settings.UseSsl,
+                config.ImapServer,
+                config.ImapPort,
+                config.UseSsl,
                 cancellationToken).ConfigureAwait(false);
 
-            progress?.Report($"Authenticating as {settings.Username}...");
-            _logger.LogInformation("Authenticating as {Username}...", settings.Username);
+            progress?.Report($"Authenticating as {config.Username}...");
+            _logger.LogInformation("Authenticating as {Username}...", config.Username);
 
-            await client.AuthenticateAsync(settings.Username, settings.Password, cancellationToken).ConfigureAwait(false);
+            await client.AuthenticateAsync(config.Username, config.Password, cancellationToken).ConfigureAwait(false);
 
             // Открыть папку
-            var folder = string.IsNullOrEmpty(settings.Folder) || settings.Folder == "INBOX"
+            var folder = string.IsNullOrEmpty(config.Folder) || config.Folder == "INBOX"
                 ? client.Inbox
-                : await client.GetFolderAsync(settings.Folder, cancellationToken).ConfigureAwait(false);
+                : await client.GetFolderAsync(config.Folder, cancellationToken).ConfigureAwait(false);
 
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
 
@@ -100,7 +100,7 @@ public class EmailService : IEmailService
             _logger.LogInformation("Opened folder '{Folder}' with {Count} messages", folder.Name, folder.Count);
 
             // Построить поисковый запрос
-            var query = BuildSearchQuery(settings);
+            var query = BuildSearchQuery(config);
 
             progress?.Report("Searching for messages...");
             _logger.LogInformation("Executing search query...");
@@ -165,27 +165,27 @@ public class EmailService : IEmailService
         return messages;
     }
 
-    private SearchQuery BuildSearchQuery(EmailSettings settings)
+    private SearchQuery BuildSearchQuery(EmailSourceConfig config)
     {
         var queries = new List<SearchQuery>();
 
         // Фильтр по дате
-        if (settings.SearchDaysBack > 0)
+        if (config.SearchDaysBack > 0)
         {
-            var sinceDate = DateTime.Now.AddDays(-settings.SearchDaysBack);
+            var sinceDate = DateTime.Now.AddDays(-config.SearchDaysBack);
             queries.Add(SearchQuery.DeliveredAfter(sinceDate));
         }
 
         // Фильтр по отправителю
-        if (!string.IsNullOrWhiteSpace(settings.SenderFilter))
+        if (!string.IsNullOrWhiteSpace(config.SenderFilter))
         {
-            queries.Add(SearchQuery.FromContains(settings.SenderFilter));
+            queries.Add(SearchQuery.FromContains(config.SenderFilter));
         }
 
         // Фильтр по теме
-        if (!string.IsNullOrWhiteSpace(settings.SubjectFilter))
+        if (!string.IsNullOrWhiteSpace(config.SubjectFilter))
         {
-            queries.Add(SearchQuery.SubjectContains(settings.SubjectFilter));
+            queries.Add(SearchQuery.SubjectContains(config.SubjectFilter));
         }
 
         // Объединить запросы через AND

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace SmartBasket.Services.Ollama;
+namespace SmartBasket.Services.Llm;
 
 /// <summary>
 /// Конвертер для decimal? который обрабатывает пустые строки как null.

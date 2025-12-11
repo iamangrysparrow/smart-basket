@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace SmartBasket.Services.Ollama;
+namespace SmartBasket.Services.Llm;
 
 /// <summary>
 /// Продукт из результата классификации

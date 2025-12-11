@@ -4,9 +4,8 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
-using SmartBasket.Services.Llm;
 
-namespace SmartBasket.Services.Ollama;
+namespace SmartBasket.Services.Llm;
 
 public class ProductClassificationService : IProductClassificationService
 {

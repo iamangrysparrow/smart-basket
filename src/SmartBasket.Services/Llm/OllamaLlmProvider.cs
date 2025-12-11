@@ -13,18 +13,18 @@ public class OllamaLlmProvider : ILlmProvider
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OllamaLlmProvider> _logger;
-    private readonly OllamaSettings _settings;
+    private readonly AiProviderConfig _config;
 
-    public string Name => "Ollama";
+    public string Name => $"Ollama/{_config.Model}";
 
     public OllamaLlmProvider(
         IHttpClientFactory httpClientFactory,
         ILogger<OllamaLlmProvider> logger,
-        OllamaSettings settings)
+        AiProviderConfig config)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-        _settings = settings;
+        _config = config;
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default)
@@ -34,11 +34,12 @@ public class OllamaLlmProvider : ILlmProvider
             var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
 
-            var response = await client.GetAsync($"{_settings.BaseUrl}/api/tags", cancellationToken);
+            var baseUrl = _config.BaseUrl ?? "http://localhost:11434";
+            var response = await client.GetAsync($"{baseUrl}/api/tags", cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
-                return (true, $"Ollama connected: {_settings.BaseUrl}, model: {_settings.Model}");
+                return (true, $"Ollama connected: {baseUrl}, model: {_config.Model}");
             }
 
             return (false, $"Ollama returned {response.StatusCode}");
@@ -61,25 +62,30 @@ public class OllamaLlmProvider : ILlmProvider
         try
         {
             var client = _httpClientFactory.CreateClient();
-            var timeoutSeconds = Math.Max(_settings.TimeoutSeconds, 60);
+            var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+
+            // Использовать настройки из конфига, если параметры не переданы явно
+            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
+            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
+            var baseUrl = _config.BaseUrl ?? "http://localhost:11434";
 
             var request = new OllamaRequest
             {
-                Model = _settings.Model,
+                Model = _config.Model,
                 Prompt = prompt,
                 Stream = true,
                 Options = new OllamaOptions
                 {
-                    Temperature = temperature,
-                    NumPredict = maxTokens
+                    Temperature = actualTemperature,
+                    NumPredict = actualMaxTokens
                 }
             };
 
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_settings.BaseUrl}/api/generate")
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/generate")
             {
                 Content = new StringContent(
                     JsonSerializer.Serialize(request),

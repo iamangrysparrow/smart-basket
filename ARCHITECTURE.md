@@ -79,17 +79,18 @@ ReceiptSource
 
 ```
 IReceiptTextParser
-├── ShopName: string          // Идентификатор парсера
+├── Name: string              // Уникальный идентификатор парсера для конфигурации
+├── SupportedShops: string[]  // Магазины для будущего авто-определения ("*" = универсальный)
 ├── CanParse(text): bool      // Может ли обработать текст (для auto-detect)
 └── Parse(text, date): ParsedReceipt
 ```
 
 **Зарегистрированные парсеры:**
 
-| Parser | Type | Description |
-|--------|------|-------------|
-| **Instamart** | Regex | Чеки Instamart/СберМаркет |
-| **LlmUniversalParser** | LLM | Универсальный парсер через AI |
+| Parser | Name | SupportedShops | Description |
+|--------|------|----------------|-------------|
+| **InstamartParser** | `InstamartParser` | Instamart, СберМаркет, kuper.ru | Regex чеков СберМаркет |
+| **LlmUniversalParser** | `LlmUniversalParser` | * | Универсальный AI парсер |
 
 **Фабрика парсеров (`ReceiptTextParserFactory`):**
 - `GetParser(name)` — получить парсер по имени
@@ -98,10 +99,10 @@ IReceiptTextParser
 
 **Логика выбора парсера:**
 ```
-Source.Parser = "Instamart"  → InstamartParser.Parse()
-                                  └── fail? → LlmUniversalParser
-Source.Parser = "Auto"       → TryParseWithRegex()
-                                  └── no match? → LlmUniversalParser
+Source.Parser = "InstamartParser"  → InstamartParser.Parse()
+                                        └── fail? → LlmUniversalParser
+Source.Parser = "Auto"             → TryParseWithRegex() (по CanParse())
+                                        └── no match? → LlmUniversalParser
 ```
 
 ---
@@ -141,6 +142,22 @@ AiProviderConfig
 |-----------|-------------|
 | **Classification** | Item → Product |
 | **Labels** | Item → Labels |
+
+---
+
+### AI Prompts (Шаблоны промптов)
+
+Промпты для AI хранятся в **отдельных файлах** для удобства редактирования без перекомпиляции.
+
+| File | Service | Placeholders |
+|------|---------|--------------|
+| `prompt_template.txt` | ReceiptParsingService | `{{YEAR}}`, `{{RECEIPT_TEXT}}` |
+| `prompt_classify_products.txt` | ProductClassificationService | `{{EXISTING_PRODUCTS}}`, `{{ITEMS}}` |
+| `prompt_assign_labels.txt` | LabelAssignmentService | `{{LABELS}}`, `{{ITEMS}}` |
+
+**Расположение:** `SmartBasket.WPF/` (рядом с exe)
+
+**Принцип:** Сервисы имеют fallback на hardcoded промпт, если файл не найден.
 
 ---
 

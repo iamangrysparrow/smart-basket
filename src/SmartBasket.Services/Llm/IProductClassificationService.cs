@@ -1,4 +1,4 @@
-namespace SmartBasket.Services.Ollama;
+namespace SmartBasket.Services.Llm;
 
 /// <summary>
 /// Существующий продукт из БД для передачи в классификацию

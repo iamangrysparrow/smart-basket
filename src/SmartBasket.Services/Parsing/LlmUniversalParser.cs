@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Services.Llm;
-using SmartBasket.Services.Ollama;
 
 namespace SmartBasket.Services.Parsing;
 
@@ -14,8 +13,6 @@ namespace SmartBasket.Services.Parsing;
 /// </summary>
 public class LlmUniversalParser : IReceiptTextParser
 {
-    public const string ParserName = "LlmUniversalParser";
-
     private readonly IAiProviderFactory _providerFactory;
     private readonly ILogger<LlmUniversalParser> _logger;
     private string? _promptTemplate;
@@ -34,7 +31,15 @@ public class LlmUniversalParser : IReceiptTextParser
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public string ShopName => ParserName;
+    /// <summary>
+    /// Уникальный идентификатор парсера для конфигурации
+    /// </summary>
+    public string Name => "LlmUniversalParser";
+
+    /// <summary>
+    /// Универсальный парсер поддерживает любые магазины (для будущего авто-определения)
+    /// </summary>
+    public IReadOnlyList<string> SupportedShops { get; } = new[] { "*" };
 
     /// <summary>
     /// LLM парсер может парсить любой текст

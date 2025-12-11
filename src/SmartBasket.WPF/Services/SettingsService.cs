@@ -28,6 +28,9 @@ public class SettingsService
 
         var json = JsonSerializer.Serialize(settings, JsonOptions);
         File.WriteAllText(_settingsPath, json);
+
+        // Decrypt back so in-memory settings remain usable
+        DecryptSecrets(settings);
     }
 
     public Task SaveSettingsAsync(AppSettings settings)
@@ -57,19 +60,6 @@ public class SettingsService
                 provider.ApiKey = SecretHelper.Encrypt(provider.ApiKey);
             }
         }
-
-        // Legacy settings (if present)
-#pragma warning disable CS0618
-        if (settings.Email != null && !string.IsNullOrEmpty(settings.Email.Password))
-        {
-            settings.Email.Password = SecretHelper.Encrypt(settings.Email.Password);
-        }
-
-        if (settings.YandexGpt != null && !string.IsNullOrEmpty(settings.YandexGpt.ApiKey))
-        {
-            settings.YandexGpt.ApiKey = SecretHelper.Encrypt(settings.YandexGpt.ApiKey);
-        }
-#pragma warning restore CS0618
     }
 
     /// <summary>
@@ -94,18 +84,5 @@ public class SettingsService
                 provider.ApiKey = SecretHelper.Decrypt(provider.ApiKey);
             }
         }
-
-        // Legacy settings (if present)
-#pragma warning disable CS0618
-        if (settings.Email != null && !string.IsNullOrEmpty(settings.Email.Password))
-        {
-            settings.Email.Password = SecretHelper.Decrypt(settings.Email.Password);
-        }
-
-        if (settings.YandexGpt != null && !string.IsNullOrEmpty(settings.YandexGpt.ApiKey))
-        {
-            settings.YandexGpt.ApiKey = SecretHelper.Decrypt(settings.YandexGpt.ApiKey);
-        }
-#pragma warning restore CS0618
     }
 }

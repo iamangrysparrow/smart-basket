@@ -35,8 +35,7 @@ public class EmailReceiptSource : IReceiptSource
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var emailSettings = ToEmailSettings(_config.Email!);
-        return await _emailService.TestConnectionAsync(emailSettings, cancellationToken);
+        return await _emailService.TestConnectionAsync(_config.Email!, cancellationToken);
     }
 
     public async Task<IReadOnlyList<RawReceipt>> FetchAsync(
@@ -45,8 +44,7 @@ public class EmailReceiptSource : IReceiptSource
     {
         _logger.LogInformation("Fetching receipts from email source '{Name}'", Name);
 
-        var emailSettings = ToEmailSettings(_config.Email!);
-        var emails = await _emailService.FetchEmailsAsync(emailSettings, progress, cancellationToken);
+        var emails = await _emailService.FetchEmailsAsync(_config.Email!, progress, cancellationToken);
 
         var rawReceipts = new List<RawReceipt>();
 
@@ -73,24 +71,5 @@ public class EmailReceiptSource : IReceiptSource
 
         _logger.LogInformation("Fetched {Count} raw receipts from '{Name}'", rawReceipts.Count, Name);
         return rawReceipts;
-    }
-
-    /// <summary>
-    /// Конвертирует новый EmailSourceConfig в legacy EmailSettings для совместимости
-    /// </summary>
-    private static EmailSettings ToEmailSettings(EmailSourceConfig config)
-    {
-        return new EmailSettings
-        {
-            ImapServer = config.ImapServer,
-            ImapPort = config.ImapPort,
-            UseSsl = config.UseSsl,
-            Username = config.Username,
-            Password = config.Password,
-            SenderFilter = config.SenderFilter,
-            SubjectFilter = config.SubjectFilter,
-            Folder = config.Folder,
-            SearchDaysBack = config.SearchDaysBack
-        };
     }
 }

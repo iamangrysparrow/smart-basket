@@ -1,19 +1,28 @@
-using SmartBasket.Services.Ollama;
+using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Parsing;
 
 /// <summary>
-/// Интерфейс для regex-парсеров чеков конкретных магазинов
+/// Интерфейс для парсеров чеков
 /// </summary>
 public interface IReceiptTextParser
 {
     /// <summary>
-    /// Название магазина, который обрабатывает этот парсер
+    /// Уникальный идентификатор парсера для использования в конфигурации
+    /// (например "InstamartParser", "LlmUniversalParser")
     /// </summary>
-    string ShopName { get; }
+    string Name { get; }
 
     /// <summary>
-    /// Проверяет, может ли этот парсер обработать данный текст чека
+    /// Список магазинов, которые поддерживает этот парсер.
+    /// Используется для будущего авто-определения парсера по магазину.
+    /// "*" означает универсальный парсер.
+    /// </summary>
+    IReadOnlyList<string> SupportedShops { get; }
+
+    /// <summary>
+    /// Проверяет, может ли этот парсер обработать данный текст чека.
+    /// Используется в режиме "Auto" для автоматического выбора парсера.
     /// </summary>
     bool CanParse(string receiptText);
 

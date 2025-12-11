@@ -9,7 +9,6 @@ using SmartBasket.Data;
 using SmartBasket.Services;
 using SmartBasket.Services.Email;
 using SmartBasket.Services.Llm;
-using SmartBasket.Services.Ollama;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Products;
 using SmartBasket.Services.Sources;
@@ -51,12 +50,7 @@ public partial class App : Application
         // Decrypt secrets after loading
         SettingsService.DecryptSecrets(_appSettings);
 
-        // Migrate legacy configuration to new format if needed (Phase 4)
-        var migrationService = new ConfigurationMigrationService();
-        if (migrationService.MigrateIfNeeded(_appSettings))
-        {
-            System.Diagnostics.Debug.WriteLine("Legacy configuration migrated to new format");
-        }
+        // Legacy configuration migration removed - now using AiProviderConfig directly
 
         // Apply saved theme before showing UI
         var themeName = _appSettings.Theme ?? "Light";
@@ -97,25 +91,25 @@ public partial class App : Application
         // HTTP Client for Ollama
         services.AddHttpClient();
 
-        // Services
-        services.AddSingleton<IEmailService, EmailService>();
-        services.AddSingleton<IOllamaService, OllamaService>();
+        // AI Providers - must be registered before services that depend on it
+        services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
+
+        // LLM Services (use AI providers via factory)
         services.AddSingleton<IProductClassificationService, ProductClassificationService>();
         services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
 
-        // Sources (Phase 2)
+        // Parsers
+        services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();
+        services.AddSingleton<LlmUniversalParser>();
+        services.AddSingleton<ReceiptTextParserFactory>();
+
+        // Email service (used by ReceiptSourceFactory for Email sources)
+        services.AddSingleton<IEmailService, EmailService>();
+
+        // Sources
         services.AddSingleton<IReceiptSourceFactory, ReceiptSourceFactory>();
 
-        // AI Providers (Phase 2) - must be registered before parsers that depend on it
-        services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
-
-        // Parsers (Phase 2)
-        services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();
-        services.AddSingleton<LlmUniversalParser>();  // Universal LLM parser
-        services.AddSingleton<ReceiptTextParserFactory>();
-        services.AddSingleton<IReceiptParsingService, ReceiptParsingService>(); // Legacy, may be removed
-
-        // Orchestration (Phase 4)
+        // Orchestration
         services.AddScoped<IReceiptCollectionService, ReceiptCollectionService>();
         services.AddScoped<IProductCleanupService, ProductCleanupService>();
 
