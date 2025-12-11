@@ -10,12 +10,12 @@ namespace SmartBasket.Services.Ollama;
 
 public class ProductClassificationService : IProductClassificationService
 {
-    private readonly ILlmProviderFactory _providerFactory;
+    private readonly IAiProviderFactory _providerFactory;
     private readonly ILogger<ProductClassificationService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public ProductClassificationService(ILlmProviderFactory providerFactory, ILogger<ProductClassificationService> logger)
+    public ProductClassificationService(IAiProviderFactory providerFactory, ILogger<ProductClassificationService> logger)
     {
         _providerFactory = providerFactory;
         _logger = logger;
@@ -45,7 +45,18 @@ public class ProductClassificationService : IProductClassificationService
             }
 
             // Получаем провайдер для классификации
-            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Classification);
+            _logger.LogDebug("Getting provider for Classification operation");
+            var provider = _providerFactory.GetProviderForOperation(AiOperation.Classification);
+            if (provider == null)
+            {
+                var errorMsg = "No AI provider configured for Classification operation. Check AiOperations.Classification in settings.";
+                _logger.LogError(errorMsg);
+                progress?.Report($"  [Classify] ERROR: {errorMsg}");
+                result.IsSuccess = false;
+                result.Message = errorMsg;
+                return result;
+            }
+            _logger.LogDebug("Got provider: {ProviderName}", provider.Name);
             progress?.Report($"  [Classify] Using provider: {provider.Name}");
             progress?.Report($"  [Classify] Classifying {itemNames.Count} items with {existingProducts.Count} existing products...");
 

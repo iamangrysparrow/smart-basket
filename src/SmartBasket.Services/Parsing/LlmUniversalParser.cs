@@ -3,107 +3,132 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
-using SmartBasket.Services.Parsing;
 
-namespace SmartBasket.Services.Llm;
+namespace SmartBasket.Services.Parsing;
 
 /// <summary>
-/// Сервис парсинга чеков. Сначала пробует regex-парсеры, при неудаче — LLM.
+/// Универсальный LLM-парсер чеков.
+/// Использует AI для парсинга любых чеков, когда regex-парсеры не подходят.
 /// </summary>
-public class ReceiptParsingService : IReceiptParsingService
+public class LlmUniversalParser : IReceiptTextParser
 {
+    public const string ParserName = "LlmUniversalParser";
+
     private readonly IAiProviderFactory _providerFactory;
-    private readonly ReceiptTextParserFactory? _textParserFactory;
-    private readonly ILogger<ReceiptParsingService> _logger;
+    private readonly ILogger<LlmUniversalParser> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public ReceiptParsingService(
+    /// <summary>
+    /// Ключ AI провайдера для парсинга (из конфигурации парсера)
+    /// </summary>
+    public string? AiProviderKey { get; set; }
+
+    public LlmUniversalParser(
         IAiProviderFactory providerFactory,
-        ILogger<ReceiptParsingService> logger,
-        ReceiptTextParserFactory? textParserFactory = null)
+        ILogger<LlmUniversalParser> logger)
     {
-        _providerFactory = providerFactory;
-        _textParserFactory = textParserFactory;
-        _logger = logger;
+        _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    public string ShopName => ParserName;
+
+    /// <summary>
+    /// LLM парсер может парсить любой текст
+    /// </summary>
+    public bool CanParse(string receiptText)
+    {
+        // LLM парсер - универсальный fallback, всегда может попробовать
+        return !string.IsNullOrWhiteSpace(receiptText);
+    }
+
+    /// <summary>
+    /// Установить путь к файлу шаблона prompt
+    /// </summary>
     public void SetPromptTemplatePath(string path)
     {
         _promptTemplatePath = path;
         _promptTemplate = null; // Reset cache
     }
 
-    public async Task<ParsedReceipt> ParseReceiptAsync(
-        string emailBody,
+    public ParsedReceipt Parse(string receiptText, DateTime emailDate)
+    {
+        // Синхронная обёртка для async метода
+        return ParseAsync(receiptText, emailDate, null, CancellationToken.None)
+            .GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Асинхронный парсинг с прогрессом
+    /// </summary>
+    public async Task<ParsedReceipt> ParseAsync(
+        string receiptText,
         DateTime emailDate,
-        IProgress<string>? progress = null,
-        CancellationToken cancellationToken = default)
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
     {
         var result = new ParsedReceipt();
 
         try
         {
-            progress?.Report("  [Parsing] Cleaning email body...");
+            _logger.LogDebug("LlmUniversalParser.ParseAsync started");
+            progress?.Report("  [LLM Parser] Starting...");
 
             // Очистить HTML теги
-            var cleanedBody = CleanHtmlTags(emailBody);
-            var originalLength = emailBody.Length;
+            var cleanedBody = CleanHtmlTags(receiptText);
+            var originalLength = receiptText.Length;
             var cleanedLength = cleanedBody.Length;
 
-            progress?.Report($"  [Parsing] Body: {originalLength} -> {cleanedLength} chars after HTML cleanup");
+            progress?.Report($"  [LLM Parser] Body: {originalLength} -> {cleanedLength} chars after HTML cleanup");
 
-            // Сначала пробуем regex-парсеры
-            if (_textParserFactory != null)
+            // Получить AI провайдер
+            ILlmProvider? provider = null;
+
+            // Сначала пробуем по ключу из конфигурации парсера
+            if (!string.IsNullOrEmpty(AiProviderKey))
             {
-                progress?.Report("  [Parsing] Trying regex parsers...");
-#pragma warning disable CS0618 // Legacy service, will be removed
-                var regexResult = _textParserFactory.TryParse(cleanedBody, emailDate);
-#pragma warning restore CS0618
-
-                if (regexResult != null && regexResult.IsSuccess)
-                {
-                    progress?.Report($"  [Parsing] Success! Regex parser found {regexResult.Items.Count} items from {regexResult.Shop}");
-                    return regexResult;
-                }
-
-                progress?.Report("  [Parsing] No regex parser matched, falling back to LLM...");
+                provider = _providerFactory.GetProvider(AiProviderKey);
+                _logger.LogDebug("Using configured provider: {ProviderKey}", AiProviderKey);
             }
 
-            // Fallback на LLM
-            // Используем Classification провайдер для парсинга (LLM fallback)
-            _logger.LogDebug("Getting provider for LLM parsing fallback");
-            var provider = _providerFactory.GetProviderForOperation(AiOperation.Classification);
+            // Fallback на провайдер для Classification
             if (provider == null)
             {
-                var errorMsg = "No AI provider configured for parsing. Check AiOperations.Classification in settings.";
+                provider = _providerFactory.GetProviderForOperation(AiOperation.Classification);
+                _logger.LogDebug("Using Classification operation provider");
+            }
+
+            if (provider == null)
+            {
+                var errorMsg = "No AI provider configured for LLM parsing. Check AiProviders and AiOperations.Classification in settings.";
                 _logger.LogError(errorMsg);
-                progress?.Report($"  [Parsing] ERROR: {errorMsg}");
+                progress?.Report($"  [LLM Parser] ERROR: {errorMsg}");
                 result.IsSuccess = false;
                 result.Message = errorMsg;
                 return result;
             }
+
             _logger.LogDebug("Got provider: {ProviderName}", provider.Name);
-            progress?.Report($"  [Parsing] Using LLM provider: {provider.Name}");
+            progress?.Report($"  [LLM Parser] Using provider: {provider.Name}");
 
             // Обрезать слишком длинные тексты
             if (cleanedBody.Length > 8000)
             {
                 cleanedBody = cleanedBody.Substring(0, 8000) + "\n... (truncated)";
-                progress?.Report($"  [LLM] Truncated to 8000 chars");
+                progress?.Report($"  [LLM Parser] Truncated to 8000 chars");
             }
 
             var prompt = BuildParsingPrompt(cleanedBody, emailDate, progress);
 
-            progress?.Report($"  [LLM] Prompt ready: {prompt.Length} chars");
-            progress?.Report($"  [LLM] === PROMPT START ===");
-            progress?.Report(prompt);
-            progress?.Report($"  [LLM] === PROMPT END ===");
+            progress?.Report($"  [LLM Parser] Prompt ready: {prompt.Length} chars");
+            _logger.LogDebug("Prompt length: {Length}", prompt.Length);
 
             // Генерируем ответ через LLM провайдер
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            progress?.Report($"  [LLM] Sending request via {provider.Name}...");
+            progress?.Report($"  [LLM Parser] Sending request via {provider.Name}...");
 
             var llmResult = await provider.GenerateAsync(
                 prompt,
@@ -113,7 +138,7 @@ public class ReceiptParsingService : IReceiptParsingService
                 cancellationToken: cancellationToken);
 
             stopwatch.Stop();
-            progress?.Report($"  [LLM] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
+            progress?.Report($"  [LLM Parser] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
 
             if (!llmResult.IsSuccess || string.IsNullOrEmpty(llmResult.Response))
             {
@@ -123,15 +148,15 @@ public class ReceiptParsingService : IReceiptParsingService
             }
 
             result.RawResponse = llmResult.Response;
-            progress?.Report($"  [LLM] Total response: {llmResult.Response.Length} chars");
+            progress?.Report($"  [LLM Parser] Total response: {llmResult.Response.Length} chars");
 
             // Извлекаем JSON из ответа
-            progress?.Report("  [LLM] Extracting JSON from response...");
+            progress?.Report("  [LLM Parser] Extracting JSON from response...");
             var jsonMatch = Regex.Match(llmResult.Response, @"\{[\s\S]*\}", RegexOptions.Multiline);
 
             if (jsonMatch.Success)
             {
-                progress?.Report($"  [LLM] Found JSON: {jsonMatch.Value.Length} chars");
+                progress?.Report($"  [LLM Parser] Found JSON: {jsonMatch.Value.Length} chars");
                 try
                 {
                     var parsedJson = JsonSerializer.Deserialize<ParsedReceiptDto>(
@@ -178,36 +203,36 @@ public class ReceiptParsingService : IReceiptParsingService
                             ? $"Parsed {result.Items.Count} items from {result.Shop}"
                             : "No items found in receipt";
 
-                        progress?.Report($"  [LLM] {result.Message}");
+                        progress?.Report($"  [LLM Parser] {result.Message}");
                     }
                 }
                 catch (JsonException ex)
                 {
-                    progress?.Report($"  [LLM] JSON parse error: {ex.Message}");
+                    progress?.Report($"  [LLM Parser] JSON parse error: {ex.Message}");
                     result.IsSuccess = false;
                     result.Message = $"Failed to parse JSON: {ex.Message}";
                 }
             }
             else
             {
-                progress?.Report("  [LLM] No JSON found in response");
+                progress?.Report("  [LLM Parser] No JSON found in response");
                 result.IsSuccess = false;
                 result.Message = "No JSON found in LLM response";
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            progress?.Report("  [LLM] Cancelled by user");
+            progress?.Report("  [LLM Parser] Cancelled by user");
             result.IsSuccess = false;
             result.Message = "Operation cancelled by user";
             throw;
         }
         catch (Exception ex)
         {
-            progress?.Report($"  [LLM] Error: {ex.Message}");
+            progress?.Report($"  [LLM Parser] Error: {ex.Message}");
             result.IsSuccess = false;
             result.Message = $"Error: {ex.Message}";
-            _logger.LogError(ex, "Receipt parsing error");
+            _logger.LogError(ex, "LLM receipt parsing error");
         }
 
         return result;
@@ -250,11 +275,11 @@ public class ReceiptParsingService : IReceiptParsingService
             try
             {
                 _promptTemplate = File.ReadAllText(_promptTemplatePath);
-                progress?.Report($"  [LLM] Loaded prompt template from: {_promptTemplatePath}");
+                progress?.Report($"  [LLM Parser] Loaded prompt template from: {_promptTemplatePath}");
             }
             catch (Exception ex)
             {
-                progress?.Report($"  [LLM] Failed to load template: {ex.Message}, using default");
+                progress?.Report($"  [LLM Parser] Failed to load template: {ex.Message}, using default");
                 _promptTemplate = null;
             }
         }

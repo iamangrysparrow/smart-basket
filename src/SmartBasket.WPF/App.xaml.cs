@@ -100,21 +100,20 @@ public partial class App : Application
         // Services
         services.AddSingleton<IEmailService, EmailService>();
         services.AddSingleton<IOllamaService, OllamaService>();
-        services.AddSingleton<ICategoryService, CategoryService>();
         services.AddSingleton<IProductClassificationService, ProductClassificationService>();
         services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
-        services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
 
         // Sources (Phase 2)
         services.AddSingleton<IReceiptSourceFactory, ReceiptSourceFactory>();
 
+        // AI Providers (Phase 2) - must be registered before parsers that depend on it
+        services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
+
         // Parsers (Phase 2)
         services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();
+        services.AddSingleton<LlmUniversalParser>();  // Universal LLM parser
         services.AddSingleton<ReceiptTextParserFactory>();
-        services.AddSingleton<IReceiptParsingService, ReceiptParsingService>();
-
-        // AI Providers (Phase 2)
-        services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
+        services.AddSingleton<IReceiptParsingService, ReceiptParsingService>(); // Legacy, may be removed
 
         // Orchestration (Phase 4)
         services.AddScoped<IReceiptCollectionService, ReceiptCollectionService>();

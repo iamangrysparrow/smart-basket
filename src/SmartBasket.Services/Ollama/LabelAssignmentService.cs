@@ -10,12 +10,12 @@ namespace SmartBasket.Services.Ollama;
 
 public class LabelAssignmentService : ILabelAssignmentService
 {
-    private readonly ILlmProviderFactory _providerFactory;
+    private readonly IAiProviderFactory _providerFactory;
     private readonly ILogger<LabelAssignmentService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public LabelAssignmentService(ILlmProviderFactory providerFactory, ILogger<LabelAssignmentService> logger)
+    public LabelAssignmentService(IAiProviderFactory providerFactory, ILogger<LabelAssignmentService> logger)
     {
         _providerFactory = providerFactory;
         _logger = logger;
@@ -46,7 +46,18 @@ public class LabelAssignmentService : ILabelAssignmentService
             }
 
             // Получаем провайдер для меток
-            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Labels);
+            _logger.LogDebug("Getting provider for Labels operation");
+            var provider = _providerFactory.GetProviderForOperation(AiOperation.Labels);
+            if (provider == null)
+            {
+                var errorMsg = "No AI provider configured for Labels operation. Check AiOperations.Labels in settings.";
+                _logger.LogError(errorMsg);
+                progress?.Report($"  [Labels] ERROR: {errorMsg}");
+                result.IsSuccess = false;
+                result.Message = errorMsg;
+                return result;
+            }
+            _logger.LogDebug("Got provider: {ProviderName}", provider.Name);
             progress?.Report($"  [Labels] Using provider: {provider.Name}");
 
             var prompt = BuildPrompt(itemName, productName, availableLabels, progress);
@@ -153,7 +164,18 @@ public class LabelAssignmentService : ILabelAssignmentService
             }
 
             // Получаем провайдер для меток
-            var provider = _providerFactory.GetProviderForOperation(LlmOperationType.Labels);
+            _logger.LogDebug("Getting provider for Labels operation (batch)");
+            var provider = _providerFactory.GetProviderForOperation(AiOperation.Labels);
+            if (provider == null)
+            {
+                var errorMsg = "No AI provider configured for Labels operation. Check AiOperations.Labels in settings.";
+                _logger.LogError(errorMsg);
+                progress?.Report($"  [Labels] ERROR: {errorMsg}");
+                result.IsSuccess = false;
+                result.Message = errorMsg;
+                return result;
+            }
+            _logger.LogDebug("Got provider: {ProviderName}", provider.Name);
             progress?.Report($"  [Labels] Using provider: {provider.Name}");
 
             var prompt = BuildBatchPrompt(items, availableLabels);

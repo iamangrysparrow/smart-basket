@@ -44,7 +44,6 @@ public partial class MainViewModel : ObservableObject
     private readonly IEmailService _emailService;
     private readonly IOllamaService _ollamaService;
     private readonly IReceiptParsingService _receiptParsingService;
-    private readonly ICategoryService _categoryService;
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
     private readonly IReceiptCollectionService _receiptCollectionService;
@@ -59,7 +58,6 @@ public partial class MainViewModel : ObservableObject
         IEmailService emailService,
         IOllamaService ollamaService,
         IReceiptParsingService receiptParsingService,
-        ICategoryService categoryService,
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
         IReceiptCollectionService receiptCollectionService,
@@ -71,7 +69,6 @@ public partial class MainViewModel : ObservableObject
         _emailService = emailService;
         _ollamaService = ollamaService;
         _receiptParsingService = receiptParsingService;
-        _categoryService = categoryService;
         _classificationService = classificationService;
         _labelAssignmentService = labelAssignmentService;
         _receiptCollectionService = receiptCollectionService;
@@ -84,9 +81,6 @@ public partial class MainViewModel : ObservableObject
         var promptTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_template.txt");
         _ollamaService.SetPromptTemplatePath(promptTemplatePath);
         _receiptParsingService.SetPromptTemplatePath(promptTemplatePath);
-
-        var categoriesTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_categories.txt");
-        _categoryService.SetPromptTemplatePath(categoriesTemplatePath);
 
         var classifyTemplatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prompt_classify_products.txt");
         _classificationService.SetPromptTemplatePath(classifyTemplatePath);

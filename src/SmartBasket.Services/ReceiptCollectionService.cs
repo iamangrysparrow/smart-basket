@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
-using SmartBasket.Services.Llm;
 using SmartBasket.Services.Ollama;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Sources;
@@ -61,7 +60,6 @@ public class ReceiptCollectionService : IReceiptCollectionService
 {
     private readonly IReceiptSourceFactory _sourceFactory;
     private readonly ReceiptTextParserFactory _parserFactory;
-    private readonly IReceiptParsingService _llmParsingService;
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
     private readonly SmartBasketDbContext _dbContext;
@@ -71,7 +69,6 @@ public class ReceiptCollectionService : IReceiptCollectionService
     public ReceiptCollectionService(
         IReceiptSourceFactory sourceFactory,
         ReceiptTextParserFactory parserFactory,
-        IReceiptParsingService llmParsingService,
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
         SmartBasketDbContext dbContext,
@@ -80,7 +77,6 @@ public class ReceiptCollectionService : IReceiptCollectionService
     {
         _sourceFactory = sourceFactory ?? throw new ArgumentNullException(nameof(sourceFactory));
         _parserFactory = parserFactory ?? throw new ArgumentNullException(nameof(parserFactory));
-        _llmParsingService = llmParsingService ?? throw new ArgumentNullException(nameof(llmParsingService));
         _classificationService = classificationService ?? throw new ArgumentNullException(nameof(classificationService));
         _labelAssignmentService = labelAssignmentService ?? throw new ArgumentNullException(nameof(labelAssignmentService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
@@ -236,8 +232,44 @@ public class ReceiptCollectionService : IReceiptCollectionService
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
-        // Сначала пробуем regex-парсеры
-        var regexResult = _parserFactory.TryParse(raw.Content, raw.Date);
+        _logger.LogDebug("ParseRawReceiptAsync: parserName={ParserName}", parserName);
+        progress?.Report($"  [Parse] Parser from config: {parserName}");
+
+        // Если указан конкретный парсер (не "Auto") — используем его
+        if (!string.IsNullOrEmpty(parserName) &&
+            !parserName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            var parser = _parserFactory.GetParser(parserName);
+            if (parser != null)
+            {
+                progress?.Report($"  [Parse] Using parser: {parser.ShopName}");
+
+                // Для LLM парсера используем async метод
+                if (parser is LlmUniversalParser llmParser)
+                {
+                    return await llmParser.ParseAsync(raw.Content, raw.Date, progress, cancellationToken);
+                }
+
+                // Regex парсер — синхронный
+                var result = parser.Parse(raw.Content, raw.Date);
+                if (result.IsSuccess)
+                {
+                    progress?.Report($"  [Parse] Success: {result.Items.Count} items from {result.Shop}");
+                    return result;
+                }
+
+                // Regex парсер не смог — fallback на LLM
+                progress?.Report($"  [Parse] Parser {parserName} failed: {result.Message}, trying LLM fallback...");
+            }
+            else
+            {
+                progress?.Report($"  [Parse] Parser '{parserName}' not found, trying auto-detect...");
+            }
+        }
+
+        // "Auto" режим: сначала пробуем regex-парсеры по CanParse()
+        progress?.Report($"  [Parse] Auto-detect: trying regex parsers...");
+        var regexResult = _parserFactory.TryParseWithRegex(raw.Content, raw.Date);
         if (regexResult != null && regexResult.IsSuccess)
         {
             progress?.Report($"  [Parse] Regex parser success: {regexResult.Items.Count} items");
@@ -246,7 +278,8 @@ public class ReceiptCollectionService : IReceiptCollectionService
 
         // Fallback на LLM
         progress?.Report($"  [Parse] No regex match, using LLM...");
-        return await _llmParsingService.ParseReceiptAsync(raw.Content, raw.Date, progress, cancellationToken);
+        var llm = _parserFactory.GetLlmParser();
+        return await llm.ParseAsync(raw.Content, raw.Date, progress, cancellationToken);
     }
 
     private async Task<List<ExistingProduct>> GetExistingProductsAsync(CancellationToken cancellationToken)
