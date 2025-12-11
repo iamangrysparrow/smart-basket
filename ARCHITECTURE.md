@@ -122,9 +122,16 @@ AiProviderConfig
 ```
 
 **Реализации:**
-- `OllamaLlmProvider` — локальная Ollama (streaming)
-- `YandexGptLlmProvider` — Yandex GPT (Foundation Models API)
-- `YandexAgentLlmProvider` — Yandex AI Studio агенты (REST Assistant API)
+| Provider | API | Streaming |
+|----------|-----|-----------|
+| `OllamaLlmProvider` | Ollama `/api/generate` | ✓ NDJSON |
+| `YandexGptLlmProvider` | Foundation Models API | ✓ NDJSON |
+| `YandexAgentLlmProvider` | REST Assistant API | ✓ SSE |
+
+**Парсинг ответов:**
+- `IResponseParser` — унифицированное извлечение JSON из LLM ответов
+- Поддержка: markdown code blocks, chain-of-thought, bracket matching
+- 5 fallback стратегий для надёжного парсинга
 
 ---
 
@@ -267,6 +274,7 @@ EF Core DbContext. PostgreSQL / SQLite.
 **AI:**
 - `ILlmProvider`, `OllamaLlmProvider`, `YandexGptLlmProvider`, `YandexAgentLlmProvider`
 - `IAiProviderFactory`
+- `IResponseParser` — унифицированный парсинг JSON из LLM ответов
 
 **Services:**
 - `ReceiptCollectionService` — оркестрация сбора

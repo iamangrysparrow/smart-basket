@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
+using SmartBasket.Core.Helpers;
 using SmartBasket.Services.Email;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -21,9 +22,10 @@ var jsonOptions = new JsonSerializerOptions
     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
 };
 
-// Load settings
+// Load settings - prefer bin/Debug version (has more configured providers)
 var possiblePaths = new[]
 {
+    @"D:\AI\smart-basket\src\SmartBasket.WPF\bin\Debug\net8.0-windows\appsettings.json",
     Path.Combine(Directory.GetCurrentDirectory(), "..", "SmartBasket.WPF", "appsettings.json"),
     Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json"),
     @"D:\AI\smart-basket\src\SmartBasket.WPF\appsettings.json"
@@ -43,14 +45,20 @@ var configuration = new ConfigurationBuilder()
 var settings = new AppSettings();
 configuration.Bind(settings);
 
+// Decrypt secrets (API keys are encrypted in the config file)
+foreach (var provider in settings.AiProviders)
+{
+    if (!string.IsNullOrEmpty(provider.ApiKey))
+    {
+        provider.ApiKey = SecretHelper.Decrypt(provider.ApiKey);
+    }
+}
+
 // Get default Ollama provider from AiProviders
 var ollamaProvider = settings.AiProviders.FirstOrDefault(p => p.Provider == AiProviderType.Ollama);
-if (ollamaProvider == null)
-{
-    Console.WriteLine("ERROR: No Ollama provider configured in AiProviders!");
-    Console.WriteLine("Please add an Ollama provider to appsettings.json");
-    return 1;
-}
+
+// Get YandexAgent provider if exists
+var yandexAgentProvider = settings.AiProviders.FirstOrDefault(p => p.Provider == AiProviderType.YandexAgent);
 
 // Get first Email source from ReceiptSources
 var emailSource = settings.ReceiptSources.FirstOrDefault(s => s.Type == SourceType.Email && s.IsEnabled);
@@ -59,7 +67,28 @@ switch (mode)
 {
     case "test-ollama":
     case "test":
+        if (ollamaProvider == null)
+        {
+            Console.WriteLine("ERROR: No Ollama provider configured!");
+            return 1;
+        }
         return await TestOllamaAsync(ollamaProvider, args.Length > 1 ? int.Parse(args[1]) : 3);
+
+    case "test-agent-stream":
+        if (yandexAgentProvider == null)
+        {
+            Console.WriteLine("ERROR: No YandexAgent provider configured in AiProviders!");
+            return 1;
+        }
+        return await TestYandexAgentStreamingAsync(yandexAgentProvider);
+
+    case "test-agent-provider":
+        if (yandexAgentProvider == null)
+        {
+            Console.WriteLine("ERROR: No YandexAgent provider configured in AiProviders!");
+            return 1;
+        }
+        return await TestYandexAgentProviderAsync(yandexAgentProvider);
 
     case "email":
         if (emailSource?.Email == null)
@@ -75,9 +104,19 @@ switch (mode)
             Console.WriteLine("ERROR: No Email source configured in ReceiptSources!");
             return 1;
         }
+        if (ollamaProvider == null)
+        {
+            Console.WriteLine("ERROR: No Ollama provider configured!");
+            return 1;
+        }
         return await ParseEmailsAsync(emailSource.Email, ollamaProvider);
 
     case "classify":
+        if (ollamaProvider == null)
+        {
+            Console.WriteLine("ERROR: No Ollama provider configured!");
+            return 1;
+        }
         var model = args.Length > 1 ? args[1] : ollamaProvider.Model;
         return await TestClassificationAsync(ollamaProvider, model);
 
@@ -86,14 +125,25 @@ switch (mode)
         Console.WriteLine();
         Console.WriteLine("Usage:");
         Console.WriteLine("  dotnet run -- test-ollama [count]  - Test Ollama performance (default: 3 runs)");
+        Console.WriteLine("  dotnet run -- test-agent-stream    - Test YandexAgent streaming API (raw HTTP)");
+        Console.WriteLine("  dotnet run -- test-agent-provider  - Test YandexAgent via LlmProvider (streaming)");
         Console.WriteLine("  dotnet run -- email                - Fetch and save emails");
         Console.WriteLine("  dotnet run -- parse                - Fetch emails and parse with Ollama");
         Console.WriteLine("  dotnet run -- classify [model]     - Test classification pipeline");
         Console.WriteLine();
         Console.WriteLine($"Settings: {settingsPath}");
-        Console.WriteLine($"Ollama Provider: {ollamaProvider.Key}");
-        Console.WriteLine($"  BaseUrl: {ollamaProvider.BaseUrl}");
-        Console.WriteLine($"  Model: {ollamaProvider.Model}");
+        if (ollamaProvider != null)
+        {
+            Console.WriteLine($"Ollama Provider: {ollamaProvider.Key}");
+            Console.WriteLine($"  BaseUrl: {ollamaProvider.BaseUrl}");
+            Console.WriteLine($"  Model: {ollamaProvider.Model}");
+        }
+        if (yandexAgentProvider != null)
+        {
+            Console.WriteLine($"YandexAgent Provider: {yandexAgentProvider.Key}");
+            Console.WriteLine($"  AgentId: {yandexAgentProvider.AgentId}");
+            Console.WriteLine($"  FolderId: {yandexAgentProvider.FolderId}");
+        }
         if (emailSource != null)
         {
             Console.WriteLine($"Email Source: {emailSource.Name}");
@@ -723,4 +773,206 @@ async Task<int> TestClassificationAsync(AiProviderConfig provider, string model)
     Console.WriteLine($"\n=== Results saved to: {outputPath} ===");
 
     return 0;
+}
+
+// ============= TEST YANDEX AGENT STREAMING =============
+async Task<int> TestYandexAgentStreamingAsync(AiProviderConfig provider)
+{
+    Console.WriteLine("=== YandexAgent Streaming API Test ===");
+    Console.WriteLine($"Agent ID: {provider.AgentId}");
+    Console.WriteLine($"Folder ID: {provider.FolderId}");
+    Console.WriteLine();
+
+    using var httpClient = new HttpClient();
+    httpClient.Timeout = TimeSpan.FromSeconds(120);
+
+    var testPrompt = "Напиши короткий тост на день рождения, дружелюбный и смешной. 2-3 предложения.";
+
+    // ========== TEST 1: Non-streaming (current implementation) ==========
+    Console.WriteLine("=== TEST 1: Non-streaming request ===");
+    {
+        var request = new
+        {
+            prompt = new { id = provider.AgentId },
+            input = testPrompt
+        };
+
+        var requestJson = JsonSerializer.Serialize(request, jsonOptions);
+        Console.WriteLine($"Request: {requestJson}");
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://rest-assistant.api.cloud.yandex.net/v1/responses")
+        {
+            Content = new StringContent(requestJson, System.Text.Encoding.UTF8, "application/json")
+        };
+        httpRequest.Headers.Add("Authorization", $"Bearer {provider.ApiKey}");
+        httpRequest.Headers.Add("x-folder-id", provider.FolderId);
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await httpClient.SendAsync(httpRequest);
+            sw.Stop();
+
+            Console.WriteLine($"Status: {response.StatusCode} ({sw.Elapsed.TotalSeconds:F1}s)");
+            Console.WriteLine($"Content-Type: {response.Content.Headers.ContentType}");
+
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Response ({content.Length} chars):");
+            Console.WriteLine(content);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine();
+
+    // ========== TEST 2: Streaming request (stream: true in body) ==========
+    Console.WriteLine("=== TEST 2: Streaming request (stream: true) ===");
+    {
+        var request = new
+        {
+            prompt = new { id = provider.AgentId },
+            input = testPrompt,
+            stream = true
+        };
+
+        var requestJson = JsonSerializer.Serialize(request, jsonOptions);
+        Console.WriteLine($"Request: {requestJson}");
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://rest-assistant.api.cloud.yandex.net/v1/responses")
+        {
+            Content = new StringContent(requestJson, System.Text.Encoding.UTF8, "application/json")
+        };
+        httpRequest.Headers.Add("Authorization", $"Bearer {provider.ApiKey}");
+        httpRequest.Headers.Add("x-folder-id", provider.FolderId);
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+            Console.WriteLine($"Status: {response.StatusCode}");
+            Console.WriteLine($"Content-Type: {response.Content.Headers.ContentType}");
+
+            // Try to read as stream
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+
+            Console.WriteLine("--- Stream content: ---");
+            var lineCount = 0;
+            while (!reader.EndOfStream && lineCount < 50) // Limit to 50 lines
+            {
+                var line = await reader.ReadLineAsync();
+                Console.WriteLine($"[{lineCount++}] {line}");
+            }
+
+            sw.Stop();
+            Console.WriteLine($"--- End stream ({sw.Elapsed.TotalSeconds:F1}s) ---");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine();
+
+    // ========== TEST 3: Streaming with Accept header ==========
+    Console.WriteLine("=== TEST 3: Streaming with Accept: text/event-stream ===");
+    {
+        var request = new
+        {
+            prompt = new { id = provider.AgentId },
+            input = testPrompt,
+            stream = true
+        };
+
+        var requestJson = JsonSerializer.Serialize(request, jsonOptions);
+        Console.WriteLine($"Request: {requestJson}");
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://rest-assistant.api.cloud.yandex.net/v1/responses")
+        {
+            Content = new StringContent(requestJson, System.Text.Encoding.UTF8, "application/json")
+        };
+        httpRequest.Headers.Add("Authorization", $"Bearer {provider.ApiKey}");
+        httpRequest.Headers.Add("x-folder-id", provider.FolderId);
+        httpRequest.Headers.Add("Accept", "text/event-stream");
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+            Console.WriteLine($"Status: {response.StatusCode}");
+            Console.WriteLine($"Content-Type: {response.Content.Headers.ContentType}");
+
+            // Try to read as stream
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+
+            Console.WriteLine("--- Stream content: ---");
+            var lineCount = 0;
+            while (!reader.EndOfStream && lineCount < 50) // Limit to 50 lines
+            {
+                var line = await reader.ReadLineAsync();
+                Console.WriteLine($"[{lineCount++}] {line}");
+            }
+
+            sw.Stop();
+            Console.WriteLine($"--- End stream ({sw.Elapsed.TotalSeconds:F1}s) ---");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+        }
+    }
+
+    return 0;
+}
+
+// ============= TEST YANDEX AGENT PROVIDER =============
+async Task<int> TestYandexAgentProviderAsync(AiProviderConfig provider)
+{
+    Console.WriteLine("=== YandexAgent Provider Test (with YandexAgentLlmProvider) ===");
+    Console.WriteLine($"Agent ID: {provider.AgentId}");
+    Console.WriteLine($"Folder ID: {provider.FolderId}");
+    Console.WriteLine();
+
+    // Create the provider using DI
+    var services = new ServiceCollection();
+    services.AddHttpClient();
+    services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
+    var serviceProvider = services.BuildServiceProvider();
+
+    var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+    var logger = serviceProvider.GetRequiredService<ILogger<SmartBasket.Services.Llm.YandexAgentLlmProvider>>();
+
+    var agentProvider = new SmartBasket.Services.Llm.YandexAgentLlmProvider(httpClientFactory, logger, provider);
+
+    var testPrompt = "Напиши короткий тост на день рождения. 2-3 предложения.";
+
+    Console.WriteLine($"Prompt: {testPrompt}");
+    Console.WriteLine();
+
+    // Progress reporter for real-time output
+    var progress = new Progress<string>(msg => Console.WriteLine(msg));
+
+    var sw = Stopwatch.StartNew();
+    var result = await agentProvider.GenerateAsync(testPrompt, maxTokens: 500, temperature: 0.3, progress: progress);
+    sw.Stop();
+
+    Console.WriteLine();
+    Console.WriteLine($"=== RESULT ({sw.Elapsed.TotalSeconds:F1}s) ===");
+    Console.WriteLine($"Success: {result.IsSuccess}");
+    if (result.IsSuccess)
+    {
+        Console.WriteLine($"Response ({result.Response?.Length ?? 0} chars):");
+        Console.WriteLine(result.Response);
+    }
+    else
+    {
+        Console.WriteLine($"Error: {result.ErrorMessage}");
+    }
+
+    return result.IsSuccess ? 0 : 1;
 }

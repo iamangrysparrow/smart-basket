@@ -106,11 +106,12 @@ public class YandexAgentLlmProvider : ILlmProvider
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 120);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            // REST Assistant API формат запроса
+            // REST Assistant API формат запроса с поддержкой streaming
             var request = new RestAssistantRequest
             {
                 Prompt = new PromptInfo { Id = _config.AgentId },
-                Input = prompt
+                Input = prompt,
+                Stream = true  // Включаем streaming
             };
 
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true });
@@ -119,8 +120,7 @@ public class YandexAgentLlmProvider : ILlmProvider
             progress?.Report($"[YandexAgent] === PROMPT START ===");
             progress?.Report(prompt);
             progress?.Report($"[YandexAgent] === PROMPT END ===");
-            progress?.Report($"[YandexAgent] Sending request to {YandexAgentApiUrl} (agent: {_config.AgentId}, timeout: {timeoutSeconds}s)...");
-            progress?.Report($"[YandexAgent] Request JSON: {requestJson}");
+            progress?.Report($"[YandexAgent] Sending STREAMING request to {YandexAgentApiUrl} (agent: {_config.AgentId}, timeout: {timeoutSeconds}s)...");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -139,7 +139,8 @@ public class YandexAgentLlmProvider : ILlmProvider
             HttpResponseMessage response;
             try
             {
-                response = await client.SendAsync(httpRequest, linkedCts.Token);
+                // ResponseHeadersRead для streaming - не ждём полного ответа
+                response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {
@@ -150,70 +151,107 @@ public class YandexAgentLlmProvider : ILlmProvider
                 return result;
             }
 
-            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            stopwatch.Stop();
-
-            progress?.Report($"[YandexAgent] === RESPONSE ===");
-            progress?.Report(responseContent);
-            progress?.Report($"[YandexAgent] === END RESPONSE ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
-
             if (!response.IsSuccessStatusCode)
             {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
                 result.IsSuccess = false;
-                result.ErrorMessage = $"YandexAgent returned {response.StatusCode}: {responseContent}";
-                _logger.LogError("YandexAgent error: {StatusCode} - {Content}", response.StatusCode, responseContent);
+                result.ErrorMessage = $"YandexAgent returned {response.StatusCode}: {errorContent}";
+                _logger.LogError("YandexAgent error: {StatusCode} - {Content}", response.StatusCode, errorContent);
                 progress?.Report($"[YandexAgent] ERROR: {response.StatusCode}");
                 return result;
             }
 
-            progress?.Report($"[YandexAgent] Total response: {responseContent.Length} chars");
+            // Читаем SSE streaming ответ
+            progress?.Report($"[YandexAgent] === STREAMING RESPONSE ===");
+            var fullResponse = new StringBuilder();
+            var lineBuffer = new StringBuilder();
 
-            // Парсим ответ REST Assistant API
-            try
+            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
+            using var reader = new StreamReader(stream);
+
+            string? currentData = null;
+
+            while (!reader.EndOfStream)
             {
-                var responseObj = JsonSerializer.Deserialize<RestAssistantResponse>(responseContent,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                linkedCts.Token.ThrowIfCancellationRequested();
 
-                if (responseObj != null && !string.IsNullOrEmpty(responseObj.OutputText))
-                {
-                    result.IsSuccess = true;
-                    result.Response = responseObj.OutputText;
-                    progress?.Report($"[YandexAgent] Parsed output_text: {responseObj.OutputText.Length} chars");
-                }
-                else if (responseObj?.Output != null && responseObj.Output.Length > 0)
-                {
-                    // Альтернативный формат с массивом output
-                    var textParts = responseObj.Output
-                        .Where(o => o.Type == "text" && !string.IsNullOrEmpty(o.Text))
-                        .Select(o => o.Text);
-                    var fullText = string.Join("", textParts);
+                var line = await reader.ReadLineAsync(linkedCts.Token);
+                if (line == null) continue;
 
-                    if (!string.IsNullOrEmpty(fullText))
-                    {
-                        result.IsSuccess = true;
-                        result.Response = fullText;
-                        progress?.Report($"[YandexAgent] Parsed output array: {fullText.Length} chars");
-                    }
-                    else
-                    {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = "YandexAgent returned empty response";
-                        progress?.Report($"[YandexAgent] ERROR: Empty response in output array");
-                    }
-                }
-                else
+                // SSE формат: "data:{json}" затем "event:event_type"
+                if (line.StartsWith("data:"))
                 {
-                    result.IsSuccess = false;
-                    result.ErrorMessage = $"YandexAgent returned unexpected format: {responseContent.Substring(0, Math.Min(200, responseContent.Length))}";
-                    progress?.Report($"[YandexAgent] ERROR: Unexpected response format");
+                    currentData = line.Substring(5); // Убираем "data:"
+                }
+                else if (line.StartsWith("event:") && currentData != null)
+                {
+                    var eventType = line.Substring(6); // Убираем "event:"
+
+                    try
+                    {
+                        var eventObj = JsonSerializer.Deserialize<StreamEvent>(currentData,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                        if (eventType == "response.output_text.delta" && eventObj?.Delta != null)
+                        {
+                            // Получили дельту текста
+                            fullResponse.Append(eventObj.Delta);
+
+                            // Буферизация для построчного вывода в progress
+                            foreach (var ch in eventObj.Delta)
+                            {
+                                if (ch == '\n')
+                                {
+                                    progress?.Report($"  {lineBuffer}");
+                                    lineBuffer.Clear();
+                                }
+                                else
+                                {
+                                    lineBuffer.Append(ch);
+                                }
+                            }
+                        }
+                        else if (eventType == "response.completed")
+                        {
+                            // Финальное событие - можно получить полный текст из response.output_text
+                            if (eventObj?.Response?.OutputText != null && fullResponse.Length == 0)
+                            {
+                                // Если дельты не пришли, берём из финального ответа
+                                fullResponse.Append(eventObj.Response.OutputText);
+                            }
+
+                            // Выводим остаток буфера
+                            if (lineBuffer.Length > 0)
+                            {
+                                progress?.Report($"  {lineBuffer}");
+                                lineBuffer.Clear();
+                            }
+                            break;
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // Skip malformed events
+                    }
+
+                    currentData = null;
                 }
             }
-            catch (JsonException ex)
+
+            stopwatch.Stop();
+            progress?.Report($"[YandexAgent] === END STREAMING ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
+
+            if (fullResponse.Length > 0)
+            {
+                result.IsSuccess = true;
+                result.Response = fullResponse.ToString();
+                progress?.Report($"[YandexAgent] Total response: {fullResponse.Length} chars");
+            }
+            else
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Failed to parse YandexAgent response: {ex.Message}";
-                _logger.LogError(ex, "Failed to parse YandexAgent response: {Content}", responseContent);
-                progress?.Report($"[YandexAgent] ERROR: JSON parse failed - {ex.Message}");
+                result.ErrorMessage = "YandexAgent returned empty response";
+                progress?.Report($"[YandexAgent] ERROR: Empty response");
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -245,6 +283,9 @@ public class YandexAgentLlmProvider : ILlmProvider
 
         [JsonPropertyName("input")]
         public string Input { get; set; } = string.Empty;
+
+        [JsonPropertyName("stream")]
+        public bool Stream { get; set; }
     }
 
     private class PromptInfo
@@ -269,5 +310,34 @@ public class YandexAgentLlmProvider : ILlmProvider
 
         [JsonPropertyName("text")]
         public string? Text { get; set; }
+    }
+
+    // DTOs для SSE streaming событий
+    private class StreamEvent
+    {
+        [JsonPropertyName("type")]
+        public string? Type { get; set; }
+
+        [JsonPropertyName("delta")]
+        public string? Delta { get; set; }
+
+        [JsonPropertyName("content_index")]
+        public int? ContentIndex { get; set; }
+
+        [JsonPropertyName("item_id")]
+        public string? ItemId { get; set; }
+
+        // Для response.completed
+        [JsonPropertyName("response")]
+        public StreamResponseInfo? Response { get; set; }
+    }
+
+    private class StreamResponseInfo
+    {
+        [JsonPropertyName("output_text")]
+        public string? OutputText { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
     }
 }
