@@ -76,6 +76,13 @@ public interface ILabelService
     /// Get statistics
     /// </summary>
     Task<(int TotalLabels, int ItemsWithLabels, int ItemsWithoutLabels)> GetStatisticsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Синхронизирует метки из файла в БД (добавляет отсутствующие)
+    /// </summary>
+    /// <param name="filePath">Путь к файлу с метками (по одной на строку)</param>
+    /// <returns>Количество добавленных меток</returns>
+    Task<int> SyncFromFileAsync(string filePath, CancellationToken ct = default);
 }
 
 /// <summary>

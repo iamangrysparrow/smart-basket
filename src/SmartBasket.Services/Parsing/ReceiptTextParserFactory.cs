@@ -94,8 +94,9 @@ public class ReceiptTextParserFactory
     /// </summary>
     /// <param name="receiptText">Текст чека</param>
     /// <param name="emailDate">Дата письма</param>
+    /// <param name="subject">Тема письма (для извлечения названия магазина)</param>
     /// <returns>Результат парсинга или null, если ни один regex-парсер не подошёл</returns>
-    public ParsedReceipt? TryParseWithRegex(string receiptText, DateTime emailDate)
+    public ParsedReceipt? TryParseWithRegex(string receiptText, DateTime emailDate, string? subject = null)
     {
         foreach (var parser in _parsers)
         {
@@ -107,7 +108,7 @@ public class ReceiptTextParserFactory
             {
                 _logger.LogInformation("Using {ParserName} for receipt parsing", parser.Name);
 
-                var result = parser.Parse(receiptText, emailDate);
+                var result = parser.Parse(receiptText, emailDate, subject);
 
                 if (result.IsSuccess)
                 {

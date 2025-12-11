@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Автоматическая синхронизация Labels из файла**:
+  - `ILabelService.SyncFromFileAsync()` — загружает метки из `user_labels.txt` в БД
+  - `ReceiptCollectionService` — при назначении меток автоматически синхронизирует из файла
+- **Утилита `HtmlHelper`**: общие методы `CleanHtml()` и `IsHtml()` для работы с HTML
+
 ### Changed
 - **Рефакторинг интерфейса парсеров (`IReceiptTextParser`)**:
   - `ShopName` → `Name` — уникальный идентификатор для конфигурации
@@ -28,6 +34,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   оставались зашифрованными в памяти. Теперь `SettingsService.Save()` расшифровывает их обратно.
 - **Исправлен поиск парсера по имени**: конфигурация `Parser: "InstamartParser"` теперь корректно
   находит `InstamartReceiptParser` (раньше искал по `ShopName = "Instamart"`)
+- **InstamartParser: исправлен парсинг HTML писем**:
+  - Добавлена очистка HTML перед парсингом (использует `HtmlHelper.CleanHtml()`)
+  - Добавлено извлечение названия магазина из темы письма (`"Ваш заказ в магазине АШАН"` → `"АШАН"`)
+  - Добавлен параметр `subject` в `IReceiptTextParser.Parse()`
+- **Labels не назначались**: исправлено — теперь метки автоматически синхронизируются из `user_labels.txt`
 
 ---
 

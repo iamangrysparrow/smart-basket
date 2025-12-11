@@ -5,6 +5,7 @@ using SmartBasket.Core.Entities;
 using SmartBasket.Data;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Parsing;
+using SmartBasket.Services.Products;
 using SmartBasket.Services.Sources;
 
 namespace SmartBasket.Services;
@@ -62,6 +63,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
     private readonly ReceiptTextParserFactory _parserFactory;
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
+    private readonly ILabelService _labelService;
     private readonly SmartBasketDbContext _dbContext;
     private readonly AppSettings _settings;
     private readonly ILogger<ReceiptCollectionService> _logger;
@@ -71,6 +73,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         ReceiptTextParserFactory parserFactory,
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
+        ILabelService labelService,
         SmartBasketDbContext dbContext,
         AppSettings settings,
         ILogger<ReceiptCollectionService> logger)
@@ -79,6 +82,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         _parserFactory = parserFactory ?? throw new ArgumentNullException(nameof(parserFactory));
         _classificationService = classificationService ?? throw new ArgumentNullException(nameof(classificationService));
         _labelAssignmentService = labelAssignmentService ?? throw new ArgumentNullException(nameof(labelAssignmentService));
+        _labelService = labelService ?? throw new ArgumentNullException(nameof(labelService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -251,7 +255,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
                 }
 
                 // Regex парсер — синхронный
-                var result = parser.Parse(raw.Content, raw.Date);
+                var result = parser.Parse(raw.Content, raw.Date, raw.Subject);
                 if (result.IsSuccess)
                 {
                     progress?.Report($"  [Parse] Success: {result.Items.Count} items from {result.Shop}");
@@ -269,7 +273,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
 
         // "Auto" режим: сначала пробуем regex-парсеры по CanParse()
         progress?.Report($"  [Parse] Auto-detect: trying regex parsers...");
-        var regexResult = _parserFactory.TryParseWithRegex(raw.Content, raw.Date);
+        var regexResult = _parserFactory.TryParseWithRegex(raw.Content, raw.Date, raw.Subject);
         if (regexResult != null && regexResult.IsSuccess)
         {
             progress?.Report($"  [Parse] Regex parser success: {regexResult.Items.Count} items");
@@ -446,14 +450,24 @@ public class ReceiptCollectionService : IReceiptCollectionService
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
+        // Автоматически синхронизировать метки из файла
+        var labelsFilePath = Path.Combine(AppContext.BaseDirectory, "user_labels.txt");
+        var syncedCount = await _labelService.SyncFromFileAsync(labelsFilePath, cancellationToken);
+        if (syncedCount > 0)
+        {
+            progress?.Report($"  [Labels] Synced {syncedCount} labels from file");
+        }
+
         var availableLabels = await _dbContext.Labels
             .ToDictionaryAsync(l => l.Name, l => l, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
         if (availableLabels.Count == 0)
         {
-            progress?.Report("  [Labels] No labels in database");
+            progress?.Report("  [Labels] No labels in database (check user_labels.txt)");
             return;
         }
+
+        progress?.Report($"  [Labels] Available labels: {availableLabels.Count}");
 
         var batchItems = items.Select(item =>
         {

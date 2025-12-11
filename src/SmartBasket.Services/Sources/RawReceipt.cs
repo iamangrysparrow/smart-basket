@@ -6,10 +6,12 @@ namespace SmartBasket.Services.Sources;
 /// <param name="Content">Сырые данные (HTML, JSON, текст)</param>
 /// <param name="ContentType">Тип контента: "text/html", "application/json", "text/plain"</param>
 /// <param name="Date">Дата получения</param>
+/// <param name="Subject">Тема письма (для email источников)</param>
 /// <param name="ExternalId">Внешний идентификатор для дедупликации (например, email message-id)</param>
 public record RawReceipt(
     string Content,
     string ContentType,
     DateTime Date,
+    string? Subject = null,
     string? ExternalId = null
 );

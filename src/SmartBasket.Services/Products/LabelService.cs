@@ -192,4 +192,60 @@ public class LabelService : ILabelService
 
         return (totalLabels, itemsWithLabels, totalItems - itemsWithLabels);
     }
+
+    public async Task<int> SyncFromFileAsync(string filePath, CancellationToken ct = default)
+    {
+        if (!File.Exists(filePath))
+            return 0;
+
+        var lines = await File.ReadAllLinesAsync(filePath, ct).ConfigureAwait(false);
+        var labelsFromFile = lines
+            .Select(l => l.Trim())
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (labelsFromFile.Count == 0)
+            return 0;
+
+        var existingLabels = await _db.Labels
+            .Select(l => l.Name)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var existingSet = new HashSet<string>(existingLabels, StringComparer.OrdinalIgnoreCase);
+
+        var newLabels = labelsFromFile
+            .Where(name => !existingSet.Contains(name))
+            .Select(name => new Label
+            {
+                Name = name,
+                Color = GenerateColor(name)
+            })
+            .ToList();
+
+        if (newLabels.Count > 0)
+        {
+            _db.Labels.AddRange(newLabels);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return newLabels.Count;
+    }
+
+    private static string GenerateColor(string name)
+    {
+        // Генерируем цвет на основе хеша имени для консистентности
+        var hash = name.GetHashCode();
+        var r = (hash & 0xFF0000) >> 16;
+        var g = (hash & 0x00FF00) >> 8;
+        var b = hash & 0x0000FF;
+
+        // Делаем цвет более пастельным (ближе к белому)
+        r = 128 + r / 2;
+        g = 128 + g / 2;
+        b = 128 + b / 2;
+
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
 }

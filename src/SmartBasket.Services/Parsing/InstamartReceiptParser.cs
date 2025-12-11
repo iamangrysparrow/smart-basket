@@ -25,6 +25,12 @@ public class InstamartReceiptParser : IReceiptTextParser
     // Маркеры для определения магазина в CanParse()
     private static readonly string[] ShopMarkers = { "Instamart", "instamart", "INSTAMART", "kuper.ru", "Kuper" };
 
+    // Паттерн для извлечения названия магазина из темы письма
+    // "Ваш заказ в магазине АШАН собран" → "АШАН"
+    private static readonly Regex ShopFromSubjectRegex = new(
+        @"в\s+магазине\s+(.+?)\s+(собран|доставлен|получен|готов)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     // Паттерн номера заказа: H + 11 цифр
     private static readonly Regex OrderNumberRegex = new(@"H\d{11}", RegexOptions.Compiled);
 
@@ -50,28 +56,33 @@ public class InstamartReceiptParser : IReceiptTextParser
 
     public bool CanParse(string receiptText)
     {
-        return ShopMarkers.Any(marker => receiptText.Contains(marker, StringComparison.OrdinalIgnoreCase));
+        // Очищаем HTML для корректной проверки
+        var cleanText = HtmlHelper.IsHtml(receiptText) ? HtmlHelper.CleanHtml(receiptText) : receiptText;
+        return ShopMarkers.Any(marker => cleanText.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    public ParsedReceipt Parse(string receiptText, DateTime emailDate)
+    public ParsedReceipt Parse(string receiptText, DateTime emailDate, string? subject = null)
     {
         var result = new ParsedReceipt
         {
-            Shop = "Instamart",
+            Shop = ExtractShopName(subject) ?? "Instamart",
             Date = emailDate
         };
 
         try
         {
+            // Очищаем HTML если нужно
+            var cleanText = HtmlHelper.IsHtml(receiptText) ? HtmlHelper.CleanHtml(receiptText) : receiptText;
+
             // Извлекаем номер заказа
-            var orderMatch = OrderNumberRegex.Match(receiptText);
+            var orderMatch = OrderNumberRegex.Match(cleanText);
             if (orderMatch.Success)
             {
                 result.OrderNumber = orderMatch.Value;
             }
 
             // Извлекаем дату
-            var dateMatch = DateRegex.Match(receiptText);
+            var dateMatch = DateRegex.Match(cleanText);
             if (dateMatch.Success)
             {
                 var day = int.Parse(dateMatch.Groups[1].Value);
@@ -89,14 +100,14 @@ public class InstamartReceiptParser : IReceiptTextParser
             }
 
             // Парсим товарные позиции
-            result.Items = ParseItems(receiptText);
+            result.Items = ParseItems(cleanText);
 
             // Вычисляем итого
             result.Total = result.Items.Sum(i => i.Amount ?? (i.Price * i.Quantity));
 
             result.IsSuccess = result.Items.Count > 0;
             result.Message = result.IsSuccess
-                ? $"Parsed {result.Items.Count} items from {Name}"
+                ? $"Parsed {result.Items.Count} items from {Name} (shop: {result.Shop})"
                 : "No items found in receipt";
         }
         catch (Exception ex)
@@ -106,6 +117,23 @@ public class InstamartReceiptParser : IReceiptTextParser
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Извлекает название магазина из темы письма
+    /// </summary>
+    private static string? ExtractShopName(string? subject)
+    {
+        if (string.IsNullOrWhiteSpace(subject))
+            return null;
+
+        var match = ShopFromSubjectRegex.Match(subject);
+        if (match.Success)
+        {
+            return match.Groups[1].Value.Trim();
+        }
+
+        return null;
     }
 
     private List<ParsedReceiptItem> ParseItems(string receiptText)

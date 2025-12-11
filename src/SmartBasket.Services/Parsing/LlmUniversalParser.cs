@@ -59,9 +59,10 @@ public class LlmUniversalParser : IReceiptTextParser
         _promptTemplate = null; // Reset cache
     }
 
-    public ParsedReceipt Parse(string receiptText, DateTime emailDate)
+    public ParsedReceipt Parse(string receiptText, DateTime emailDate, string? subject = null)
     {
         // Синхронная обёртка для async метода
+        // LLM парсер извлекает магазин из текста, поэтому subject пока игнорируется
         return ParseAsync(receiptText, emailDate, null, CancellationToken.None)
             .GetAwaiter().GetResult();
     }
@@ -243,31 +244,9 @@ public class LlmUniversalParser : IReceiptTextParser
         return result;
     }
 
-    private string CleanHtmlTags(string html)
+    private static string CleanHtmlTags(string html)
     {
-        if (string.IsNullOrEmpty(html))
-            return string.Empty;
-
-        // Удалить style и script теги с содержимым
-        var result = Regex.Replace(html, @"<style[^>]*>[\s\S]*?</style>", "", RegexOptions.IgnoreCase);
-        result = Regex.Replace(result, @"<script[^>]*>[\s\S]*?</script>", "", RegexOptions.IgnoreCase);
-
-        // Заменить <br>, <p>, <div>, <tr> на переносы строк
-        result = Regex.Replace(result, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
-        result = Regex.Replace(result, @"</?(p|div|tr|li)[^>]*>", "\n", RegexOptions.IgnoreCase);
-        result = Regex.Replace(result, @"</(td|th)>", " | ", RegexOptions.IgnoreCase);
-
-        // Удалить все остальные HTML теги
-        result = Regex.Replace(result, @"<[^>]+>", "");
-
-        // Декодировать HTML entities
-        result = System.Net.WebUtility.HtmlDecode(result);
-
-        // Убрать множественные пробелы и переносы
-        result = Regex.Replace(result, @"[ \t]+", " ");
-        result = Regex.Replace(result, @"\n\s*\n", "\n\n");
-
-        return result.Trim();
+        return HtmlHelper.CleanHtml(html);
     }
 
     private string BuildParsingPrompt(string emailBody, DateTime emailDate, IProgress<string>? progress = null)

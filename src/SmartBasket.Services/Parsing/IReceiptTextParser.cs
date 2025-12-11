@@ -29,5 +29,8 @@ public interface IReceiptTextParser
     /// <summary>
     /// Парсит текст чека и возвращает структурированные данные
     /// </summary>
-    ParsedReceipt Parse(string receiptText, DateTime emailDate);
+    /// <param name="receiptText">Текст чека (HTML или plain text)</param>
+    /// <param name="emailDate">Дата письма</param>
+    /// <param name="subject">Тема письма (для извлечения названия магазина)</param>
+    ParsedReceipt Parse(string receiptText, DateTime emailDate, string? subject = null);
 }

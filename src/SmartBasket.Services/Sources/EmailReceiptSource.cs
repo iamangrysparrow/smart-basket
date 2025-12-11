@@ -65,6 +65,7 @@ public class EmailReceiptSource : IReceiptSource
                 Content: content,
                 ContentType: contentType,
                 Date: email.Date,
+                Subject: email.Subject,
                 ExternalId: email.MessageId
             ));
         }
