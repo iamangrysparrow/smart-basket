@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 
@@ -10,13 +9,18 @@ namespace SmartBasket.Services.Llm;
 public class LabelAssignmentService : ILabelAssignmentService
 {
     private readonly IAiProviderFactory _providerFactory;
+    private readonly IResponseParser _responseParser;
     private readonly ILogger<LabelAssignmentService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public LabelAssignmentService(IAiProviderFactory providerFactory, ILogger<LabelAssignmentService> logger)
+    public LabelAssignmentService(
+        IAiProviderFactory providerFactory,
+        IResponseParser responseParser,
+        ILogger<LabelAssignmentService> logger)
     {
         _providerFactory = providerFactory;
+        _responseParser = responseParser;
         _logger = logger;
     }
 
@@ -88,37 +92,27 @@ public class LabelAssignmentService : ILabelAssignmentService
             result.RawResponse = llmResult.Response;
             progress?.Report($"  [Labels] Total response: {llmResult.Response.Length} chars");
 
-            // Extract JSON array from response
-            var jsonMatch = Regex.Match(llmResult.Response, @"\[[\s\S]*?\]", RegexOptions.Multiline);
-            if (jsonMatch.Success)
-            {
-                try
-                {
-                    var labels = JsonSerializer.Deserialize<List<string>>(jsonMatch.Value);
-                    if (labels != null)
-                    {
-                        // Filter to only include valid labels
-                        var validLabels = labels
-                            .Where(l => availableLabels.Contains(l, StringComparer.OrdinalIgnoreCase))
-                            .ToList();
+            // Extract JSON array using unified ResponseParser
+            var parseResult = _responseParser.ParseJsonArray<string>(llmResult.Response, progress);
 
-                        result.AssignedLabels = validLabels;
-                        result.IsSuccess = true;
-                        result.Message = validLabels.Count > 0
-                            ? $"Assigned {validLabels.Count} labels"
-                            : "No labels assigned";
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    result.IsSuccess = false;
-                    result.Message = $"Failed to parse JSON: {ex.Message}";
-                }
+            if (parseResult.IsSuccess && parseResult.Data != null)
+            {
+                // Filter to only include valid labels
+                var validLabels = parseResult.Data
+                    .Where(l => availableLabels.Contains(l, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+
+                result.AssignedLabels = validLabels;
+                result.IsSuccess = true;
+                result.Message = validLabels.Count > 0
+                    ? $"Assigned {validLabels.Count} labels (method: {parseResult.ExtractionMethod})"
+                    : "No labels assigned";
             }
             else
             {
-                // No labels assigned is OK
+                // No labels assigned is OK (model might return empty or text response)
                 result.IsSuccess = true;
+                result.AssignedLabels = new List<string>();
                 result.Message = "No labels assigned";
             }
         }
@@ -234,42 +228,30 @@ public class LabelAssignmentService : ILabelAssignmentService
     {
         var results = new List<BatchItemResult>();
 
-        // Ищем JSON массив
-        var jsonMatch = Regex.Match(response, @"\[[\s\S]*\]", RegexOptions.Multiline);
-        if (!jsonMatch.Success)
+        // Extract JSON array using unified ResponseParser
+        var parseResult = _responseParser.ParseJsonArray<BatchResponseItem>(response, null);
+
+        if (!parseResult.IsSuccess || parseResult.Data == null)
             return results;
 
-        try
+        // Создаем lookup для быстрого поиска
+        var availableLabelsSet = new HashSet<string>(availableLabels, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var parsedItem in parseResult.Data)
         {
-            var parsed = JsonSerializer.Deserialize<List<BatchResponseItem>>(jsonMatch.Value,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (string.IsNullOrWhiteSpace(parsedItem.Item))
+                continue;
 
-            if (parsed == null)
-                return results;
+            // Фильтруем только валидные метки
+            var validLabels = parsedItem.Labels?
+                .Where(l => availableLabelsSet.Contains(l))
+                .ToList() ?? new List<string>();
 
-            // Создаем lookup для быстрого поиска
-            var availableLabelsSet = new HashSet<string>(availableLabels, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var parsedItem in parsed)
+            results.Add(new BatchItemResult
             {
-                if (string.IsNullOrWhiteSpace(parsedItem.Item))
-                    continue;
-
-                // Фильтруем только валидные метки
-                var validLabels = parsedItem.Labels?
-                    .Where(l => availableLabelsSet.Contains(l))
-                    .ToList() ?? new List<string>();
-
-                results.Add(new BatchItemResult
-                {
-                    ItemName = parsedItem.Item,
-                    Labels = validLabels
-                });
-            }
-        }
-        catch (JsonException)
-        {
-            // Если не удалось распарсить - возвращаем пустой список
+                ItemName = parsedItem.Item,
+                Labels = validLabels
+            });
         }
 
         return results;

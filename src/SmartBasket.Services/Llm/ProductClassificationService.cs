@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 
@@ -10,13 +9,18 @@ namespace SmartBasket.Services.Llm;
 public class ProductClassificationService : IProductClassificationService
 {
     private readonly IAiProviderFactory _providerFactory;
+    private readonly IResponseParser _responseParser;
     private readonly ILogger<ProductClassificationService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
 
-    public ProductClassificationService(IAiProviderFactory providerFactory, ILogger<ProductClassificationService> logger)
+    public ProductClassificationService(
+        IAiProviderFactory providerFactory,
+        IResponseParser responseParser,
+        ILogger<ProductClassificationService> logger)
     {
         _providerFactory = providerFactory;
+        _responseParser = responseParser;
         _logger = logger;
     }
 
@@ -88,37 +92,22 @@ public class ProductClassificationService : IProductClassificationService
             result.RawResponse = llmResult.Response;
             progress?.Report($"  [Classify] Total response: {llmResult.Response.Length} chars");
 
-            // Extract JSON object from response
-            var jsonMatch = Regex.Match(llmResult.Response, @"\{[\s\S]*\}", RegexOptions.Multiline);
-            if (jsonMatch.Success)
-            {
-                try
-                {
-                    var parsed = JsonSerializer.Deserialize<ClassificationResponse>(
-                        jsonMatch.Value,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            // Extract and parse JSON using unified ResponseParser
+            var parseResult = _responseParser.ParseJsonObject<ClassificationResponse>(llmResult.Response, progress);
 
-                    if (parsed != null)
-                    {
-                        result.Products = parsed.Products;
-                        result.Items = parsed.Items;
-                        result.IsSuccess = true;
-                        result.Message = $"Classified {result.Items.Count} items into {result.Products.Count} products";
-                        progress?.Report($"  [Classify] {result.Message}");
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    progress?.Report($"  [Classify] JSON parse error: {ex.Message}");
-                    result.IsSuccess = false;
-                    result.Message = $"Failed to parse JSON: {ex.Message}";
-                }
+            if (parseResult.IsSuccess && parseResult.Data != null)
+            {
+                result.Products = parseResult.Data.Products;
+                result.Items = parseResult.Data.Items;
+                result.IsSuccess = true;
+                result.Message = $"Classified {result.Items.Count} items into {result.Products.Count} products";
+                progress?.Report($"  [Classify] {result.Message} (method: {parseResult.ExtractionMethod})");
             }
             else
             {
-                progress?.Report("  [Classify] No JSON object found in response");
+                progress?.Report($"  [Classify] JSON parse error: {parseResult.ErrorMessage}");
                 result.IsSuccess = false;
-                result.Message = "No JSON found in response";
+                result.Message = parseResult.ErrorMessage ?? "Failed to parse JSON";
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

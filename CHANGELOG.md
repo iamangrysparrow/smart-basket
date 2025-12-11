@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Yandex AI Studio Agent Provider**:
+  - `YandexAgentLlmProvider` — провайдер для кастомных агентов Yandex AI Studio
+  - Использует REST Assistant API (`https://rest-assistant.api.cloud.yandex.net/v1/responses`)
+  - `AiProviderType.YandexAgent` — новый тип провайдера
+  - `AiProviderConfig.AgentId` — свойство для ID агента
+  - UI настройки: поля Agent ID, Folder ID, API Key
+  - Логирование запросов/ответов в формате ARCHITECTURE-AI.md
 - **Автоматическая синхронизация Labels из файла**:
   - `ILabelService.SyncFromFileAsync()` — загружает метки из `user_labels.txt` в БД
   - `ReceiptCollectionService` — при назначении меток автоматически синхронизирует из файла

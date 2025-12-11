@@ -109,19 +109,22 @@ Source.Parser = "Auto"             → TryParseWithRegex() (по CanParse())
 
 ### AI Providers (Поставщики AI)
 
-Конфигурация доступа к AI-модели. Ключ: `Provider/Model`.
+Конфигурация доступа к AI-модели. Ключ: `Provider/Model` или `Provider/AgentId`.
 
 ```
 AiProviderConfig
-├── Key: string               // "Ollama/qwen2.5:1.5b"
-├── Provider: ProviderType    // Ollama, YandexGPT, OpenAI
-├── Model: string
+├── Key: string               // "Ollama/qwen2.5:1.5b" или "YandexAgent/fvtp..."
+├── Provider: ProviderType    // Ollama, YandexGPT, YandexAgent, OpenAI
+├── Model: string             // (не для YandexAgent)
+├── AgentId: string           // (только для YandexAgent)
+├── FolderId: string          // (для Yandex*)
 └── Temperature, Timeout, ...
 ```
 
 **Реализации:**
-- `OllamaLlmProvider` — локальная Ollama
-- `YandexGptLlmProvider` — Yandex GPT
+- `OllamaLlmProvider` — локальная Ollama (streaming)
+- `YandexGptLlmProvider` — Yandex GPT (Foundation Models API)
+- `YandexAgentLlmProvider` — Yandex AI Studio агенты (REST Assistant API)
 
 ---
 
@@ -262,7 +265,7 @@ EF Core DbContext. PostgreSQL / SQLite.
 - `ReceiptTextParserFactory`
 
 **AI:**
-- `ILlmProvider`, `OllamaLlmProvider`, `YandexGptLlmProvider`
+- `ILlmProvider`, `OllamaLlmProvider`, `YandexGptLlmProvider`, `YandexAgentLlmProvider`
 - `IAiProviderFactory`
 
 **Services:**

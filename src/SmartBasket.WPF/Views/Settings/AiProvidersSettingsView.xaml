@@ -125,10 +125,13 @@
                                   SelectedValuePath="Tag" FontSize="12" Padding="4,3" Margin="0,0,0,6">
                             <ComboBoxItem Content="Ollama (локальный)" Tag="{x:Static core:AiProviderType.Ollama}"/>
                             <ComboBoxItem Content="YandexGPT" Tag="{x:Static core:AiProviderType.YandexGPT}"/>
+                            <ComboBoxItem Content="Yandex Agent (AI Studio)" Tag="{x:Static core:AiProviderType.YandexAgent}"/>
                             <ComboBoxItem Content="OpenAI / OpenAI-compatible" Tag="{x:Static core:AiProviderType.OpenAI}"/>
                         </ComboBox>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Модель" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <!-- Модель (скрыта для YandexAgent) -->
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Модель" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                                   Visibility="{Binding ShowModel, Converter={StaticResource BoolToVis}}"/>
                         <!-- Ollama models - динамический список -->
                         <ComboBox Grid.Row="2" Grid.Column="1" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
                                   IsEditable="True" FontSize="12" Padding="4,3" Margin="0,0,0,6"
@@ -164,6 +167,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <!-- BaseUrl (Ollama, OpenAI) -->
@@ -173,7 +177,7 @@
                                  Style="{StaticResource TextInput}" Margin="0,0,0,6"
                                  Visibility="{Binding ShowBaseUrl, Converter={StaticResource BoolToVis}}"/>
 
-                        <!-- API Key (YandexGPT, OpenAI) -->
+                        <!-- API Key (YandexGPT, YandexAgent, OpenAI) -->
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="API Key" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
                                    Visibility="{Binding ShowApiKey, Converter={StaticResource BoolToVis}}"/>
                         <controls:PasswordBoxWithReveal Grid.Row="1" Grid.Column="1"
@@ -181,12 +185,20 @@
                                                         Margin="0,0,0,6"
                                                         Visibility="{Binding ShowApiKey, Converter={StaticResource BoolToVis}}"/>
 
-                        <!-- Folder ID (YandexGPT) -->
+                        <!-- Folder ID (YandexGPT, YandexAgent) -->
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Folder ID" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
                                    Visibility="{Binding ShowFolderId, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding FolderId, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource TextInput}" Margin="0,0,0,6"
                                  Visibility="{Binding ShowFolderId, Converter={StaticResource BoolToVis}}"/>
+
+                        <!-- Agent ID (YandexAgent) -->
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Agent ID" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                                   Visibility="{Binding ShowAgentId, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding AgentId, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextInput}" Margin="0,0,0,6"
+                                 ToolTip="ID агента из Yandex AI Studio (например: fvtp92o93d44ke9oun70)"
+                                 Visibility="{Binding ShowAgentId, Converter={StaticResource BoolToVis}}"/>
                     </Grid>
 
                     <!-- Advanced Settings -->

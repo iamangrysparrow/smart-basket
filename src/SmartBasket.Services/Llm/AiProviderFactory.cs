@@ -96,6 +96,7 @@ public class AiProviderFactory : IAiProviderFactory
         {
             AiProviderType.Ollama => CreateOllamaProvider(config),
             AiProviderType.YandexGPT => CreateYandexGptProvider(config),
+            AiProviderType.YandexAgent => CreateYandexAgentProvider(config),
             AiProviderType.OpenAI => throw new NotImplementedException("OpenAI provider is not implemented yet"),
             _ => throw new ArgumentException($"Unknown provider type: {config.Provider}")
         };
@@ -114,6 +115,14 @@ public class AiProviderFactory : IAiProviderFactory
         return new YandexGptLlmProvider(
             _httpClientFactory,
             _loggerFactory.CreateLogger<YandexGptLlmProvider>(),
+            config);
+    }
+
+    private ILlmProvider CreateYandexAgentProvider(AiProviderConfig config)
+    {
+        return new YandexAgentLlmProvider(
+            _httpClientFactory,
+            _loggerFactory.CreateLogger<YandexAgentLlmProvider>(),
             config);
     }
 }

@@ -95,6 +95,7 @@ public partial class App : Application
         services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
 
         // LLM Services (use AI providers via factory)
+        services.AddSingleton<IResponseParser, ResponseParser>();
         services.AddSingleton<IProductClassificationService, ProductClassificationService>();
         services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
 

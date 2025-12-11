@@ -22,6 +22,7 @@ public partial class AiProviderViewModel : ObservableObject
         MaxTokens = config.MaxTokens;
         ApiKey = config.ApiKey ?? string.Empty;
         FolderId = config.FolderId ?? string.Empty;
+        AgentId = config.AgentId ?? string.Empty;
     }
 
     private string _originalKey = string.Empty;
@@ -50,10 +51,13 @@ public partial class AiProviderViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOllama))]
     [NotifyPropertyChangedFor(nameof(IsYandexGpt))]
+    [NotifyPropertyChangedFor(nameof(IsYandexAgent))]
     [NotifyPropertyChangedFor(nameof(IsOpenAi))]
     [NotifyPropertyChangedFor(nameof(ShowBaseUrl))]
     [NotifyPropertyChangedFor(nameof(ShowApiKey))]
     [NotifyPropertyChangedFor(nameof(ShowFolderId))]
+    [NotifyPropertyChangedFor(nameof(ShowAgentId))]
+    [NotifyPropertyChangedFor(nameof(ShowModel))]
     private AiProviderType _provider = AiProviderType.Ollama;
 
     [ObservableProperty]
@@ -77,14 +81,20 @@ public partial class AiProviderViewModel : ObservableObject
     [ObservableProperty]
     private string _folderId = string.Empty;
 
+    [ObservableProperty]
+    private string _agentId = string.Empty;
+
     // Helper properties for UI visibility
     public bool IsOllama => Provider == AiProviderType.Ollama;
     public bool IsYandexGpt => Provider == AiProviderType.YandexGPT;
+    public bool IsYandexAgent => Provider == AiProviderType.YandexAgent;
     public bool IsOpenAi => Provider == AiProviderType.OpenAI;
 
     public bool ShowBaseUrl => IsOllama || IsOpenAi;
-    public bool ShowApiKey => IsYandexGpt || IsOpenAi;
-    public bool ShowFolderId => IsYandexGpt;
+    public bool ShowApiKey => IsYandexGpt || IsYandexAgent || IsOpenAi;
+    public bool ShowFolderId => IsYandexGpt || IsYandexAgent;
+    public bool ShowAgentId => IsYandexAgent;
+    public bool ShowModel => !IsYandexAgent;
 
     public bool IsNew => string.IsNullOrEmpty(_originalKey);
 
@@ -114,7 +124,8 @@ public partial class AiProviderViewModel : ObservableObject
             TimeoutSeconds = TimeoutSeconds,
             MaxTokens = MaxTokens,
             ApiKey = string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey,
-            FolderId = string.IsNullOrWhiteSpace(FolderId) ? null : FolderId
+            FolderId = string.IsNullOrWhiteSpace(FolderId) ? null : FolderId,
+            AgentId = string.IsNullOrWhiteSpace(AgentId) ? null : AgentId
         };
     }
 }

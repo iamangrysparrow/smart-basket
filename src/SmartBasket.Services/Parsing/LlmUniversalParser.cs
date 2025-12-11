@@ -1,7 +1,6 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Services.Llm;
 
@@ -14,6 +13,7 @@ namespace SmartBasket.Services.Parsing;
 public class LlmUniversalParser : IReceiptTextParser
 {
     private readonly IAiProviderFactory _providerFactory;
+    private readonly IResponseParser _responseParser;
     private readonly ILogger<LlmUniversalParser> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
@@ -25,9 +25,11 @@ public class LlmUniversalParser : IReceiptTextParser
 
     public LlmUniversalParser(
         IAiProviderFactory providerFactory,
+        IResponseParser responseParser,
         ILogger<LlmUniversalParser> logger)
     {
         _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
+        _responseParser = responseParser ?? throw new ArgumentNullException(nameof(responseParser));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -156,74 +158,60 @@ public class LlmUniversalParser : IReceiptTextParser
             result.RawResponse = llmResult.Response;
             progress?.Report($"  [LLM Parser] Total response: {llmResult.Response.Length} chars");
 
-            // Извлекаем JSON из ответа
+            // Извлекаем JSON из ответа используя унифицированный ResponseParser
             progress?.Report("  [LLM Parser] Extracting JSON from response...");
-            var jsonMatch = Regex.Match(llmResult.Response, @"\{[\s\S]*\}", RegexOptions.Multiline);
+            var parseResult = _responseParser.ParseJsonObject<ParsedReceiptDto>(llmResult.Response, progress);
 
-            if (jsonMatch.Success)
+            if (parseResult.IsSuccess && parseResult.Data != null)
             {
-                progress?.Report($"  [LLM Parser] Found JSON: {jsonMatch.Value.Length} chars");
-                try
+                var parsedJson = parseResult.Data;
+                progress?.Report($"  [LLM Parser] Found JSON (method: {parseResult.ExtractionMethod})");
+
+                result.Shop = parsedJson.Shop ?? "Unknown";
+                result.OrderNumber = parsedJson.OrderNumber;
+                result.Total = parsedJson.Total;
+
+                // Try parsing date/datetime
+                if (!string.IsNullOrEmpty(parsedJson.OrderDatetime) &&
+                    DateTime.TryParse(parsedJson.OrderDatetime.Replace(":", " "), out var datetime))
                 {
-                    var parsedJson = JsonSerializer.Deserialize<ParsedReceiptDto>(
-                        jsonMatch.Value,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    result.Date = datetime;
+                }
+                else if (!string.IsNullOrEmpty(parsedJson.Date) &&
+                         DateTime.TryParse(parsedJson.Date, out var date))
+                {
+                    result.Date = date;
+                }
 
-                    if (parsedJson != null)
+                if (parsedJson.Items != null)
+                {
+                    foreach (var item in parsedJson.Items)
                     {
-                        result.Shop = parsedJson.Shop ?? "Unknown";
-                        result.OrderNumber = parsedJson.OrderNumber;
-                        result.Total = parsedJson.Total;
-
-                        // Try parsing date/datetime
-                        if (!string.IsNullOrEmpty(parsedJson.OrderDatetime) &&
-                            DateTime.TryParse(parsedJson.OrderDatetime.Replace(":", " "), out var datetime))
+                        result.Items.Add(new ParsedReceiptItem
                         {
-                            result.Date = datetime;
-                        }
-                        else if (!string.IsNullOrEmpty(parsedJson.Date) &&
-                                 DateTime.TryParse(parsedJson.Date, out var date))
-                        {
-                            result.Date = date;
-                        }
-
-                        if (parsedJson.Items != null)
-                        {
-                            foreach (var item in parsedJson.Items)
-                            {
-                                result.Items.Add(new ParsedReceiptItem
-                                {
-                                    Name = item.Name ?? "Unknown",
-                                    Quantity = item.Quantity ?? 1,
-                                    Unit = item.Unit,
-                                    Price = item.Price,
-                                    Amount = item.Amount,
-                                    UnitOfMeasure = item.UnitOfMeasure,
-                                    UnitQuantity = item.UnitQuantity
-                                });
-                            }
-                        }
-
-                        result.IsSuccess = result.Items.Count > 0;
-                        result.Message = result.IsSuccess
-                            ? $"Parsed {result.Items.Count} items from {result.Shop}"
-                            : "No items found in receipt";
-
-                        progress?.Report($"  [LLM Parser] {result.Message}");
+                            Name = item.Name ?? "Unknown",
+                            Quantity = item.Quantity ?? 1,
+                            Unit = item.Unit,
+                            Price = item.Price,
+                            Amount = item.Amount,
+                            UnitOfMeasure = item.UnitOfMeasure,
+                            UnitQuantity = item.UnitQuantity
+                        });
                     }
                 }
-                catch (JsonException ex)
-                {
-                    progress?.Report($"  [LLM Parser] JSON parse error: {ex.Message}");
-                    result.IsSuccess = false;
-                    result.Message = $"Failed to parse JSON: {ex.Message}";
-                }
+
+                result.IsSuccess = result.Items.Count > 0;
+                result.Message = result.IsSuccess
+                    ? $"Parsed {result.Items.Count} items from {result.Shop}"
+                    : "No items found in receipt";
+
+                progress?.Report($"  [LLM Parser] {result.Message}");
             }
             else
             {
-                progress?.Report("  [LLM Parser] No JSON found in response");
+                progress?.Report($"  [LLM Parser] JSON parse error: {parseResult.ErrorMessage}");
                 result.IsSuccess = false;
-                result.Message = "No JSON found in LLM response";
+                result.Message = parseResult.ErrorMessage ?? "No JSON found in LLM response";
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

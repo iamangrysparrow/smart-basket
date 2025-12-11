@@ -52,4 +52,9 @@ public class AiProviderConfig
     /// Folder ID (для YandexGPT)
     /// </summary>
     public string? FolderId { get; set; }
+
+    /// <summary>
+    /// Agent ID (для YandexAgent)
+    /// </summary>
+    public string? AgentId { get; set; }
 }

@@ -721,6 +721,95 @@ public partial class SettingsViewModel : ObservableObject
                     _log?.Invoke($"[Settings] YandexGPT ответ: {errorBody}");
                 }
             }
+            else if (SelectedAiProvider.Provider == AiProviderType.YandexAgent)
+            {
+                // Проверка обязательных полей
+                if (string.IsNullOrWhiteSpace(SelectedAiProvider.ApiKey))
+                {
+                    StatusMessage = $"Тест {providerKey}: API ключ не указан";
+                    _log?.Invoke($"[Settings] YandexAgent: API ключ отсутствует");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(SelectedAiProvider.FolderId))
+                {
+                    StatusMessage = $"Тест {providerKey}: Folder ID не указан";
+                    _log?.Invoke($"[Settings] YandexAgent: Folder ID отсутствует");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(SelectedAiProvider.AgentId))
+                {
+                    StatusMessage = $"Тест {providerKey}: Agent ID не указан";
+                    _log?.Invoke($"[Settings] YandexAgent: Agent ID отсутствует");
+                    return;
+                }
+
+                if (_httpClientFactory == null)
+                {
+                    StatusMessage = $"Тест {providerKey}: HttpClient недоступен";
+                    _log?.Invoke($"[Settings] Ошибка: HttpClientFactory не инициализирован");
+                    return;
+                }
+
+                // Реальный тест YandexAgent через REST Assistant API
+                _log?.Invoke($"[Settings] YandexAgent: тестовый запрос к REST Assistant API...");
+
+                using var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(60);
+
+                // REST Assistant API формат
+                var folderId = SelectedAiProvider.FolderId;
+                var agentId = SelectedAiProvider.AgentId;
+
+                var requestBody = new
+                {
+                    prompt = new { id = agentId },
+                    input = "Привет! Ответь одним словом: Работает"
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+                _log?.Invoke($"[Settings] YandexAgent REQUEST BODY:");
+                _log?.Invoke(json);
+
+                var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var request = new System.Net.Http.HttpRequestMessage(
+                    System.Net.Http.HttpMethod.Post,
+                    "https://rest-assistant.api.cloud.yandex.net/v1/responses")
+                {
+                    Content = content
+                };
+
+                // Авторизация - Bearer token
+                var apiKey = SelectedAiProvider.ApiKey;
+                var authHeader = $"Bearer {apiKey}";
+                request.Headers.Add("Authorization", authHeader);
+                request.Headers.Add("x-folder-id", folderId);
+
+                _log?.Invoke($"[Settings] YandexAgent URL: https://rest-assistant.api.cloud.yandex.net/v1/responses");
+                _log?.Invoke($"[Settings] YandexAgent Authorization: {authHeader.Substring(0, Math.Min(20, authHeader.Length))}...");
+                _log?.Invoke($"[Settings] YandexAgent x-folder-id: {folderId}");
+                _log?.Invoke($"[Settings] YandexAgent Agent ID: {agentId}");
+
+                var response = await client.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync();
+                    _log?.Invoke($"[Settings] YandexAgent ответ: {responseBody.Substring(0, Math.Min(200, responseBody.Length))}...");
+                    StatusMessage = $"Тест {providerKey}: OK";
+                    _log?.Invoke($"[Settings] YandexAgent: тест пройден успешно!");
+                }
+                else
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    StatusMessage = $"Тест {providerKey}: HTTP {(int)response.StatusCode}";
+                    _log?.Invoke($"[Settings] YandexAgent ошибка: {response.StatusCode}");
+                    _log?.Invoke($"[Settings] YandexAgent ответ: {errorBody}");
+                }
+            }
             else
             {
                 StatusMessage = $"Тест {providerKey}: неподдерживаемый провайдер";
