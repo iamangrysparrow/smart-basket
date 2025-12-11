@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:SmartBasket.WPF.Views"
+        xmlns:models="clr-namespace:SmartBasket.WPF.Models"
         mc:Ignorable="d"
         Title="Smart Basket"
         Height="750" Width="1200"
@@ -157,8 +158,65 @@
                       Cursor="SizeNS" Visibility="{Binding ElementName=LogPanel, Path=Visibility}"/>
 
         <Border Grid.Row="2" x:Name="LogPanel" Background="{DynamicResource LogBackgroundBrush}"
-                Height="140" MinHeight="60" MaxHeight="350" Visibility="Collapsed"
+                Height="160" MinHeight="80" MaxHeight="400" Visibility="Collapsed"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Border.Resources>
+                <!-- Log level indicator style -->
+                <Style x:Key="LogLevelIndicator" TargetType="Border">
+                    <Setter Property="Width" Value="3"/>
+                    <Setter Property="Margin" Value="0,1,6,1"/>
+                    <Setter Property="CornerRadius" Value="1"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Level}" Value="{x:Static models:LogLevel.Debug}">
+                            <Setter Property="Background" Value="{DynamicResource TextTertiaryBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Level}" Value="{x:Static models:LogLevel.Info}">
+                            <Setter Property="Background" Value="{DynamicResource InfoBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Level}" Value="{x:Static models:LogLevel.Warning}">
+                            <Setter Property="Background" Value="{DynamicResource WarningBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Level}" Value="{x:Static models:LogLevel.Error}">
+                            <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+                <!-- Filter toggle style -->
+                <Style x:Key="MiniFilterToggle" TargetType="ToggleButton">
+                    <Setter Property="Padding" Value="4,1"/>
+                    <Setter Property="Margin" Value="1,0"/>
+                    <Setter Property="FontSize" Value="9"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource BorderLightBrush}"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ToggleButton">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="2" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                    <Style.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource AccentLightBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Resources>
+
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -168,6 +226,7 @@
                 <Border Grid.Row="0" Background="{DynamicResource LogHeaderBrush}" Padding="4,2">
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -180,10 +239,22 @@
                                          Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}"
+                        <!-- Level filters -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="D" IsChecked="{Binding ShowDebug}" ToolTip="Debug"/>
+                            <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="I" IsChecked="{Binding ShowInfo}" ToolTip="Info"/>
+                            <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="W" IsChecked="{Binding ShowWarning}" ToolTip="Warning"/>
+                            <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="E" IsChecked="{Binding ShowError}" ToolTip="Error"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="2" Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
 
-                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <StackPanel Grid.Column="3" Orientation="Horizontal">
+                            <Button Style="{StaticResource ToolbarButton}" Command="{Binding CopyLogCommand}" ToolTip="Copy">
+                                <Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+                                      Fill="{DynamicResource LogTextBrush}" Width="10" Height="10" Stretch="Uniform"/>
+                            </Button>
                             <Button Style="{StaticResource ToolbarButton}" Command="{Binding ClearLogCommand}" ToolTip="Clear">
                                 <Path Data="{StaticResource IconClear}" Fill="{DynamicResource LogTextBrush}" Width="10" Height="10" Stretch="Uniform"/>
                             </Button>
@@ -200,22 +271,67 @@
                     </Grid>
                 </Border>
 
-                <ListBox Grid.Row="1" x:Name="LogListBox" ItemsSource="{Binding LogEntries}"
+                <ListBox Grid.Row="1" x:Name="LogListBox" ItemsSource="{Binding FilteredLogEntries}"
                          Background="{DynamicResource LogBackgroundBrush}" Foreground="{DynamicResource LogTextBrush}"
                          FontFamily="Cascadia Code, Consolas, Courier New" FontSize="10" BorderThickness="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True">
+                         SelectionMode="Extended"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.CanContentScroll="True"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.ScrollChanged="LogListBox_ScrollChanged">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="6,1"/>
+                            <Setter Property="Height" Value="18"/>
+                            <Setter Property="Padding" Value="4,0"/>
                             <Setter Property="BorderThickness" Value="0"/>
                             <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
                             <Style.Triggers>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource LogHeaderBrush}"/>
+                                    <Setter Property="Background" Value="{DynamicResource SelectedBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
                                 </Trigger>
                             </Style.Triggers>
                         </Style>
                     </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:LogEntry}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource LogLevelIndicator}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding FormattedMessage, Mode=OneWay}"
+                                           Foreground="{DynamicResource LogTextBrush}"
+                                           FontFamily="Cascadia Code, Consolas, Courier New"
+                                           FontSize="10"
+                                           TextWrapping="NoWrap"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Copy Selected" Command="{Binding CopyLogCommand}" InputGestureText="Ctrl+C">
+                                <MenuItem.Icon>
+                                    <Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+                                          Fill="{DynamicResource TextPrimaryBrush}" Width="12" Height="12" Stretch="Uniform"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <MenuItem Header="Clear All" Command="{Binding ClearLogCommand}">
+                                <MenuItem.Icon>
+                                    <Path Data="{StaticResource IconClear}"
+                                          Fill="{DynamicResource TextPrimaryBrush}" Width="12" Height="12" Stretch="Uniform"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
                 </ListBox>
             </Grid>
         </Border>

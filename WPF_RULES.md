@@ -631,6 +631,28 @@ private void PopOutLog_Click(object sender, RoutedEventArgs e)
 - [ ] NEVER log passwords, API keys, tokens - mask them!
 - [ ] Test: perform operation, verify log shows complete flow
 
+### ListBox with virtualization (for large collections):
+- [ ] Set `VirtualizingPanel.IsVirtualizing="True"`
+- [ ] Set `VirtualizingPanel.VirtualizationMode="Recycling"`
+- [ ] Set `ScrollViewer.CanContentScroll="True"` (required for virtualization)
+- [ ] **CRITICAL**: Set fixed `Height` on `ListBoxItem` in `ItemContainerStyle`
+- [ ] Use `TextBlock` in `ItemTemplate`, NOT `TextBox` (TextBox breaks virtualization on click)
+- [ ] For multiline log messages: split into separate entries in ViewModel
+
+```xml
+<!-- Example: Fixed height ListBox for logs -->
+<ListBox ItemsSource="{Binding LogEntries}"
+         VirtualizingPanel.IsVirtualizing="True"
+         VirtualizingPanel.VirtualizationMode="Recycling"
+         ScrollViewer.CanContentScroll="True">
+    <ListBox.ItemContainerStyle>
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Height" Value="18"/>  <!-- CRITICAL for smooth scroll -->
+        </Style>
+    </ListBox.ItemContainerStyle>
+</ListBox>
+```
+
 ---
 
 ## Quick Start Prompt

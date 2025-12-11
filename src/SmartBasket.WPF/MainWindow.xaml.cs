@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using SmartBasket.Core.Configuration;
 using SmartBasket.WPF.Services;
@@ -20,6 +21,8 @@ public partial class MainWindow : Window
     private readonly SettingsService _settingsService;
     private readonly IHttpClientFactory _httpClientFactory;
     private LogWindow? _logWindow;
+    private bool _userScrolledUp;
+    private ScrollViewer? _logScrollViewer;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -40,14 +43,15 @@ public partial class MainWindow : Window
         viewModel.EnableCollectionSynchronization();
         viewModel.EnableCategoryCollectionSynchronization();
 
-        // Auto-scroll log
+        // Auto-scroll log with smart behavior
         if (viewModel.LogEntries is INotifyCollectionChanged observable)
         {
             observable.CollectionChanged += (s, e) =>
             {
                 Dispatcher.BeginInvoke(() =>
                 {
-                    if (LogListBox.Items.Count > 0)
+                    // Smart auto-scroll: only if enabled and user hasn't scrolled up
+                    if (_viewModel.AutoScrollEnabled && !_userScrolledUp && LogListBox.Items.Count > 0)
                     {
                         LogListBox.ScrollIntoView(LogListBox.Items[^1]);
                     }
@@ -59,6 +63,18 @@ public partial class MainWindow : Window
                 });
             };
         }
+
+        // Subscribe to filtered view changes
+        viewModel.FilteredLogEntries.CollectionChanged += (s, e) =>
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (_viewModel.AutoScrollEnabled && !_userScrolledUp && LogListBox.Items.Count > 0)
+                {
+                    LogListBox.ScrollIntoView(LogListBox.Items[^1]);
+                }
+            });
+        };
 
         // Update theme icon based on current theme
         UpdateThemeIcon();
@@ -156,6 +172,49 @@ public partial class MainWindow : Window
                 ThemeIcon.Data = geometry;
             }
         });
+    }
+
+    /// <summary>
+    /// Smart auto-scroll: detects manual scroll up, re-enables at bottom
+    /// </summary>
+    private void LogListBox_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        // Get ScrollViewer lazily
+        _logScrollViewer ??= GetScrollViewer(LogListBox);
+        if (_logScrollViewer == null) return;
+
+        // Only react to user-initiated scrolls (not programmatic)
+        if (e.ExtentHeightChange == 0)
+        {
+            // User scrolled manually
+            var atBottom = _logScrollViewer.VerticalOffset >= _logScrollViewer.ScrollableHeight - 10;
+
+            if (atBottom)
+            {
+                // User scrolled to bottom - re-enable auto-scroll
+                _userScrolledUp = false;
+                _viewModel.AutoScrollEnabled = true;
+            }
+            else if (e.VerticalChange < 0)
+            {
+                // User scrolled up - disable auto-scroll
+                _userScrolledUp = true;
+                _viewModel.AutoScrollEnabled = false;
+            }
+        }
+    }
+
+    private static ScrollViewer? GetScrollViewer(DependencyObject obj)
+    {
+        if (obj is ScrollViewer sv) return sv;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(obj); i++)
+        {
+            var child = VisualTreeHelper.GetChild(obj, i);
+            var result = GetScrollViewer(child);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     protected override void OnClosed(EventArgs e)

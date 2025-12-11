@@ -27,6 +27,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `ILabelService.SyncFromFileAsync()` — загружает метки из `user_labels.txt` в БД
   - `ReceiptCollectionService` — при назначении меток автоматически синхронизирует из файла
 - **Утилита `HtmlHelper`**: общие методы `CleanHtml()` и `IsHtml()` для работы с HTML
+- **Улучшенный Log Viewer**:
+  - `LogEntry` модель с уровнями (Debug, Info, Warning, Error)
+  - Цветные индикаторы уровней (серый/синий/жёлтый/красный)
+  - Фильтрация по уровням (toggle buttons D/I/W/E)
+  - Умный auto-scroll: отключается при scroll up, включается при scroll down
+  - Кнопка Copy — копирует все отфильтрованные записи в буфер
+  - Context menu с Copy Selected и Clear All
+  - Фиксированная высота строк для плавной виртуализации
+  - Многострочные сообщения разбиваются на отдельные записи
 
 ### Changed
 - **Рефакторинг интерфейса парсеров (`IReceiptTextParser`)**:

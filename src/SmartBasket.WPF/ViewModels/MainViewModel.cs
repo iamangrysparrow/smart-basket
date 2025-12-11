@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Data;
@@ -11,6 +12,7 @@ using SmartBasket.Data;
 using SmartBasket.Services;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Products;
+using SmartBasket.WPF.Models;
 using SmartBasket.WPF.Services;
 
 namespace SmartBasket.WPF.ViewModels;
@@ -67,12 +69,29 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "Ready";
 
     // Log - thread-safe via BindingOperations.EnableCollectionSynchronization
-    public ObservableCollection<string> LogEntries { get; } = new();
+    public ObservableCollection<LogEntry> LogEntries { get; } = new();
     private readonly object _logEntriesLock = new();
 
     // Full log for saving (not truncated)
-    private readonly List<string> _fullLog = new();
+    private readonly List<LogEntry> _fullLog = new();
     private readonly object _fullLogLock = new();
+
+    // Log filtering by level
+    [ObservableProperty] private bool _showDebug = true;
+    [ObservableProperty] private bool _showInfo = true;
+    [ObservableProperty] private bool _showWarning = true;
+    [ObservableProperty] private bool _showError = true;
+
+    // Auto-scroll state
+    [ObservableProperty] private bool _autoScrollEnabled = true;
+
+    // Filtered view of log entries
+    public ICollectionView FilteredLogEntries { get; private set; } = null!;
+
+    partial void OnShowDebugChanged(bool value) => FilteredLogEntries?.Refresh();
+    partial void OnShowInfoChanged(bool value) => FilteredLogEntries?.Refresh();
+    partial void OnShowWarningChanged(bool value) => FilteredLogEntries?.Refresh();
+    partial void OnShowErrorChanged(bool value) => FilteredLogEntries?.Refresh();
 
     // Results - thread-safe via BindingOperations.EnableCollectionSynchronization
     public ObservableCollection<ReceiptViewModel> Receipts { get; } = new();
@@ -129,12 +148,35 @@ public partial class MainViewModel : ObservableObject
         BindingOperations.EnableCollectionSynchronization(LogEntries, _logEntriesLock);
         BindingOperations.EnableCollectionSynchronization(Receipts, _receiptsLock);
         BindingOperations.EnableCollectionSynchronization(ShopFilters, _shopFiltersLock);
+
+        // Create filtered view for log entries with level filtering
+        FilteredLogEntries = CollectionViewSource.GetDefaultView(LogEntries);
+        FilteredLogEntries.Filter = LogEntryFilter;
     }
 
-    private void Log(string message)
+    private bool LogEntryFilter(object item)
     {
-        var timestamp = DateTime.Now.ToString("HH:mm:ss");
-        var entry = $"[{timestamp}] {message}";
+        if (item is not LogEntry entry)
+            return true;
+
+        return entry.Level switch
+        {
+            LogLevel.Debug => ShowDebug,
+            LogLevel.Info => ShowInfo,
+            LogLevel.Warning => ShowWarning,
+            LogLevel.Error => ShowError,
+            _ => true
+        };
+    }
+
+    private void Log(string message, LogLevel level = LogLevel.Debug)
+    {
+        var entry = new LogEntry
+        {
+            Timestamp = DateTime.Now,
+            Level = level,
+            Message = message
+        };
 
         // Save to full log (never truncated) for file export
         lock (_fullLogLock)
@@ -156,11 +198,23 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Публичный метод для добавления записей в лог из других компонентов
+    /// Публичный метод для добавления записей в лог из других компонентов.
+    /// Автоматически определяет уровень по содержимому сообщения.
+    /// Многострочные сообщения разбиваются на отдельные записи.
     /// </summary>
     public void AddLogEntry(string message)
     {
-        Log(message);
+        if (string.IsNullOrEmpty(message))
+            return;
+
+        // Разбиваем многострочные сообщения на отдельные записи
+        var lines = message.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+        foreach (var line in lines)
+        {
+            var entry = LogEntry.FromMessage(line);
+            Log(entry.Message, entry.Level);
+        }
     }
 
     /// <summary>
@@ -169,7 +223,7 @@ public partial class MainViewModel : ObservableObject
     private void LogException(Exception ex, string context = "")
     {
         var prefix = string.IsNullOrEmpty(context) ? "ERROR" : $"ERROR [{context}]";
-        Log($"{prefix}: {ex.GetType().Name}: {ex.Message}");
+        Log($"{prefix}: {ex.GetType().Name}: {ex.Message}", LogLevel.Error);
 
         // Логируем всю цепочку InnerException
         var inner = ex.InnerException;
@@ -177,7 +231,7 @@ public partial class MainViewModel : ObservableObject
         while (inner != null)
         {
             var indent = new string(' ', depth * 2);
-            Log($"{indent}-> InnerException[{depth}]: {inner.GetType().Name}: {inner.Message}");
+            Log($"{indent}-> InnerException[{depth}]: {inner.GetType().Name}: {inner.Message}", LogLevel.Error);
             inner = inner.InnerException;
             depth++;
         }
@@ -577,7 +631,7 @@ public partial class MainViewModel : ObservableObject
         {
             LogEntries.Clear();
         }
-        Log("Log cleared");
+        Log("Log cleared", LogLevel.Info);
     }
 
     [RelayCommand]
@@ -594,18 +648,47 @@ public partial class MainViewModel : ObservableObject
             string[] entries;
             lock (_fullLogLock)
             {
-                // Save full log (not truncated UI version)
-                entries = _fullLog.ToArray();
+                // Save full log (not truncated UI version) with full format
+                entries = _fullLog.Select(e => e.FullMessage).ToArray();
             }
 
             File.WriteAllLines(logPath, entries);
-            Log($"Log saved to: {logPath} ({entries.Length} entries)");
+            Log($"Log saved to: {logPath} ({entries.Length} entries)", LogLevel.Info);
             StatusText = $"Log saved: {Path.GetFileName(logPath)} ({entries.Length} entries)";
         }
         catch (Exception ex)
         {
             LogException(ex, "SaveLog");
             StatusText = "Log save FAILED";
+        }
+    }
+
+    /// <summary>
+    /// Copy all visible log entries to clipboard
+    /// </summary>
+    [RelayCommand]
+    private void CopyLog()
+    {
+        try
+        {
+            string[] entries;
+            lock (_logEntriesLock)
+            {
+                entries = LogEntries
+                    .Where(e => LogEntryFilter(e))
+                    .Select(e => e.FormattedMessage)
+                    .ToArray();
+            }
+
+            if (entries.Length > 0)
+            {
+                Clipboard.SetText(string.Join(Environment.NewLine, entries));
+                StatusText = $"Copied {entries.Length} log entries to clipboard";
+            }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "CopyLog");
         }
     }
 
