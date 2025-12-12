@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **UI для редактирования AI Prompts**:
+  - `PromptEditorWindow` — модальное окно редактирования промптов
+  - Кастомный промпт для каждой операции + провайдера (сохраняется в настройках)
+  - Кнопка "Умный промпт" — вставка минимального промпта для умных моделей (GPT-4, Claude)
+  - Индикаторы "(настроен)" для операций с кастомными промптами
+  - Placeholders: `{{EXISTING_HIERARCHY}}`, `{{EXISTING_HIERARCHY_JSON}}`, `{{ITEMS}}`, `{{LABELS}}`
+- **Поддержка JSON-формата иерархии для умных моделей**:
+  - `BuildHierarchyJson()` — JSON-представление иерархии продуктов
+  - Placeholder `{{EXISTING_HIERARCHY_JSON}}` — альтернатива текстовому формату
+  - Опциональное поле `path` в `ClassifiedItem` — путь в иерархии как массив
 - **Yandex AI Studio Agent Provider**:
   - `YandexAgentLlmProvider` — провайдер для кастомных агентов Yandex AI Studio
   - Использует REST Assistant API (`https://rest-assistant.api.cloud.yandex.net/v1/responses`)
@@ -62,6 +72,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Добавлено извлечение названия магазина из темы письма (`"Ваш заказ в магазине АШАН"` → `"АШАН"`)
   - Добавлен параметр `subject` в `IReceiptTextParser.Parse()`
 - **Labels не назначались**: исправлено — теперь метки автоматически синхронизируются из `user_labels.txt`
+- **Промпты классификации**: добавлено правило №6 о запрете категорий "Не категоризировано", "Другое", "Прочее"
 
 ---
 

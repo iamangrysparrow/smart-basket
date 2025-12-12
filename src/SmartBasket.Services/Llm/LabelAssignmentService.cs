@@ -13,6 +13,7 @@ public class LabelAssignmentService : ILabelAssignmentService
     private readonly ILogger<LabelAssignmentService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
+    private string? _customPrompt;
 
     public LabelAssignmentService(
         IAiProviderFactory providerFactory,
@@ -28,6 +29,12 @@ public class LabelAssignmentService : ILabelAssignmentService
     {
         _promptTemplatePath = path;
         _promptTemplate = null;
+    }
+
+    public void SetCustomPrompt(string? prompt)
+    {
+        _customPrompt = prompt;
+        _logger.LogDebug("Custom prompt set: {HasPrompt}", !string.IsNullOrWhiteSpace(prompt));
     }
 
     public async Task<LabelAssignmentResult> AssignLabelsAsync(
@@ -265,7 +272,15 @@ public class LabelAssignmentService : ILabelAssignmentService
         var itemsList = string.Join("\n", items.Select((item, i) =>
             $"{i + 1}. \"{item.ItemName}\" (категория: {item.ProductName})"));
 
-        // Try to load template from file
+        // Priority 1: Custom prompt (from settings)
+        if (!string.IsNullOrWhiteSpace(_customPrompt))
+        {
+            return _customPrompt
+                .Replace("{{LABELS}}", labelsList)
+                .Replace("{{ITEMS}}", itemsList);
+        }
+
+        // Priority 2: Template from file
         if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
         {
             try
@@ -281,7 +296,7 @@ public class LabelAssignmentService : ILabelAssignmentService
             }
         }
 
-        // Default prompt (fallback)
+        // Priority 3: Default prompt (fallback)
         return $@"Назначь подходящие метки для каждого товара из списка.
 
 ДОСТУПНЫЕ МЕТКИ:
@@ -308,7 +323,20 @@ public class LabelAssignmentService : ILabelAssignmentService
         IReadOnlyList<string> availableLabels,
         IProgress<string>? progress = null)
     {
-        // Try to load template from file
+        var labelsList = string.Join("\n", availableLabels.Select(l => $"- {l}"));
+
+        // Priority 1: Custom prompt (from settings)
+        if (!string.IsNullOrWhiteSpace(_customPrompt))
+        {
+            progress?.Report($"  [Labels] Using custom prompt ({_customPrompt.Length} chars)");
+            return _customPrompt
+                .Replace("{{LABELS}}", labelsList)
+                .Replace("{{ITEM_NAME}}", itemName)
+                .Replace("{{PRODUCT_NAME}}", productName)
+                .Replace("{{ITEMS}}", itemName); // Support batch placeholder too
+        }
+
+        // Priority 2: Template from file
         if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
         {
             try
@@ -321,8 +349,6 @@ public class LabelAssignmentService : ILabelAssignmentService
             }
         }
 
-        var labelsList = string.Join("\n", availableLabels.Select(l => $"- {l}"));
-
         if (!string.IsNullOrEmpty(_promptTemplate))
         {
             return _promptTemplate
@@ -331,7 +357,7 @@ public class LabelAssignmentService : ILabelAssignmentService
                 .Replace("{{PRODUCT_NAME}}", productName);
         }
 
-        // Default prompt (fallback)
+        // Priority 3: Default prompt (fallback)
         return $@"Назначь подходящие метки для товара.
 
 ДОСТУПНЫЕ МЕТКИ:

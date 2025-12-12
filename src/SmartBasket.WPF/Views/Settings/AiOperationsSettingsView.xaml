@@ -39,6 +39,15 @@
                                       ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                       IsEditable="True" FontSize="12" Padding="4,3"/>
                         </Grid>
+                        <!-- Edit Prompt Link -->
+                        <TextBlock Margin="100,6,0,0">
+                            <Hyperlink Click="EditClassificationPrompt_Click"
+                                       TextDecorations="None"
+                                       Foreground="{DynamicResource AccentBrush}">
+                                <Run Text="Редактировать промпт"/>
+                            </Hyperlink>
+                            <Run x:Name="ClassificationPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                        </TextBlock>
                     </StackPanel>
                 </GroupBox>
 
@@ -58,6 +67,15 @@
                                       ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                       IsEditable="True" FontSize="12" Padding="4,3"/>
                         </Grid>
+                        <!-- Edit Prompt Link -->
+                        <TextBlock Margin="100,6,0,0">
+                            <Hyperlink Click="EditLabelsPrompt_Click"
+                                       TextDecorations="None"
+                                       Foreground="{DynamicResource AccentBrush}">
+                                <Run Text="Редактировать промпт"/>
+                            </Hyperlink>
+                            <Run x:Name="LabelsPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                        </TextBlock>
                     </StackPanel>
                 </GroupBox>
 
@@ -73,6 +91,9 @@
                             <LineBreak/>
                             <LineBreak/>
                             Оставьте поле пустым, чтобы отключить операцию.
+                            <LineBreak/>
+                            <LineBreak/>
+                            <Run FontWeight="SemiBold">Промпты:</Run> для каждой операции можно настроить свой промпт под конкретного провайдера.
                         </TextBlock>
                     </StackPanel>
                 </Border>

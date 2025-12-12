@@ -95,6 +95,9 @@ public class ReceiptCollectionService : IReceiptCollectionService
     {
         var result = new CollectionResult();
 
+        // Setup custom prompts from settings
+        SetupCustomPrompts(progress);
+
         // 1. Получить источники
         IReadOnlyList<IReceiptSource> sources;
         if (sourceNames != null && sourceNames.Any())
@@ -539,5 +542,45 @@ public class ReceiptCollectionService : IReceiptCollectionService
 
         _dbContext.EmailHistory.Add(history);
         await _dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Настраивает кастомные промпты из конфигурации для каждой операции
+    /// </summary>
+    private void SetupCustomPrompts(IProgress<string>? progress)
+    {
+        var ops = _settings.AiOperations;
+
+        // Classification prompt
+        if (!string.IsNullOrWhiteSpace(ops.Classification))
+        {
+            var customPrompt = ops.GetCustomPrompt("Classification", ops.Classification);
+            if (!string.IsNullOrWhiteSpace(customPrompt))
+            {
+                _classificationService.SetCustomPrompt(customPrompt);
+                progress?.Report($"  [Setup] Custom prompt for Classification/{ops.Classification}");
+                _logger.LogDebug("Custom prompt loaded for Classification: {ProviderKey}", ops.Classification);
+            }
+            else
+            {
+                _classificationService.SetCustomPrompt(null);
+            }
+        }
+
+        // Labels prompt
+        if (!string.IsNullOrWhiteSpace(ops.Labels))
+        {
+            var customPrompt = ops.GetCustomPrompt("Labels", ops.Labels);
+            if (!string.IsNullOrWhiteSpace(customPrompt))
+            {
+                _labelAssignmentService.SetCustomPrompt(customPrompt);
+                progress?.Report($"  [Setup] Custom prompt for Labels/{ops.Labels}");
+                _logger.LogDebug("Custom prompt loaded for Labels: {ProviderKey}", ops.Labels);
+            }
+            else
+            {
+                _labelAssignmentService.SetCustomPrompt(null);
+            }
+        }
     }
 }

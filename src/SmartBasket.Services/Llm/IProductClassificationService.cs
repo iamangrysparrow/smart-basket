@@ -22,6 +22,11 @@ public interface IProductClassificationService
     void SetPromptTemplatePath(string path);
 
     /// <summary>
+    /// Установить кастомный prompt напрямую (приоритет над файлом)
+    /// </summary>
+    void SetCustomPrompt(string? prompt);
+
+    /// <summary>
     /// Классифицировать товары из чека по продуктам
     /// </summary>
     /// <param name="itemNames">Названия товаров для классификации</param>

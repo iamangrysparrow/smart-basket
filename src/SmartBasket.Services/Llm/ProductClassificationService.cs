@@ -13,6 +13,7 @@ public class ProductClassificationService : IProductClassificationService
     private readonly ILogger<ProductClassificationService> _logger;
     private string? _promptTemplate;
     private string? _promptTemplatePath;
+    private string? _customPrompt;
 
     public ProductClassificationService(
         IAiProviderFactory providerFactory,
@@ -28,6 +29,12 @@ public class ProductClassificationService : IProductClassificationService
     {
         _promptTemplatePath = path;
         _promptTemplate = null;
+    }
+
+    public void SetCustomPrompt(string? prompt)
+    {
+        _customPrompt = prompt;
+        _logger.LogDebug("Custom prompt set: {HasPrompt}", !string.IsNullOrWhiteSpace(prompt));
     }
 
     public async Task<ProductClassificationResult> ClassifyAsync(
@@ -133,7 +140,21 @@ public class ProductClassificationService : IProductClassificationService
         IReadOnlyList<ExistingProduct> existingProducts,
         IProgress<string>? progress = null)
     {
-        // Try to load template from file
+        var hierarchyText = BuildHierarchyText(existingProducts);
+        var hierarchyJson = BuildHierarchyJson(existingProducts);
+        var itemsList = string.Join("\n", itemNames.Select((item, idx) => $"{idx + 1}. {item}"));
+
+        // Priority 1: Custom prompt (from settings)
+        if (!string.IsNullOrWhiteSpace(_customPrompt))
+        {
+            progress?.Report($"  [Classify] Using custom prompt ({_customPrompt.Length} chars)");
+            return _customPrompt
+                .Replace("{{EXISTING_HIERARCHY}}", hierarchyText)
+                .Replace("{{EXISTING_HIERARCHY_JSON}}", hierarchyJson)
+                .Replace("{{ITEMS}}", itemsList);
+        }
+
+        // Priority 2: Template from file
         if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
         {
             try
@@ -148,17 +169,15 @@ public class ProductClassificationService : IProductClassificationService
             }
         }
 
-        var hierarchyText = BuildHierarchyText(existingProducts);
-        var itemsList = string.Join("\n", itemNames.Select((item, idx) => $"{idx + 1}. {item}"));
-
         if (!string.IsNullOrEmpty(_promptTemplate))
         {
             return _promptTemplate
                 .Replace("{{EXISTING_HIERARCHY}}", hierarchyText)
+                .Replace("{{EXISTING_HIERARCHY_JSON}}", hierarchyJson)
                 .Replace("{{ITEMS}}", itemsList);
         }
 
-        // Default prompt (fallback)
+        // Priority 3: Default prompt (fallback)
         return $@"Выдели продукты из списка товаров и построй иерархию.
 
 СУЩЕСТВУЮЩАЯ ИЕРАРХИЯ ПРОДУКТОВ:
@@ -212,5 +231,30 @@ public class ProductClassificationService : IProductClassificationService
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Строит JSON-представление иерархии продуктов для умных моделей.
+    /// Формат: [{"id": 1, "name": "Молочные продукты", "parent_id": null}, ...]
+    /// </summary>
+    private string BuildHierarchyJson(IReadOnlyList<ExistingProduct> existingProducts)
+    {
+        if (existingProducts.Count == 0)
+        {
+            return "[]";
+        }
+
+        var jsonProducts = existingProducts.Select(p => new
+        {
+            id = p.Id,
+            name = p.Name,
+            parent_id = p.ParentId
+        });
+
+        return JsonSerializer.Serialize(jsonProducts, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 }

@@ -31,6 +31,11 @@ public partial class SettingsViewModel : ObservableObject
         BuildCategoryTree();
     }
 
+    /// <summary>
+    /// Делегат логирования для передачи в дочерние окна
+    /// </summary>
+    public Action<string>? Log => _log;
+
     #region Navigation Tree
 
     /// <summary>

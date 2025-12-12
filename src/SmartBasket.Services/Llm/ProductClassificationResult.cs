@@ -36,6 +36,13 @@ public class ClassifiedItem
     /// </summary>
     [JsonPropertyName("product")]
     public string Product { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Путь в иерархии продуктов (опционально, для умных моделей)
+    /// Например: ["Молочные продукты", "Молоко"]
+    /// </summary>
+    [JsonPropertyName("path")]
+    public List<string>? Path { get; set; }
 }
 
 /// <summary>

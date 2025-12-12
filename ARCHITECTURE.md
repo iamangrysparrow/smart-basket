@@ -157,17 +157,30 @@ AiProviderConfig
 
 ### AI Prompts (Шаблоны промптов)
 
-Промпты для AI хранятся в **отдельных файлах** для удобства редактирования без перекомпиляции.
+Промпты для AI имеют **три уровня приоритета**:
+
+1. **Кастомный промпт** (из настроек UI) — приоритет максимальный
+2. **Файл шаблона** (`prompt_*.txt`) — если кастомный не задан
+3. **Hardcoded fallback** — если файл не найден
+
+**Кастомные промпты:**
+- Редактируются через UI (Settings → AI Operations → "Редактировать промпт")
+- Сохраняются в `AiOperations.Prompts` по ключу `"Operation/ProviderKey"`
+- Кнопка "Умный промпт" — вставляет минимальный промпт для GPT-4/Claude
 
 | File | Service | Placeholders |
 |------|---------|--------------|
-| `prompt_template.txt` | ReceiptParsingService | `{{YEAR}}`, `{{RECEIPT_TEXT}}` |
-| `prompt_classify_products.txt` | ProductClassificationService | `{{EXISTING_PRODUCTS}}`, `{{ITEMS}}` |
+| `prompt_template.txt` | LlmUniversalParser | `{{YEAR}}`, `{{RECEIPT_TEXT}}` |
+| `prompt_classify_products.txt` | ProductClassificationService | `{{EXISTING_HIERARCHY}}`, `{{EXISTING_HIERARCHY_JSON}}`, `{{ITEMS}}` |
 | `prompt_assign_labels.txt` | LabelAssignmentService | `{{LABELS}}`, `{{ITEMS}}` |
 
 **Расположение:** `SmartBasket.WPF/` (рядом с exe)
 
-**Принцип:** Сервисы имеют fallback на hardcoded промпт, если файл не найден.
+**JSON-формат иерархии** (`{{EXISTING_HIERARCHY_JSON}}`):
+```json
+[{"id": 1, "name": "Молочные продукты", "parent_id": null}, ...]
+```
+Используется для умных моделей вместо текстового `{{EXISTING_HIERARCHY}}`.
 
 ---
 

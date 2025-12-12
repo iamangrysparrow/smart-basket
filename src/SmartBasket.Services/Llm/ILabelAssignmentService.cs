@@ -51,6 +51,11 @@ public interface ILabelAssignmentService
     void SetPromptTemplatePath(string path);
 
     /// <summary>
+    /// Установить кастомный prompt напрямую (приоритет над файлом)
+    /// </summary>
+    void SetCustomPrompt(string? prompt);
+
+    /// <summary>
     /// Назначить метки для товара (одиночный вызов)
     /// </summary>
     /// <param name="itemName">Название товара</param>
