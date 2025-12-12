@@ -64,9 +64,23 @@ public partial class ProductsItemsViewModel : ObservableObject
     [ObservableProperty]
     private string _itemSearchText = string.Empty;
 
+    // Label emptiness filter: "Все", "Непустые", "Пустые"
+    public ObservableCollection<string> LabelEmptinessFilters { get; } = new() { "Все", "Непустые", "Пустые" };
+
+    [ObservableProperty]
+    private string _selectedLabelEmptinessFilter = "Все";
+
     partial void OnSelectedShopFilterChanged(string value) => LoadItemsCommand.Execute(null);
     partial void OnIncludeChildrenItemsChanged(bool value) => LoadItemsCommand.Execute(null);
     partial void OnItemSearchTextChanged(string value) => LoadItemsCommand.Execute(null);
+    partial void OnSelectedLabelEmptinessFilterChanged(string value) => FilterLabels();
+    partial void OnMasterSearchTextChanged(string value)
+    {
+        if (IsProductsMode)
+            FilterProductTree();
+        else
+            FilterLabels();
+    }
 
     #endregion
 
@@ -173,6 +187,107 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     #endregion
 
+    #region Product Tree Filtering
+
+    // Full tree for filtering (cached)
+    private List<ProductTreeItemViewModel> _fullProductTree = new();
+
+    // Full labels for filtering (cached)
+    private List<LabelListItemViewModel> _fullLabels = new();
+
+    private void FilterProductTree()
+    {
+        if (string.IsNullOrWhiteSpace(MasterSearchText))
+        {
+            // No filter - restore full tree
+            lock (_productTreeLock)
+            {
+                ProductTree.Clear();
+                foreach (var item in _fullProductTree)
+                {
+                    ProductTree.Add(item);
+                }
+            }
+            return;
+        }
+
+        var searchLower = MasterSearchText.ToLowerInvariant();
+
+        lock (_productTreeLock)
+        {
+            ProductTree.Clear();
+
+            foreach (var item in _fullProductTree)
+            {
+                if (item.IsAllNode)
+                {
+                    // Always show "All" node
+                    ProductTree.Add(item);
+                }
+                else if (MatchesSearch(item, searchLower))
+                {
+                    ProductTree.Add(item);
+                }
+            }
+        }
+    }
+
+    private bool MatchesSearch(ProductTreeItemViewModel item, string searchLower)
+    {
+        // Match if name contains search text
+        if (item.Name.ToLowerInvariant().Contains(searchLower))
+            return true;
+
+        // Match if any child matches
+        foreach (var child in item.Children)
+        {
+            if (MatchesSearch(child, searchLower))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void FilterLabels()
+    {
+        var hasSearchFilter = !string.IsNullOrWhiteSpace(MasterSearchText);
+        var searchLower = hasSearchFilter ? MasterSearchText.ToLowerInvariant() : "";
+        var hasEmptinessFilter = SelectedLabelEmptinessFilter != "Все";
+
+        lock (_labelsLock)
+        {
+            Labels.Clear();
+
+            foreach (var item in _fullLabels)
+            {
+                // Special nodes (All, Without Labels) always shown unless emptiness filter
+                if (item.IsSpecialNode)
+                {
+                    // For emptiness filter, hide "All" if filtering
+                    if (hasEmptinessFilter && item.IsAllNode)
+                        continue;
+
+                    Labels.Add(item);
+                    continue;
+                }
+
+                // Apply search filter
+                if (hasSearchFilter && !item.Name.ToLowerInvariant().Contains(searchLower))
+                    continue;
+
+                // Apply emptiness filter
+                if (SelectedLabelEmptinessFilter == "Непустые" && item.ItemCount == 0)
+                    continue;
+                if (SelectedLabelEmptinessFilter == "Пустые" && item.ItemCount > 0)
+                    continue;
+
+                Labels.Add(item);
+            }
+        }
+    }
+
+    #endregion
+
     #region Commands - Load Data
 
     [RelayCommand]
@@ -183,32 +298,37 @@ public partial class ProductsItemsViewModel : ObservableObject
 
         try
         {
-            var products = await Task.Run(() => _productService.GetAllWithHierarchyAsync());
+            var products = await _productService.GetAllWithHierarchyAsync();
 
             lock (_productTreeLock)
             {
                 ProductTree.Clear();
+                _fullProductTree.Clear();
 
                 // Add "All" node
                 var allCount = products.Sum(p => CountItemsRecursive(p));
-                ProductTree.Add(new ProductTreeItemViewModel
+                var allNode = new ProductTreeItemViewModel
                 {
                     Name = "Все",
                     Icon = "📁",
                     ItemCount = allCount,
                     IsSpecialNode = true,
                     IsAllNode = true
-                });
+                };
+                ProductTree.Add(allNode);
+                _fullProductTree.Add(allNode);
 
                 // Build tree from root products
                 var rootProducts = products.Where(p => p.ParentId == null).OrderBy(p => p.Name);
                 foreach (var product in rootProducts)
                 {
-                    ProductTree.Add(BuildProductTreeItem(product, products));
+                    var treeItem = BuildProductTreeItem(product, products);
+                    ProductTree.Add(treeItem);
+                    _fullProductTree.Add(treeItem);
                 }
             }
 
-            var (totalProducts, totalItems) = await Task.Run(() => _productService.GetStatisticsAsync());
+            var (totalProducts, totalItems) = await _productService.GetStatisticsAsync();
             TotalProductsCount = totalProducts;
             TotalItemsCount = totalItems;
         }
@@ -223,6 +343,7 @@ public partial class ProductsItemsViewModel : ObservableObject
         var item = new ProductTreeItemViewModel
         {
             Id = product.Id,
+            ParentId = product.ParentId,
             Name = product.Name,
             Icon = "📦",
             ItemCount = product.Items?.Count ?? 0
@@ -259,44 +380,51 @@ public partial class ProductsItemsViewModel : ObservableObject
 
         try
         {
-            var labelsWithCounts = await Task.Run(() => _labelService.GetAllWithCountsAsync());
-            var (_, itemsWithLabels, itemsWithoutLabels) = await Task.Run(() => _labelService.GetStatisticsAsync());
+            var labelsWithCounts = await _labelService.GetAllWithCountsAsync();
+            var (_, itemsWithLabels, itemsWithoutLabels) = await _labelService.GetStatisticsAsync();
 
             lock (_labelsLock)
             {
                 Labels.Clear();
+                _fullLabels.Clear();
 
                 // Add "All" node
-                Labels.Add(new LabelListItemViewModel
+                var allNode = new LabelListItemViewModel
                 {
                     Name = "Все",
                     Color = "#808080",
                     ItemCount = itemsWithLabels + itemsWithoutLabels,
                     IsSpecialNode = true,
                     IsAllNode = true
-                });
+                };
+                Labels.Add(allNode);
+                _fullLabels.Add(allNode);
 
                 // Add labels
                 foreach (var (label, count) in labelsWithCounts)
                 {
-                    Labels.Add(new LabelListItemViewModel
+                    var labelItem = new LabelListItemViewModel
                     {
                         Id = label.Id,
                         Name = label.Name,
                         Color = label.Color ?? "#808080",
                         ItemCount = count
-                    });
+                    };
+                    Labels.Add(labelItem);
+                    _fullLabels.Add(labelItem);
                 }
 
                 // Add "Without labels" node
-                Labels.Add(new LabelListItemViewModel
+                var withoutNode = new LabelListItemViewModel
                 {
                     Name = "Без метки",
                     Color = "#CCCCCC",
                     ItemCount = itemsWithoutLabels,
                     IsSpecialNode = true,
                     IsWithoutLabelsNode = true
-                });
+                };
+                Labels.Add(withoutNode);
+                _fullLabels.Add(withoutNode);
             }
 
             TotalLabelsCount = labelsWithCounts.Count;
@@ -334,8 +462,7 @@ public partial class ProductsItemsViewModel : ObservableObject
                 {
                     if (IncludeChildrenItems)
                     {
-                        var descendantIds = await Task.Run(() =>
-                            _productService.GetDescendantIdsAsync(SelectedProduct.Id.Value));
+                        var descendantIds = await _productService.GetDescendantIdsAsync(SelectedProduct.Id.Value);
                         filter.ProductIds = descendantIds.Append(SelectedProduct.Id.Value).ToList();
                     }
                     else
@@ -360,7 +487,7 @@ public partial class ProductsItemsViewModel : ObservableObject
                 }
             }
 
-            var items = await Task.Run(() => _itemService.GetItemsAsync(filter));
+            var items = await _itemService.GetItemsAsync(filter);
 
             lock (_itemsLock)
             {
@@ -374,7 +501,7 @@ public partial class ProductsItemsViewModel : ObservableObject
             // Load shop filters if needed
             if (ShopFilters.Count <= 1)
             {
-                var shops = await Task.Run(() => _itemService.GetShopsAsync());
+                var shops = await _itemService.GetShopsAsync();
                 lock (_shopFiltersLock)
                 {
                     ShopFilters.Clear();
@@ -399,14 +526,66 @@ public partial class ProductsItemsViewModel : ObservableObject
     {
         if (IsProductsMode)
         {
+            // Save selected product ID
+            var selectedId = SelectedProduct?.Id;
+
             await LoadProductTreeAsync();
+
+            // Restore selection
+            if (selectedId.HasValue)
+            {
+                SelectedProduct = FindProductById(ProductTree, selectedId.Value);
+            }
+            else if (ProductTree.Count > 0)
+            {
+                SelectedProduct = ProductTree[0]; // Select "All"
+            }
+
             await LoadItemsAsync();
         }
         else
         {
+            // Save selected label ID
+            var selectedId = SelectedLabel?.Id;
+            var wasAllNode = SelectedLabel?.IsAllNode ?? false;
+            var wasWithoutLabelsNode = SelectedLabel?.IsWithoutLabelsNode ?? false;
+
             await LoadLabelsAsync();
+
+            // Restore selection
+            if (selectedId.HasValue)
+            {
+                SelectedLabel = Labels.FirstOrDefault(l => l.Id == selectedId);
+            }
+            else if (wasAllNode)
+            {
+                SelectedLabel = Labels.FirstOrDefault(l => l.IsAllNode);
+            }
+            else if (wasWithoutLabelsNode)
+            {
+                SelectedLabel = Labels.FirstOrDefault(l => l.IsWithoutLabelsNode);
+            }
+            else if (Labels.Count > 0)
+            {
+                SelectedLabel = Labels[0]; // Select "All"
+            }
+
             await LoadItemsAsync();
         }
+    }
+
+    private ProductTreeItemViewModel? FindProductById(IEnumerable<ProductTreeItemViewModel> items, Guid id)
+    {
+        foreach (var item in items)
+        {
+            if (item.Id == id)
+                return item;
+
+            var found = FindProductById(item.Children, id);
+            if (found != null)
+                return found;
+        }
+        return null;
     }
 
     #endregion
@@ -433,8 +612,7 @@ public partial class ProductsItemsViewModel : ObservableObject
     {
         if (SelectedProduct?.Id == null || SelectedProduct.IsSpecialNode) return;
 
-        var (canDelete, itemsCount, childrenCount) = await Task.Run(() =>
-            _productService.CanDeleteAsync(SelectedProduct.Id.Value));
+        var (canDelete, itemsCount, childrenCount) = await _productService.CanDeleteAsync(SelectedProduct.Id.Value);
 
         if (!canDelete)
         {
@@ -442,8 +620,7 @@ public partial class ProductsItemsViewModel : ObservableObject
             return;
         }
 
-        var (success, _) = await Task.Run(() =>
-            _productService.DeleteAsync(SelectedProduct.Id.Value));
+        var (success, _) = await _productService.DeleteAsync(SelectedProduct.Id.Value);
 
         if (success)
         {
@@ -453,21 +630,21 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     public async Task<Product> CreateProductAsync(string name, Guid? parentId)
     {
-        var product = await Task.Run(() => _productService.CreateAsync(name, parentId));
+        var product = await _productService.CreateAsync(name, parentId);
         await LoadProductTreeAsync();
         return product;
     }
 
     public async Task<Product> UpdateProductAsync(Guid id, string name, Guid? parentId)
     {
-        var product = await Task.Run(() => _productService.UpdateAsync(id, name, parentId));
+        var product = await _productService.UpdateAsync(id, name, parentId);
         await LoadProductTreeAsync();
         return product;
     }
 
     public async Task<(bool CanDelete, int ItemsCount, int ChildrenCount)> CanDeleteProductAsync(Guid id)
     {
-        return await Task.Run(() => _productService.CanDeleteAsync(id));
+        return await _productService.CanDeleteAsync(id);
     }
 
     #endregion
@@ -494,20 +671,20 @@ public partial class ProductsItemsViewModel : ObservableObject
     {
         if (SelectedLabel?.Id == null || SelectedLabel.IsSpecialNode) return;
 
-        await Task.Run(() => _labelService.DeleteAsync(SelectedLabel.Id.Value));
+        await _labelService.DeleteAsync(SelectedLabel.Id.Value);
         await LoadLabelsAsync();
     }
 
     public async Task<Label> CreateLabelAsync(string name, string color)
     {
-        var label = await Task.Run(() => _labelService.CreateAsync(name, color));
+        var label = await _labelService.CreateAsync(name, color);
         await LoadLabelsAsync();
         return label;
     }
 
     public async Task<Label> UpdateLabelAsync(Guid id, string name, string color)
     {
-        var label = await Task.Run(() => _labelService.UpdateAsync(id, name, color));
+        var label = await _labelService.UpdateAsync(id, name, color);
         await LoadLabelsAsync();
         return label;
     }
@@ -522,7 +699,7 @@ public partial class ProductsItemsViewModel : ObservableObject
         if (targetProduct?.Id == null || SelectedItems.Count == 0) return;
 
         var itemIds = SelectedItems.Select(i => i.Id).ToList();
-        await Task.Run(() => _itemService.MoveItemsToProductAsync(itemIds, targetProduct.Id.Value));
+        await _itemService.MoveItemsToProductAsync(itemIds, targetProduct.Id.Value);
 
         await RefreshAsync();
     }
@@ -533,7 +710,7 @@ public partial class ProductsItemsViewModel : ObservableObject
         if (label?.Id == null || SelectedItems.Count == 0) return;
 
         var itemIds = SelectedItems.Select(i => i.Id).ToList();
-        await Task.Run(() => _labelService.AssignLabelToItemsAsync(itemIds, label.Id.Value));
+        await _labelService.AssignLabelToItemsAsync(itemIds, label.Id.Value);
 
         await LoadItemsAsync();
     }
@@ -544,7 +721,7 @@ public partial class ProductsItemsViewModel : ObservableObject
         if (label?.Id == null || SelectedItems.Count == 0) return;
 
         var itemIds = SelectedItems.Select(i => i.Id).ToList();
-        await Task.Run(() => _labelService.RemoveLabelFromItemsAsync(itemIds, label.Id.Value));
+        await _labelService.RemoveLabelFromItemsAsync(itemIds, label.Id.Value);
 
         await LoadItemsAsync();
     }
@@ -556,7 +733,7 @@ public partial class ProductsItemsViewModel : ObservableObject
 
         foreach (var item in SelectedItems.ToList())
         {
-            await Task.Run(() => _labelService.RemoveAllLabelsFromItemAsync(item.Id));
+            await _labelService.RemoveAllLabelsFromItemAsync(item.Id);
         }
 
         await LoadItemsAsync();

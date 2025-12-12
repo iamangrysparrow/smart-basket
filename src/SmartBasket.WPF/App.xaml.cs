@@ -110,16 +110,16 @@ public partial class App : Application
         // Sources
         services.AddSingleton<IReceiptSourceFactory, ReceiptSourceFactory>();
 
-        // Orchestration
-        services.AddScoped<IReceiptCollectionService, ReceiptCollectionService>();
-        services.AddScoped<IProductCleanupService, ProductCleanupService>();
+        // Orchestration - Transient to get fresh DbContext each time
+        services.AddTransient<IReceiptCollectionService, ReceiptCollectionService>();
+        services.AddTransient<IProductCleanupService, ProductCleanupService>();
 
         services.AddSingleton<SettingsService>();
 
-        // Product/Item/Label services
-        services.AddScoped<IProductService, ProductService>();
-        services.AddScoped<ILabelService, LabelService>();
-        services.AddScoped<IItemService, ItemService>();
+        // Product/Item/Label services - Transient to avoid DbContext concurrency issues in WPF
+        services.AddTransient<IProductService, ProductService>();
+        services.AddTransient<ILabelService, LabelService>();
+        services.AddTransient<IItemService, ItemService>();
 
         // ViewModels
         services.AddTransient<MainViewModel>();

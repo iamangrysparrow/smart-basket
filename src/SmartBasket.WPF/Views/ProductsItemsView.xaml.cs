@@ -1,11 +1,14 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using SmartBasket.WPF.ViewModels;
 
 namespace SmartBasket.WPF.Views;
 
 public partial class ProductsItemsView : UserControl
 {
+    private DateTime _lastClickTime;
+    private ProductTreeItemViewModel? _lastClickedItem;
     private ProductsItemsViewModel? _viewModel;
 
     public ProductsItemsView()
@@ -19,6 +22,11 @@ public partial class ProductsItemsView : UserControl
         if (_viewModel == null) return;
 
         _viewModel.EnableCollectionSynchronization();
+
+        // Rebuild context menus when collections change
+        _viewModel.Labels.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(BuildContextMenus);
+        _viewModel.ProductTree.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(BuildContextMenus);
+
         await _viewModel.InitializeAsync();
 
         BuildContextMenus();
@@ -281,4 +289,159 @@ public partial class ProductsItemsView : UserControl
             BuildContextMenus();
         }
     }
+
+    #region Inline Product Editing
+
+    private async void AddProductInline_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+
+        // Add as sibling (same parent) of selected product
+        Guid? parentId = _viewModel.SelectedProduct?.ParentId;
+
+        await _viewModel.CreateProductAsync("Новый продукт", parentId);
+        BuildContextMenus();
+    }
+
+    private async void AddChildProductInline_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null || _viewModel.SelectedProduct == null) return;
+
+        // Can't add child to special node
+        if (_viewModel.SelectedProduct.IsSpecialNode) return;
+
+        // Add as child of selected product
+        Guid? parentId = _viewModel.SelectedProduct.Id;
+
+        var newProduct = await _viewModel.CreateProductAsync("Новый продукт", parentId);
+
+        // Expand parent to show new child
+        _viewModel.SelectedProduct.IsExpanded = true;
+
+        BuildContextMenus();
+    }
+
+    private void RenameProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel?.SelectedProduct == null || _viewModel.SelectedProduct.IsSpecialNode) return;
+
+        _viewModel.SelectedProduct.StartEdit();
+    }
+
+    private async void DeleteProductContext_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+
+        // Reuse the existing delete logic
+        if (_viewModel.IsProductsMode && _viewModel.SelectedProduct?.Id != null)
+        {
+            var (canDelete, itemsCount, childrenCount) = await _viewModel.CanDeleteProductAsync(
+                _viewModel.SelectedProduct.Id.Value);
+
+            if (!canDelete)
+            {
+                MessageBox.Show(
+                    $"Нельзя удалить продукт \"{_viewModel.SelectedProduct.Name}\":\n\n" +
+                    $"- Связано товаров: {itemsCount}\n" +
+                    $"- Дочерних продуктов: {childrenCount}\n\n" +
+                    "Сначала переместите товары и удалите дочерние продукты.",
+                    "Удаление невозможно",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Удалить продукт \"{_viewModel.SelectedProduct.Name}\"?",
+                "Подтверждение",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                await _viewModel.DeleteProductCommand.ExecuteAsync(null);
+                BuildContextMenus();
+            }
+        }
+    }
+
+    private void ProductItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement element || element.DataContext is not ProductTreeItemViewModel product)
+            return;
+
+        // Ignore special nodes
+        if (product.IsSpecialNode) return;
+
+        // Double-click detection
+        var now = DateTime.Now;
+        if (_lastClickedItem == product && (now - _lastClickTime).TotalMilliseconds < 500)
+        {
+            // Double-click - start editing
+            product.StartEdit();
+            e.Handled = true;
+        }
+
+        _lastClickedItem = product;
+        _lastClickTime = now;
+    }
+
+    private async void EditTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox.DataContext is not ProductTreeItemViewModel product)
+            return;
+
+        if (e.Key == Key.Enter)
+        {
+            await SaveProductEditAsync(product);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            product.CancelEdit();
+            e.Handled = true;
+        }
+    }
+
+    private async void EditTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox.DataContext is not ProductTreeItemViewModel product)
+            return;
+
+        if (product.IsEditing)
+        {
+            await SaveProductEditAsync(product);
+        }
+    }
+
+    private void EditTextBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            textBox.Focus();
+            textBox.SelectAll();
+        }
+    }
+
+    private async Task SaveProductEditAsync(ProductTreeItemViewModel product)
+    {
+        if (_viewModel == null || !product.IsEditing) return;
+
+        var newName = product.EditName?.Trim();
+        if (string.IsNullOrEmpty(newName))
+        {
+            product.CancelEdit();
+            return;
+        }
+
+        if (newName != product.Name && product.Id.HasValue)
+        {
+            await _viewModel.UpdateProductAsync(product.Id.Value, newName, product.ParentId);
+        }
+
+        product.CancelEdit();
+        BuildContextMenus();
+    }
+
+    #endregion
 }

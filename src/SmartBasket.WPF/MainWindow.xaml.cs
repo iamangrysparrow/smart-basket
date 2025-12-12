@@ -87,6 +87,30 @@ public partial class MainWindow : Window
 
         // Set DataContext for ProductsItemsView
         ProductsItemsViewControl.DataContext = _productsItemsViewModel;
+
+        // Auto-load receipts on startup (first tab is Чеки)
+        _viewModel.LoadReceiptsCommand.Execute(null);
+    }
+
+    private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Only handle tab control selection changes (not nested controls)
+        if (e.Source != MainTabControl) return;
+
+        switch (MainTabControl.SelectedIndex)
+        {
+            case 0: // Чеки
+                // Load receipts if not already loaded
+                if (_viewModel.Receipts.Count == 0 && !_viewModel.IsProcessing)
+                {
+                    _viewModel.LoadReceiptsCommand.Execute(null);
+                }
+                break;
+
+            case 1: // Продукты
+                // ProductsItemsView handles its own loading in UserControl_Loaded
+                break;
+        }
     }
 
     private void ToggleLogPanel_Click(object sender, RoutedEventArgs e)

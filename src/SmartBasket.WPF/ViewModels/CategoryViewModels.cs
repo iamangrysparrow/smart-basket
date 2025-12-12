@@ -96,6 +96,7 @@ public class LabelViewModel
 public partial class ProductTreeItemViewModel : ObservableObject
 {
     public Guid? Id { get; set; }
+    public Guid? ParentId { get; set; }
 
     [ObservableProperty]
     private string _name = string.Empty;
@@ -109,10 +110,28 @@ public partial class ProductTreeItemViewModel : ObservableObject
     [ObservableProperty]
     private bool _isExpanded;
 
+    [ObservableProperty]
+    private bool _isEditing;
+
+    [ObservableProperty]
+    private string _editName = string.Empty;
+
     public bool IsSpecialNode { get; set; }
     public bool IsAllNode { get; set; }
 
     public ObservableCollection<ProductTreeItemViewModel> Children { get; } = new();
+
+    public void StartEdit()
+    {
+        EditName = Name;
+        IsEditing = true;
+    }
+
+    public void CancelEdit()
+    {
+        IsEditing = false;
+        EditName = string.Empty;
+    }
 }
 
 /// <summary>

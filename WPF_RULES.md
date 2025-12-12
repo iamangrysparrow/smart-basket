@@ -98,7 +98,75 @@ private async Task DoWorkAsync()
 - Button auto-disables when `IsProcessing = true`
 - No need for manual `if (IsProcessing) return` check
 
-### 7. Global exception handlers
+### 7. DbContext Concurrency in WPF - CRITICAL!
+
+**Problem**: In WPF, `Scoped` services act like `Singleton` because there's no request scope like in ASP.NET. Multiple ViewModels sharing one `DbContext` causes:
+```
+InvalidOperationException: 'A second operation was started on this context instance
+before a previous operation completed.'
+```
+
+**Root cause**: ViewModels inject services that share one `DbContext`, then call async methods simultaneously.
+
+**Solution**: Use `IDbContextFactory` + `Transient` registration:
+
+```csharp
+// In DbContextFactory.cs
+public static IServiceCollection AddSmartBasketDbContext(
+    this IServiceCollection services,
+    DatabaseProviderType providerType,
+    string connectionString)
+{
+    // Register factory (creates new DbContext on each call)
+    services.AddDbContextFactory<SmartBasketDbContext>(options =>
+    {
+        switch (providerType)
+        {
+            case DatabaseProviderType.PostgreSQL:
+                options.UseNpgsql(connectionString);
+                break;
+            case DatabaseProviderType.SQLite:
+                options.UseSqlite(connectionString);
+                break;
+        }
+    });
+
+    // Register DbContext as Transient via factory
+    // Each injection gets NEW instance - no concurrency issues!
+    services.AddTransient(sp =>
+        sp.GetRequiredService<IDbContextFactory<SmartBasketDbContext>>().CreateDbContext());
+
+    return services;
+}
+```
+
+```csharp
+// In App.xaml.cs - register services as Transient (NOT Scoped!)
+// Each service gets its own DbContext instance
+services.AddTransient<IProductService, ProductService>();
+services.AddTransient<ILabelService, LabelService>();
+services.AddTransient<IItemService, ItemService>();
+services.AddTransient<IReceiptCollectionService, ReceiptCollectionService>();
+
+// ViewModels also Transient (they get fresh services each time)
+services.AddTransient<MainViewModel>();
+services.AddTransient<ProductsItemsViewModel>();
+```
+
+**Key rules**:
+1. **NEVER use `AddScoped` for DB services in WPF** - there's no scope!
+2. **NEVER use `Task.Run()` around async service methods** - they already offload to ThreadPool
+3. **Each ViewModel should get fresh service instances** via Transient DI
+
+```csharp
+// BAD - Task.Run wraps async call, creates thread chaos
+var products = await Task.Run(() => _productService.GetAllWithHierarchyAsync());
+
+// GOOD - just await the async method directly
+var products = await _productService.GetAllWithHierarchyAsync();
+```
+
+### 8. Global exception handlers
 ```csharp
 // In App.xaml.cs OnStartup
 AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -112,7 +180,7 @@ private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledEx
 }
 ```
 
-### 8. Comprehensive Logging - MANDATORY for all operations
+### 9. Comprehensive Logging - MANDATORY for all operations
 
 **Logging Levels (default: DEBUG):**
 - `DEBUG` - Detailed flow: method entry/exit, parameters, intermediate values
@@ -218,7 +286,7 @@ json = Regex.Replace(json,
 
 ## CommunityToolkit.Mvvm - Critical Rules
 
-### 9. RelayCommand naming convention
+### 10. RelayCommand naming convention
 ```csharp
 // Method name -> Generated command name
 private void Save() {}           // -> SaveCommand
@@ -232,7 +300,7 @@ Command="{Binding SaveAsyncCommand}"  // DOES NOT EXIST!
 Command="{Binding SaveCommand}"
 ```
 
-### 10. Logging from modal dialogs (ShowDialog)
+### 11. Logging from modal dialogs (ShowDialog)
 ```csharp
 // BAD - blocks if called from ShowDialog context
 Action<string> log = message => _viewModel.AddLogEntry(message);
@@ -247,7 +315,7 @@ var dialog = new SettingsWindow(vm);
 dialog.ShowDialog();  // Log calls won't block now
 ```
 
-### 11. ObservableCollection - don't Clear() if bound to ComboBox
+### 12. ObservableCollection - don't Clear() if bound to ComboBox
 ```csharp
 // BAD - clears selection in bound ComboBox/ListBox
 AvailableItems.Clear();
@@ -277,7 +345,7 @@ private void SyncCollection(IList<string> newItems)
 }
 ```
 
-### 12. Track renames for cascading updates
+### 13. Track renames for cascading updates
 ```csharp
 // When entity Key can be renamed, track original for updates
 public class EntityViewModel
@@ -662,15 +730,16 @@ This is a WPF .NET 8 application using CommunityToolkit.Mvvm.
 
 Key rules:
 1. Use BindingOperations.EnableCollectionSynchronization for thread-safe collections
-2. Wrap service calls in Task.Run() to free UI thread
+2. DON'T wrap async service calls in Task.Run() - await directly
 3. Use ThreadSafeProgress<T> instead of Progress<T>
 4. Always ConfigureAwait(false) in services
 5. Never use lock inside Dispatcher.Invoke
 6. [RelayCommand] on SaveAsync() generates SaveCommand (not SaveAsyncCommand!)
-7. Use CanExecute + NotifyCanExecuteChangedFor to disable buttons during operations
-8. Use Dispatcher.BeginInvoke for callbacks from modal dialogs
-9. Don't Clear() ObservableCollection bound to ComboBox - sync by index instead
-10. LOG EVERYTHING! Every method must log: entry, parameters, decisions, results
+7. DbContext concurrency: use AddDbContextFactory + Transient services (NOT Scoped!)
+8. Use CanExecute + NotifyCanExecuteChangedFor to disable buttons during operations
+9. Use Dispatcher.BeginInvoke for callbacks from modal dialogs
+10. Don't Clear() ObservableCollection bound to ComboBox - sync by index instead
+11. LOG EVERYTHING! Every method must log: entry, parameters, decisions, results
     - Levels: DEBUG (default), INFO, WARNING, ERROR
     - Mask passwords/API keys in logs
 

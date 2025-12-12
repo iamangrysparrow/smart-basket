@@ -10,7 +10,9 @@ public static class DbContextFactory
         DatabaseProviderType providerType,
         string connectionString)
     {
-        services.AddDbContext<SmartBasketDbContext>(options =>
+        // Use DbContextFactory for WPF apps to avoid concurrency issues
+        // Each service will create its own DbContext instance via Transient registration
+        services.AddDbContextFactory<SmartBasketDbContext>(options =>
         {
             switch (providerType)
             {
@@ -24,6 +26,10 @@ public static class DbContextFactory
                     throw new ArgumentException($"Unsupported database provider: {providerType}");
             }
         });
+
+        // Register DbContext as Transient - each injection gets a new instance
+        // This prevents concurrency issues in WPF where services may run in parallel
+        services.AddTransient(sp => sp.GetRequiredService<IDbContextFactory<SmartBasketDbContext>>().CreateDbContext());
 
         return services;
     }

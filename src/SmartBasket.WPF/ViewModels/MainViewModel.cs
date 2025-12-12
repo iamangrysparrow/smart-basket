@@ -108,6 +108,22 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private DateTime? _filterDateFrom;
     [ObservableProperty] private DateTime? _filterDateTo;
 
+    // Auto-apply filters on change
+    partial void OnSelectedShopFilterChanged(string value) => ApplyFiltersIfNotProcessing();
+    partial void OnFilterDateFromChanged(DateTime? value) => ApplyFiltersIfNotProcessing();
+    partial void OnFilterDateToChanged(DateTime? value) => ApplyFiltersIfNotProcessing();
+
+    private void ApplyFiltersIfNotProcessing()
+    {
+        if (!IsProcessing && _receiptsLoaded)
+        {
+            LoadReceiptsCommand.Execute(null);
+        }
+    }
+
+    // Track if receipts were loaded at least once (to avoid loading on init)
+    private bool _receiptsLoaded;
+
     // Search in receipt items
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FilteredItems))]
@@ -499,6 +515,7 @@ public partial class MainViewModel : ObservableObject
 
             Log($"Loaded {receipts.Count} receipts, total: {TotalSum:N2}\u20BD");
             StatusText = $"Loaded {receipts.Count} receipts";
+            _receiptsLoaded = true;
         }
         catch (Exception ex)
         {
@@ -512,20 +529,24 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ApplyFiltersAsync()
+    private void ClearFilters()
     {
-        Log($"Applying filters: Shop='{SelectedShopFilter}', From={FilterDateFrom:dd.MM.yyyy}, To={FilterDateTo:dd.MM.yyyy}");
-        await LoadReceiptsAsync();
-    }
+        // Temporarily disable auto-reload
+        var wasLoaded = _receiptsLoaded;
+        _receiptsLoaded = false;
 
-    [RelayCommand]
-    private async Task ClearFiltersAsync()
-    {
         SelectedShopFilter = "Все";
         FilterDateFrom = null;
         FilterDateTo = null;
-        Log("Filters cleared");
-        await LoadReceiptsAsync();
+
+        _receiptsLoaded = wasLoaded;
+        Log("Фильтры сброшены", LogLevel.Info);
+
+        // Reload once after all filters cleared
+        if (_receiptsLoaded)
+        {
+            LoadReceiptsCommand.Execute(null);
+        }
     }
 
     [RelayCommand]
