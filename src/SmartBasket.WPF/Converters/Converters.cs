@@ -131,23 +131,31 @@ public class StringToColorConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
+        Color color = Colors.Gray;
+
         if (value is string colorString && !string.IsNullOrEmpty(colorString))
         {
             try
             {
-                return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(colorString);
+                color = (Color)ColorConverter.ConvertFromString(colorString);
             }
             catch
             {
-                return System.Windows.Media.Colors.Gray;
+                color = Colors.Gray;
             }
         }
-        return System.Windows.Media.Colors.Gray;
+
+        // Always return Brush for Background binding (targetType is often Object)
+        return new SolidColorBrush(color);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value is System.Windows.Media.Color color)
+        if (value is SolidColorBrush brush)
+        {
+            return $"#{brush.Color.R:X2}{brush.Color.G:X2}{brush.Color.B:X2}";
+        }
+        if (value is Color color)
         {
             return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
         }

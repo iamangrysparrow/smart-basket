@@ -734,6 +734,15 @@ public partial class ProductsItemsViewModel : ObservableObject
         await LoadItemsAsync();
     }
 
+    /// <summary>
+    /// Updates the product assignment for a single item (from ItemCardDialog)
+    /// </summary>
+    public async Task UpdateItemProductAsync(Guid itemId, Guid newProductId)
+    {
+        await _itemService.MoveItemsToProductAsync(new List<Guid> { itemId }, newProductId);
+        await LoadItemsAsync();
+    }
+
     #endregion
 
     #region Initialization

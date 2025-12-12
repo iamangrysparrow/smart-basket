@@ -62,6 +62,35 @@ public partial class ProductsItemsView : UserControl
         _viewModel.SelectedItemsCount = _viewModel.SelectedItems.Count;
     }
 
+    private async void ItemsDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel == null) return;
+
+        // Get clicked item
+        var item = ItemsDataGrid.SelectedItem as ItemGridViewModel;
+        if (item == null) return;
+
+        await ShowItemCardDialogAsync(item);
+    }
+
+    private async Task ShowItemCardDialogAsync(ItemGridViewModel item)
+    {
+        if (_viewModel == null) return;
+
+        var dialog = new ItemCardDialog
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        dialog.SetItem(item);
+        dialog.SetAvailableProducts(_viewModel.ProductTree.ToList());
+
+        if (dialog.ShowDialog() == true && dialog.ProductChanged && dialog.SelectedProductId.HasValue)
+        {
+            await _viewModel.UpdateItemProductAsync(item.Id, dialog.SelectedProductId.Value);
+        }
+    }
+
     private void BuildContextMenus()
     {
         if (_viewModel == null) return;

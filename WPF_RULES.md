@@ -679,6 +679,23 @@ private void PopOutLog_Click(object sender, RoutedEventArgs e)
 - [ ] Especially logging callbacks - they will deadlock otherwise
 - [ ] Test: perform action in dialog that logs, verify main window responsive
 
+### Dialog Window Sizing:
+- [ ] **NEVER use fixed Height** for dialogs with dynamic content
+- [ ] Use `SizeToContent="Height"` (or `WidthAndHeight`) - window adapts to content
+- [ ] Fixed `Width` is OK for consistent layout
+- [ ] If content may overflow: add `MaxHeight` and `ScrollViewer`
+```xml
+<!-- WRONG - content may be clipped if doesn't fit -->
+<Window Width="450" Height="350" ...>
+
+<!-- CORRECT - auto-size to content -->
+<Window Width="450" SizeToContent="Height" ...>
+
+<!-- CORRECT - with max height limit -->
+<Window Width="450" SizeToContent="Height" MaxHeight="600" ...>
+```
+- [ ] Test: open dialog with varying content (0 labels vs 10 labels) - all should be visible
+
 ### Before adding editable ComboBox bound to collection:
 - [ ] `IsEditable="True"` + `Text="{Binding Value}"` + `ItemsSource="{Binding Options}"`
 - [ ] Never `Clear()` the ItemsSource collection - it resets Text binding

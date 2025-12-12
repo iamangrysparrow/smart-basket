@@ -299,7 +299,8 @@
                               Style="{StaticResource ModernDataGrid}"
                               AutoGenerateColumns="False" IsReadOnly="True"
                               SelectionMode="Extended"
-                              SelectionChanged="ItemsDataGrid_SelectionChanged">
+                              SelectionChanged="ItemsDataGrid_SelectionChanged"
+                              MouseDoubleClick="ItemsDataGrid_MouseDoubleClick">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
                             <DataGridTextColumn Header="Ед." Binding="{Binding UnitOfMeasure}" Width="40"/>
