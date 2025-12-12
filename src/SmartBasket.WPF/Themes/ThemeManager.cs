@@ -1,6 +1,5 @@
 using System;
 using System.Windows;
-using System.Windows.Media;
 
 namespace SmartBasket.WPF.Themes;
 
@@ -12,7 +11,7 @@ public enum AppTheme
 
 /// <summary>
 /// Управление темами приложения.
-/// Переключает ResourceDictionary в App.Resources.
+/// Переключает ResourceDictionary с цветами в App.Resources.
 /// </summary>
 public static class ThemeManager
 {
@@ -22,6 +21,12 @@ public static class ThemeManager
 
     public static event EventHandler<AppTheme>? ThemeChanged;
 
+    public static void SetTheme(AppTheme theme)
+    {
+        if (_currentTheme == theme) return;
+        ApplyTheme(theme);
+    }
+
     public static void ApplyTheme(AppTheme theme)
     {
         _currentTheme = theme;
@@ -29,35 +34,38 @@ public static class ThemeManager
         var app = Application.Current;
         if (app == null) return;
 
-        // Найти и удалить текущую тему
-        ResourceDictionary? themeToRemove = null;
-        foreach (var dict in app.Resources.MergedDictionaries)
+        var resources = app.Resources.MergedDictionaries;
+
+        // Find and remove current theme color dictionary (both old and new format)
+        ResourceDictionary? themeDict = null;
+        foreach (var dict in resources)
         {
-            if (dict.Source?.OriginalString.Contains("Theme.xaml") == true)
+            var source = dict.Source?.OriginalString;
+            if (source != null && (
+                source.Contains("Colors.Light") ||
+                source.Contains("Colors.Dark") ||
+                source.Contains("LightTheme") ||
+                source.Contains("DarkTheme")))
             {
-                themeToRemove = dict;
+                themeDict = dict;
                 break;
             }
         }
 
-        if (themeToRemove != null)
+        if (themeDict != null)
         {
-            app.Resources.MergedDictionaries.Remove(themeToRemove);
+            resources.Remove(themeDict);
         }
 
-        // Добавить новую тему
-        var themePath = theme switch
+        // Add new theme dictionary
+        var newThemeUri = theme switch
         {
-            AppTheme.Dark => "Themes/DarkTheme.xaml",
-            _ => "Themes/LightTheme.xaml"
+            AppTheme.Light => new Uri("Themes/Colors.Light.xaml", UriKind.Relative),
+            AppTheme.Dark => new Uri("Themes/Colors.Dark.xaml", UriKind.Relative),
+            _ => throw new ArgumentOutOfRangeException(nameof(theme))
         };
 
-        var newTheme = new ResourceDictionary
-        {
-            Source = new Uri(themePath, UriKind.Relative)
-        };
-
-        app.Resources.MergedDictionaries.Insert(0, newTheme);
+        resources.Insert(0, new ResourceDictionary { Source = newThemeUri });
 
         ThemeChanged?.Invoke(null, theme);
     }

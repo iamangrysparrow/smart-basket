@@ -2,17 +2,50 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:SmartBasket.WPF"
-             xmlns:converters="clr-namespace:SmartBasket.WPF.Converters">
+             xmlns:converters="clr-namespace:SmartBasket.WPF.Converters"
+             xmlns:hc="https://handyorg.github.io/handycontrol">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Theme (will be replaced by ThemeManager) -->
+                <!-- 1. Theme Colors (Light by default, replaced by ThemeManager) -->
+                <ResourceDictionary Source="Themes/Colors.Light.xaml"/>
+
+                <!-- 2. Brushes (reference colors via DynamicResource) -->
+                <ResourceDictionary Source="Themes/Brushes.xaml"/>
+
+                <!-- 3. Sizes and Typography -->
+                <ResourceDictionary Source="Themes/Sizes.xaml"/>
+
+                <!-- 4. HandyControl themes -->
+                <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/SkinDefault.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/Theme.xaml"/>
+
+                <!-- 5. Legacy theme for backward compatibility -->
                 <ResourceDictionary Source="Themes/LightTheme.xaml"/>
-                <!-- Icons -->
+
+                <!-- 6. Icons -->
                 <ResourceDictionary Source="Themes/Icons.xaml"/>
-                <!-- Shared Styles -->
+
+                <!-- 7. Shared Styles -->
                 <ResourceDictionary Source="Themes/SharedStyles.xaml"/>
+
+                <!-- 8. Control Styles (override defaults) -->
+                <ResourceDictionary Source="Themes/Controls/ButtonStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/TextBlockStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/TextBoxStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/ListBoxStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/TagStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/ComboBoxStyles.xaml"/>
+
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Global Window Style (rendering quality settings) -->
+            <Style TargetType="Window">
+                <Setter Property="UseLayoutRounding" Value="True"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            </Style>
 
             <!-- Global Converters -->
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>

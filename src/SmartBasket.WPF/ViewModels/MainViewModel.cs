@@ -454,6 +454,9 @@ public partial class MainViewModel : ObservableObject
                 IQueryable<Receipt> query = _dbContext.Receipts
                     .Include(r => r.Items)
                         .ThenInclude(i => i.Item)
+                            .ThenInclude(item => item!.Product)
+                    .Include(r => r.Items)
+                        .ThenInclude(i => i.Item)
                             .ThenInclude(item => item!.ItemLabels)
                                 .ThenInclude(il => il.Label);
 

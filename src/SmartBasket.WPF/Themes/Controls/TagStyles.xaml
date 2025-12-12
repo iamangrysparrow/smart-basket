@@ -1,0 +1,227 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Base Tag Style -->
+    <Style x:Key="TagBase" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusS}"/>
+        <Setter Property="Padding" Value="8,2"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <!-- Category Tags by Color -->
+    <Style x:Key="TagDairy" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryDairyBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagMeat" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryMeatBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagVegetables" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryVegetablesBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagBakery" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryBakeryBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagDrinks" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryDrinksBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagGrocery" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryGroceryBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagFrozen" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryFrozenBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagHousehold" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryHouseholdBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagOther" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryOtherBg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Tag TextBlock Styles -->
+    <Style x:Key="TagTextDairy" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryDairyFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextMeat" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryMeatFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextVegetables" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryVegetablesFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextBakery" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryBakeryFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextDrinks" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryDrinksFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextGrocery" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryGroceryFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextFrozen" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryFrozenFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextHousehold" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryHouseholdFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TagTextOther" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <SolidColorBrush Color="{DynamicResource CategoryOtherFg}"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Generic Tag (Accent) -->
+    <Style x:Key="TagAccent" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
+    </Style>
+
+    <Style x:Key="TagTextAccent" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+    </Style>
+
+    <!-- Status Tags -->
+    <Style x:Key="TagSuccess" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background" Value="{DynamicResource SuccessSubtleBrush}"/>
+    </Style>
+
+    <Style x:Key="TagTextSuccess" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+    </Style>
+
+    <Style x:Key="TagWarning" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background" Value="{DynamicResource WarningSubtleBrush}"/>
+    </Style>
+
+    <Style x:Key="TagTextWarning" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+    </Style>
+
+    <Style x:Key="TagError" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background" Value="{DynamicResource ErrorSubtleBrush}"/>
+    </Style>
+
+    <Style x:Key="TagTextError" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+    </Style>
+
+    <Style x:Key="TagInfo" TargetType="Border" BasedOn="{StaticResource TagBase}">
+        <Setter Property="Background" Value="{DynamicResource InfoSubtleBrush}"/>
+    </Style>
+
+    <Style x:Key="TagTextInfo" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+    </Style>
+
+</ResourceDictionary>

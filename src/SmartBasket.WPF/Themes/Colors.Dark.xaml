@@ -1,0 +1,69 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Background -->
+    <Color x:Key="BackgroundBase">#1E1E1E</Color>
+    <Color x:Key="BackgroundLayer1">#252526</Color>
+    <Color x:Key="BackgroundLayer2">#2D2D30</Color>
+    <Color x:Key="BackgroundElevated">#3C3C3C</Color>
+
+    <!-- Foreground -->
+    <Color x:Key="ForegroundPrimary">#E0E0E0</Color>
+    <Color x:Key="ForegroundSecondary">#A0A0A0</Color>
+    <Color x:Key="ForegroundTertiary">#6E6E6E</Color>
+    <Color x:Key="ForegroundInverse">#1E1E1E</Color>
+
+    <!-- Border -->
+    <Color x:Key="BorderDefault">#3C3C3C</Color>
+    <Color x:Key="BorderStrong">#505050</Color>
+    <Color x:Key="BorderSubtle">#2D2D30</Color>
+
+    <!-- Accent (Purple - lighter for dark theme) -->
+    <Color x:Key="AccentDefault">#B388FF</Color>
+    <Color x:Key="AccentHover">#D1C4E9</Color>
+    <Color x:Key="AccentPressed">#9575CD</Color>
+    <Color x:Key="AccentSubtle">#332940</Color>
+    <Color x:Key="AccentMuted">#7E57C2</Color>
+
+    <!-- Semantic -->
+    <Color x:Key="Success">#81C784</Color>
+    <Color x:Key="SuccessSubtle">#1B3D1F</Color>
+    <Color x:Key="Warning">#FFB74D</Color>
+    <Color x:Key="WarningSubtle">#3D2E14</Color>
+    <Color x:Key="Error">#E57373</Color>
+    <Color x:Key="ErrorSubtle">#3D1F1F</Color>
+    <Color x:Key="Info">#64B5F6</Color>
+    <Color x:Key="InfoSubtle">#1A2D3D</Color>
+
+    <!-- Category Tags (Dark variants) -->
+    <Color x:Key="CategoryDefaultBg">#3C3C3C</Color>
+    <Color x:Key="CategoryDefaultFg">#9E9E9E</Color>
+    <Color x:Key="CategoryDairyBg">#1A2D3D</Color>
+    <Color x:Key="CategoryDairyFg">#64B5F6</Color>
+    <Color x:Key="CategoryMeatBg">#3D1F1F</Color>
+    <Color x:Key="CategoryMeatFg">#E57373</Color>
+    <Color x:Key="CategoryVegetablesBg">#1B3D1F</Color>
+    <Color x:Key="CategoryVegetablesFg">#81C784</Color>
+    <Color x:Key="CategoryBakeryBg">#3D2814</Color>
+    <Color x:Key="CategoryBakeryFg">#FFB74D</Color>
+    <Color x:Key="CategoryDrinksBg">#14333D</Color>
+    <Color x:Key="CategoryDrinksFg">#4DD0E1</Color>
+    <Color x:Key="CategoryGroceryBg">#2D1B3D</Color>
+    <Color x:Key="CategoryGroceryFg">#CE93D8</Color>
+    <Color x:Key="CategoryFrozenBg">#1A1F3D</Color>
+    <Color x:Key="CategoryFrozenFg">#9FA8DA</Color>
+    <Color x:Key="CategoryHouseholdBg">#2D2519</Color>
+    <Color x:Key="CategoryHouseholdFg">#BCAAA4</Color>
+    <Color x:Key="CategoryOtherBg">#2D2D30</Color>
+    <Color x:Key="CategoryOtherFg">#9E9E9E</Color>
+
+    <!-- HandyControl integration -->
+    <Color x:Key="PrimaryColor">#B388FF</Color>
+    <Color x:Key="DarkPrimaryColor">#9575CD</Color>
+    <Color x:Key="LightPrimaryColor">#332940</Color>
+    <Color x:Key="DangerColor">#E57373</Color>
+    <Color x:Key="WarningColor">#FFB74D</Color>
+    <Color x:Key="InfoColor">#64B5F6</Color>
+    <Color x:Key="SuccessColor">#81C784</Color>
+
+</ResourceDictionary>

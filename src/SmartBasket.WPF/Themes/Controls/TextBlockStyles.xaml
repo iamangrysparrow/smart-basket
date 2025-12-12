@@ -1,0 +1,86 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Caption (11px) - подписи, хинты -->
+    <Style x:Key="CaptionText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}"/>
+    </Style>
+
+    <Style x:Key="CaptionTextTertiary" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundTertiaryBrush}"/>
+    </Style>
+
+    <!-- Body (13px) - основной текст -->
+    <Style x:Key="BodyText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+    </Style>
+
+    <Style x:Key="BodyTextStrong" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightSemiBold}"/>
+    </Style>
+
+    <Style x:Key="BodyTextSecondary" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}"/>
+    </Style>
+
+    <!-- Subtitle (14px) - заголовки секций -->
+    <Style x:Key="SubtitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeSubtitle}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightSemiBold}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+    </Style>
+
+    <!-- Title (18px) - заголовки панелей -->
+    <Style x:Key="TitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeTitle}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightSemiBold}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+    </Style>
+
+    <!-- Header (24px) - заголовки окон -->
+    <Style x:Key="HeaderText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeHeader}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightSemiBold}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+    </Style>
+
+    <!-- Accent Text -->
+    <Style x:Key="AccentText" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+    </Style>
+
+    <!-- Table Header (uppercase) -->
+    <Style x:Key="TableHeaderText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightSemiBold}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}"/>
+    </Style>
+
+    <!-- Monospace (для чисел) -->
+    <Style x:Key="MonoText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+    </Style>
+
+    <Style x:Key="MonoTextStrong" TargetType="TextBlock" BasedOn="{StaticResource MonoText}">
+        <Setter Property="FontWeight" Value="{DynamicResource FontWeightSemiBold}"/>
+    </Style>
+
+    <!-- Empty category indicator -->
+    <Style x:Key="EmptyText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        <Setter Property="FontStyle" Value="Italic"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundTertiaryBrush}"/>
+    </Style>
+
+</ResourceDictionary>

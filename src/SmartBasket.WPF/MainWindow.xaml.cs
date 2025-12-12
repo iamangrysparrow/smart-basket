@@ -113,6 +113,22 @@ public partial class MainWindow : Window
         }
     }
 
+    private void TabReceipts_Checked(object sender, RoutedEventArgs e)
+    {
+        if (MainTabControl != null)
+        {
+            MainTabControl.SelectedIndex = 0;
+        }
+    }
+
+    private void TabProducts_Checked(object sender, RoutedEventArgs e)
+    {
+        if (MainTabControl != null)
+        {
+            MainTabControl.SelectedIndex = 1;
+        }
+    }
+
     private void ToggleLogPanel_Click(object sender, RoutedEventArgs e)
     {
         if (_logWindow != null)
