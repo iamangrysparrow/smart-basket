@@ -1,0 +1,1185 @@
+============================================================
+ PROJECT STRUCTURE: smart-basket
+============================================================
+
+Generated: 12.12.2025 18:38:59,30
+Path: D:\AI\smart-basket
+
+Excluded directories: node_modules .git .venv __pycache__ .idea .vscode bin obj target build dist
+
+============================================================
+
+Folder PATH listing
+Volume serial number is FC25-66D4
+D:.
+|   .gitignore
+|   ARCHITECTURE-AI.md
+|   ARCHITECTURE.md
+|   CHANGELOG.md
+|   export-structure-advanced.bat
+|   inventory-system-arch.md
+|   ItemsAndProducts.drawio
+|   next-md.md
+|   nul
+|   ROADMAP.md
+|   smart-basket-module.md
+|   smart-basket-structure-temp.txt
+|   smart-basket-structure.txt
+|   TODO_20251212.md
+|   WPF_RULES.md
+|   Ç†Ë ß†™†ß ¢ ¨†£†ß®≠• ÄòÄç ·Æ°‡†≠.eml
+|   Ç†Ë ß†™†ß ¢ ¨†£†ß®≠• ÄòÄç ·Æ°‡†≠.pdf
+|   ä„ß≠•ÊÆ¢.txt
+|   
++---.claude
+|       settings.local.json
+|       
++---.vscode
+|       launch.json
+|       tasks.json
+|       
++---output
+|       2025-12-03_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_clean.txt
+|       2025-12-03_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_parsed.json
+|       
++---src
+|   |   appsettings.20251212.json
+|   |   appsettings.json
+|   |   SmartBasket.sln
+|   |   
+|   +---output
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_body.txt
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_clean.txt
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_ollama_request.json
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_ollama_response.json
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_ollama_text.txt
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_parsed.json
+|   |       01_2025-12-03_1555_Ç†Ë_ß†™†ß_¢_¨†£†ß®≠•_ÄòÄç_·Æ°‡†≠_prompt.txt
+|   |       
+|   +---SmartBasket.CLI
+|   |   |   .gitignore
+|   |   |   Program.cs
+|   |   |   SmartBasket.CLI.csproj
+|   |   |   test-models.ps1
+|   |   |   
+|   |   +---bin
+|   |   |   \---Debug
+|   |   |       \---net8.0
+|   |   |           |   BouncyCastle.Cryptography.dll
+|   |   |           |   MailKit.dll
+|   |   |           |   Microsoft.Data.Sqlite.dll
+|   |   |           |   Microsoft.EntityFrameworkCore.Abstractions.dll
+|   |   |           |   Microsoft.EntityFrameworkCore.dll
+|   |   |           |   Microsoft.EntityFrameworkCore.Relational.dll
+|   |   |           |   Microsoft.EntityFrameworkCore.Sqlite.dll
+|   |   |           |   Microsoft.Extensions.Caching.Abstractions.dll
+|   |   |           |   Microsoft.Extensions.Caching.Memory.dll
+|   |   |           |   Microsoft.Extensions.Configuration.Abstractions.dll
+|   |   |           |   Microsoft.Extensions.Configuration.Binder.dll
+|   |   |           |   Microsoft.Extensions.Configuration.dll
+|   |   |           |   Microsoft.Extensions.Configuration.FileExtensions.dll
+|   |   |           |   Microsoft.Extensions.Configuration.Json.dll
+|   |   |           |   Microsoft.Extensions.DependencyInjection.Abstractions.dll
+|   |   |           |   Microsoft.Extensions.DependencyInjection.dll
+|   |   |           |   Microsoft.Extensions.DependencyModel.dll
+|   |   |           |   Microsoft.Extensions.Diagnostics.Abstractions.dll
+|   |   |           |   Microsoft.Extensions.Diagnostics.dll
+|   |   |           |   Microsoft.Extensions.FileProviders.Abstractions.dll
+|   |   |           |   Microsoft.Extensions.FileProviders.Physical.dll
+|   |   |           |   Microsoft.Extensions.FileSystemGlobbing.dll
+|   |   |           |   Microsoft.Extensions.Http.dll
+|   |   |           |   Microsoft.Extensions.Logging.Abstractions.dll
+|   |   |           |   Microsoft.Extensions.Logging.Configuration.dll
+|   |   |           |   Microsoft.Extensions.Logging.Console.dll
+|   |   |           |   Microsoft.Extensions.Logging.dll
+|   |   |           |   Microsoft.Extensions.Options.ConfigurationExtensions.dll
+|   |   |           |   Microsoft.Extensions.Options.dll
+|   |   |           |   Microsoft.Extensions.Primitives.dll
+|   |   |           |   MimeKit.dll
+|   |   |           |   Npgsql.dll
+|   |   |           |   Npgsql.EntityFrameworkCore.PostgreSQL.dll
+|   |   |           |   SmartBasket.CLI.deps.json
+|   |   |           |   SmartBasket.CLI.dll
+|   |   |           |   SmartBasket.CLI.exe
+|   |   |           |   SmartBasket.CLI.pdb
+|   |   |           |   SmartBasket.CLI.runtimeconfig.json
+|   |   |           |   SmartBasket.Core.dll
+|   |   |           |   SmartBasket.Core.pdb
+|   |   |           |   SmartBasket.Data.dll
+|   |   |           |   SmartBasket.Data.pdb
+|   |   |           |   SmartBasket.Services.dll
+|   |   |           |   SmartBasket.Services.pdb
+|   |   |           |   SQLitePCLRaw.batteries_v2.dll
+|   |   |           |   SQLitePCLRaw.core.dll
+|   |   |           |   SQLitePCLRaw.provider.e_sqlite3.dll
+|   |   |           |   System.Diagnostics.DiagnosticSource.dll
+|   |   |           |   System.IO.Pipelines.dll
+|   |   |           |   System.Security.Cryptography.Pkcs.dll
+|   |   |           |   System.Text.Encodings.Web.dll
+|   |   |           |   System.Text.Json.dll
+|   |   |           |   
+|   |   |           \---runtimes
+|   |   |               +---browser
+|   |   |               |   \---lib
+|   |   |               |       \---net8.0
+|   |   |               |               System.Text.Encodings.Web.dll
+|   |   |               |               
+|   |   |               +---browser-wasm
+|   |   |               |   \---nativeassets
+|   |   |               |       \---net8.0
+|   |   |               |               e_sqlite3.a
+|   |   |               |               
+|   |   |               +---linux-arm
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-arm64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-armel
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-mips64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-musl-arm
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-musl-arm64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-musl-x64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-ppc64le
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-s390x
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-x64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---linux-x86
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.so
+|   |   |               |           
+|   |   |               +---maccatalyst-arm64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.dylib
+|   |   |               |           
+|   |   |               +---maccatalyst-x64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.dylib
+|   |   |               |           
+|   |   |               +---osx-arm64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.dylib
+|   |   |               |           
+|   |   |               +---osx-x64
+|   |   |               |   \---native
+|   |   |               |           libe_sqlite3.dylib
+|   |   |               |           
+|   |   |               +---win
+|   |   |               |   \---lib
+|   |   |               |       \---net8.0
+|   |   |               |               System.Security.Cryptography.Pkcs.dll
+|   |   |               |               
+|   |   |               +---win-arm
+|   |   |               |   \---native
+|   |   |               |           e_sqlite3.dll
+|   |   |               |           
+|   |   |               +---win-arm64
+|   |   |               |   \---native
+|   |   |               |           e_sqlite3.dll
+|   |   |               |           
+|   |   |               +---win-x64
+|   |   |               |   \---native
+|   |   |               |           e_sqlite3.dll
+|   |   |               |           
+|   |   |               \---win-x86
+|   |   |                   \---native
+|   |   |                           e_sqlite3.dll
+|   |   |                           
+|   |   +---obj
+|   |   |   |   project.assets.json
+|   |   |   |   project.nuget.cache
+|   |   |   |   SmartBasket.CLI.csproj.nuget.dgspec.json
+|   |   |   |   SmartBasket.CLI.csproj.nuget.g.props
+|   |   |   |   SmartBasket.CLI.csproj.nuget.g.targets
+|   |   |   |   
+|   |   |   \---Debug
+|   |   |       \---net8.0
+|   |   |           |   .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+|   |   |           |   apphost.exe
+|   |   |           |   SmartBas.CB8B923D.Up2Date
+|   |   |           |   SmartBasket.CLI.AssemblyInfo.cs
+|   |   |           |   SmartBasket.CLI.AssemblyInfoInputs.cache
+|   |   |           |   SmartBasket.CLI.assets.cache
+|   |   |           |   SmartBasket.CLI.csproj.AssemblyReference.cache
+|   |   |           |   SmartBasket.CLI.csproj.CoreCompileInputs.cache
+|   |   |           |   SmartBasket.CLI.csproj.FileListAbsolute.txt
+|   |   |           |   SmartBasket.CLI.dll
+|   |   |           |   SmartBasket.CLI.GeneratedMSBuildEditorConfig.editorconfig
+|   |   |           |   SmartBasket.CLI.genruntimeconfig.cache
+|   |   |           |   SmartBasket.CLI.GlobalUsings.g.cs
+|   |   |           |   SmartBasket.CLI.pdb
+|   |   |           |   
+|   |   |           +---ref
+|   |   |           |       SmartBasket.CLI.dll
+|   |   |           |       
+|   |   |           \---refint
+|   |   |                   SmartBasket.CLI.dll
+|   |   |                   
+|   |   \---output
+|   |           classify_test_20251209_222449.json
+|   |           classify_test_20251209_224100.json
+|   |           
+|   +---SmartBasket.Core
+|   |   |   .gitignore
+|   |   |   SmartBasket.Core.csproj
+|   |   |   
+|   |   +---bin
+|   |   |   \---Debug
+|   |   |       \---net8.0
+|   |   |               SmartBasket.Core.deps.json
+|   |   |               SmartBasket.Core.dll
+|   |   |               SmartBasket.Core.pdb
+|   |   |               
+|   |   +---Configuration
+|   |   |       AiOperationsConfig.cs
+|   |   |       AiProviderConfig.cs
+|   |   |       AiProviderType.cs
+|   |   |       AppSettings.cs
+|   |   |       DatabaseSettings.cs
+|   |   |       EmailSourceConfig.cs
+|   |   |       ParserConfig.cs
+|   |   |       ParserType.cs
+|   |   |       ReceiptSourceConfig.cs
+|   |   |       SourceType.cs
+|   |   |       
+|   |   +---Entities
+|   |   |       BaseEntity.cs
+|   |   |       EmailHistory.cs
+|   |   |       Item.cs
+|   |   |       ItemLabel.cs
+|   |   |       Label.cs
+|   |   |       Product.cs
+|   |   |       ProductLabel.cs
+|   |   |       Receipt.cs
+|   |   |       ReceiptItem.cs
+|   |   |       
+|   |   +---Helpers
+|   |   |       SecretHelper.cs
+|   |   |       
+|   |   \---obj
+|   |       |   project.assets.json
+|   |       |   project.nuget.cache
+|   |       |   SmartBasket.Core.csproj.nuget.dgspec.json
+|   |       |   SmartBasket.Core.csproj.nuget.g.props
+|   |       |   SmartBasket.Core.csproj.nuget.g.targets
+|   |       |   
+|   |       \---Debug
+|   |           \---net8.0
+|   |               |   .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+|   |               |   SmartBasket.Core.AssemblyInfo.cs
+|   |               |   SmartBasket.Core.AssemblyInfoInputs.cache
+|   |               |   SmartBasket.Core.assets.cache
+|   |               |   SmartBasket.Core.csproj.CoreCompileInputs.cache
+|   |               |   SmartBasket.Core.csproj.FileListAbsolute.txt
+|   |               |   SmartBasket.Core.dll
+|   |               |   SmartBasket.Core.GeneratedMSBuildEditorConfig.editorconfig
+|   |               |   SmartBasket.Core.GlobalUsings.g.cs
+|   |               |   SmartBasket.Core.pdb
+|   |               |   
+|   |               +---ref
+|   |               |       SmartBasket.Core.dll
+|   |               |       
+|   |               \---refint
+|   |                       SmartBasket.Core.dll
+|   |                       
+|   +---SmartBasket.Data
+|   |   |   .gitignore
+|   |   |   DatabaseProviderType.cs
+|   |   |   DbContextFactory.cs
+|   |   |   SmartBasket.Data.csproj
+|   |   |   SmartBasketDbContext.cs
+|   |   |   
+|   |   +---bin
+|   |   |   \---Debug
+|   |   |       \---net8.0
+|   |   |               SmartBasket.Core.dll
+|   |   |               SmartBasket.Core.pdb
+|   |   |               SmartBasket.Data.deps.json
+|   |   |               SmartBasket.Data.dll
+|   |   |               SmartBasket.Data.pdb
+|   |   |               SmartBasket.Data.runtimeconfig.json
+|   |   |               
+|   |   \---obj
+|   |       |   project.assets.json
+|   |       |   project.nuget.cache
+|   |       |   SmartBasket.Data.csproj.nuget.dgspec.json
+|   |       |   SmartBasket.Data.csproj.nuget.g.props
+|   |       |   SmartBasket.Data.csproj.nuget.g.targets
+|   |       |   
+|   |       \---Debug
+|   |           \---net8.0
+|   |               |   .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+|   |               |   SmartBas.D73D74E5.Up2Date
+|   |               |   SmartBasket.Data.AssemblyInfo.cs
+|   |               |   SmartBasket.Data.AssemblyInfoInputs.cache
+|   |               |   SmartBasket.Data.assets.cache
+|   |               |   SmartBasket.Data.csproj.AssemblyReference.cache
+|   |               |   SmartBasket.Data.csproj.CoreCompileInputs.cache
+|   |               |   SmartBasket.Data.csproj.FileListAbsolute.txt
+|   |               |   SmartBasket.Data.dll
+|   |               |   SmartBasket.Data.GeneratedMSBuildEditorConfig.editorconfig
+|   |               |   SmartBasket.Data.genruntimeconfig.cache
+|   |               |   SmartBasket.Data.GlobalUsings.g.cs
+|   |               |   SmartBasket.Data.pdb
+|   |               |   
+|   |               +---ref
+|   |               |       SmartBasket.Data.dll
+|   |               |       
+|   |               \---refint
+|   |                       SmartBasket.Data.dll
+|   |                       
+|   +---SmartBasket.Services
+|   |   |   .gitignore
+|   |   |   ReceiptCollectionService.cs
+|   |   |   SmartBasket.Services.csproj
+|   |   |   
+|   |   +---bin
+|   |   |   \---Debug
+|   |   |       \---net8.0
+|   |   |               SmartBasket.Core.dll
+|   |   |               SmartBasket.Core.pdb
+|   |   |               SmartBasket.Data.dll
+|   |   |               SmartBasket.Data.pdb
+|   |   |               SmartBasket.Services.deps.json
+|   |   |               SmartBasket.Services.dll
+|   |   |               SmartBasket.Services.pdb
+|   |   |               
+|   |   +---Email
+|   |   |       EmailMessage.cs
+|   |   |       EmailService.cs
+|   |   |       IEmailService.cs
+|   |   |       
+|   |   +---Llm
+|   |   |       AiProviderFactory.cs
+|   |   |       ILabelAssignmentService.cs
+|   |   |       ILlmProvider.cs
+|   |   |       IProductClassificationService.cs
+|   |   |       LabelAssignmentService.cs
+|   |   |       OllamaLlmProvider.cs
+|   |   |       ParsedReceiptItem.cs
+|   |   |       ProductClassificationResult.cs
+|   |   |       ProductClassificationService.cs
+|   |   |       ResponseParser.cs
+|   |   |       YandexAgentLlmProvider.cs
+|   |   |       YandexGptLlmProvider.cs
+|   |   |       
+|   |   +---obj
+|   |   |   |   project.assets.json
+|   |   |   |   project.nuget.cache
+|   |   |   |   SmartBasket.Services.csproj.nuget.dgspec.json
+|   |   |   |   SmartBasket.Services.csproj.nuget.g.props
+|   |   |   |   SmartBasket.Services.csproj.nuget.g.targets
+|   |   |   |   
+|   |   |   \---Debug
+|   |   |       \---net8.0
+|   |   |           |   .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+|   |   |           |   SmartBas.5EC44D07.Up2Date
+|   |   |           |   SmartBasket.Services.AssemblyInfo.cs
+|   |   |           |   SmartBasket.Services.AssemblyInfoInputs.cache
+|   |   |           |   SmartBasket.Services.assets.cache
+|   |   |           |   SmartBasket.Services.csproj.AssemblyReference.cache
+|   |   |           |   SmartBasket.Services.csproj.CoreCompileInputs.cache
+|   |   |           |   SmartBasket.Services.csproj.FileListAbsolute.txt
+|   |   |           |   SmartBasket.Services.dll
+|   |   |           |   SmartBasket.Services.GeneratedMSBuildEditorConfig.editorconfig
+|   |   |           |   SmartBasket.Services.GlobalUsings.g.cs
+|   |   |           |   SmartBasket.Services.pdb
+|   |   |           |   
+|   |   |           +---ref
+|   |   |           |       SmartBasket.Services.dll
+|   |   |           |       
+|   |   |           \---refint
+|   |   |                   SmartBasket.Services.dll
+|   |   |                   
+|   |   +---Parsing
+|   |   |       HtmlHelper.cs
+|   |   |       InstamartReceiptParser.cs
+|   |   |       IReceiptTextParser.cs
+|   |   |       LlmUniversalParser.cs
+|   |   |       ReceiptTextParserFactory.cs
+|   |   |       
+|   |   +---Products
+|   |   |       IItemService.cs
+|   |   |       ILabelService.cs
+|   |   |       IProductService.cs
+|   |   |       ItemService.cs
+|   |   |       LabelService.cs
+|   |   |       ProductCleanupService.cs
+|   |   |       ProductService.cs
+|   |   |       
+|   |   \---Sources
+|   |           EmailReceiptSource.cs
+|   |           IReceiptSource.cs
+|   |           RawReceipt.cs
+|   |           ReceiptSourceFactory.cs
+|   |           
+|   \---SmartBasket.WPF
+|       |   .gitignore
+|       |   App.xaml
+|       |   App.xaml.cs
+|       |   appsettings.json
+|       |   AssemblyInfo.cs
+|       |   MainWindow.xaml
+|       |   MainWindow.xaml.cs
+|       |   prompt_assign_labels.txt
+|       |   prompt_categories.txt
+|       |   prompt_categories_test.txt
+|       |   prompt_classify_products.txt
+|       |   prompt_template.txt
+|       |   SmartBasket.WPF.csproj
+|       |   user_labels.txt
+|       |   
+|       +---bin
+|       |   \---Debug
+|       |       \---net8.0-windows
+|       |           |   appsettings.json
+|       |           |   BouncyCastle.Cryptography.dll
+|       |           |   CommunityToolkit.Mvvm.dll
+|       |           |   MailKit.dll
+|       |           |   Microsoft.Data.Sqlite.dll
+|       |           |   Microsoft.EntityFrameworkCore.Abstractions.dll
+|       |           |   Microsoft.EntityFrameworkCore.dll
+|       |           |   Microsoft.EntityFrameworkCore.Relational.dll
+|       |           |   Microsoft.EntityFrameworkCore.Sqlite.dll
+|       |           |   Microsoft.Extensions.Caching.Abstractions.dll
+|       |           |   Microsoft.Extensions.Caching.Memory.dll
+|       |           |   Microsoft.Extensions.Configuration.Abstractions.dll
+|       |           |   Microsoft.Extensions.Configuration.Binder.dll
+|       |           |   Microsoft.Extensions.Configuration.dll
+|       |           |   Microsoft.Extensions.Configuration.FileExtensions.dll
+|       |           |   Microsoft.Extensions.Configuration.Json.dll
+|       |           |   Microsoft.Extensions.DependencyInjection.Abstractions.dll
+|       |           |   Microsoft.Extensions.DependencyInjection.dll
+|       |           |   Microsoft.Extensions.DependencyModel.dll
+|       |           |   Microsoft.Extensions.Diagnostics.Abstractions.dll
+|       |           |   Microsoft.Extensions.Diagnostics.dll
+|       |           |   Microsoft.Extensions.FileProviders.Abstractions.dll
+|       |           |   Microsoft.Extensions.FileProviders.Physical.dll
+|       |           |   Microsoft.Extensions.FileSystemGlobbing.dll
+|       |           |   Microsoft.Extensions.Http.dll
+|       |           |   Microsoft.Extensions.Logging.Abstractions.dll
+|       |           |   Microsoft.Extensions.Logging.Debug.dll
+|       |           |   Microsoft.Extensions.Logging.dll
+|       |           |   Microsoft.Extensions.Options.ConfigurationExtensions.dll
+|       |           |   Microsoft.Extensions.Options.dll
+|       |           |   Microsoft.Extensions.Primitives.dll
+|       |           |   MimeKit.dll
+|       |           |   Npgsql.dll
+|       |           |   Npgsql.EntityFrameworkCore.PostgreSQL.dll
+|       |           |   prompt_assign_labels.txt
+|       |           |   prompt_categories.txt
+|       |           |   prompt_classify_products.txt
+|       |           |   prompt_template.txt
+|       |           |   SmartBasket.Core.dll
+|       |           |   SmartBasket.Core.pdb
+|       |           |   SmartBasket.Data.dll
+|       |           |   SmartBasket.Data.pdb
+|       |           |   SmartBasket.Services.dll
+|       |           |   SmartBasket.Services.pdb
+|       |           |   SmartBasket.WPF.deps.json
+|       |           |   SmartBasket.WPF.dll
+|       |           |   SmartBasket.WPF.exe
+|       |           |   SmartBasket.WPF.pdb
+|       |           |   SmartBasket.WPF.runtimeconfig.json
+|       |           |   SQLitePCLRaw.batteries_v2.dll
+|       |           |   SQLitePCLRaw.core.dll
+|       |           |   SQLitePCLRaw.provider.e_sqlite3.dll
+|       |           |   System.Security.Cryptography.Pkcs.dll
+|       |           |   user_labels.txt
+|       |           |   
+|       |           +---logs
+|       |           |       smartbasket_2025-12-11_01-53-48.log
+|       |           |       smartbasket_2025-12-11_10-09-56.log
+|       |           |       smartbasket_2025-12-11_10-13-16.log
+|       |           |       smartbasket_2025-12-11_10-31-01.log
+|       |           |       smartbasket_2025-12-11_10-33-27.log
+|       |           |       smartbasket_2025-12-11_11-21-59.log
+|       |           |       smartbasket_2025-12-11_11-59-19.log
+|       |           |       smartbasket_2025-12-11_12-34-56.log
+|       |           |       smartbasket_2025-12-11_14-56-09.log
+|       |           |       smartbasket_2025-12-11_15-03-25.log
+|       |           |       smartbasket_2025-12-11_15-07-59.log
+|       |           |       smartbasket_2025-12-11_15-41-31.log
+|       |           |       smartbasket_2025-12-11_16-01-42.log
+|       |           |       smartbasket_2025-12-11_16-09-27.log
+|       |           |       smartbasket_2025-12-11_16-19-11.log
+|       |           |       smartbasket_2025-12-11_19-07-25.log
+|       |           |       smartbasket_2025-12-12_10-48-54.log
+|       |           |       
+|       |           \---runtimes
+|       |               +---browser-wasm
+|       |               |   \---nativeassets
+|       |               |       \---net8.0
+|       |               |               e_sqlite3.a
+|       |               |               
+|       |               +---linux-arm
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-arm64
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-armel
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-mips64
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-musl-arm
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-musl-arm64
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-musl-x64
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-ppc64le
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-s390x
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-x64
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---linux-x86
+|       |               |   \---native
+|       |               |           libe_sqlite3.so
+|       |               |           
+|       |               +---maccatalyst-arm64
+|       |               |   \---native
+|       |               |           libe_sqlite3.dylib
+|       |               |           
+|       |               +---maccatalyst-x64
+|       |               |   \---native
+|       |               |           libe_sqlite3.dylib
+|       |               |           
+|       |               +---osx-arm64
+|       |               |   \---native
+|       |               |           libe_sqlite3.dylib
+|       |               |           
+|       |               +---osx-x64
+|       |               |   \---native
+|       |               |           libe_sqlite3.dylib
+|       |               |           
+|       |               +---win
+|       |               |   \---lib
+|       |               |       \---net8.0
+|       |               |               System.Security.Cryptography.Pkcs.dll
+|       |               |               
+|       |               +---win-arm
+|       |               |   \---native
+|       |               |           e_sqlite3.dll
+|       |               |           
+|       |               +---win-arm64
+|       |               |   \---native
+|       |               |           e_sqlite3.dll
+|       |               |           
+|       |               +---win-x64
+|       |               |   \---native
+|       |               |           e_sqlite3.dll
+|       |               |           
+|       |               \---win-x86
+|       |                   \---native
+|       |                           e_sqlite3.dll
+|       |                           
+|       +---Controls
+|       |       PasswordBoxWithReveal.xaml
+|       |       PasswordBoxWithReveal.xaml.cs
+|       |       
+|       +---Converters
+|       |       Converters.cs
+|       |       
+|       +---Models
+|       |       LogEntry.cs
+|       |       
+|       +---obj
+|       |   |   project.assets.json
+|       |   |   project.nuget.cache
+|       |   |   SmartBasket.WPF.csproj.nuget.dgspec.json
+|       |   |   SmartBasket.WPF.csproj.nuget.g.props
+|       |   |   SmartBasket.WPF.csproj.nuget.g.targets
+|       |   |   SmartBasket.WPF_iqol15hj_wpftmp.csproj.nuget.dgspec.json
+|       |   |   SmartBasket.WPF_iqol15hj_wpftmp.csproj.nuget.g.props
+|       |   |   SmartBasket.WPF_iqol15hj_wpftmp.csproj.nuget.g.targets
+|       |   |   SmartBasket.WPF_zjky3sjy_wpftmp.csproj.nuget.dgspec.json
+|       |   |   SmartBasket.WPF_zjky3sjy_wpftmp.csproj.nuget.g.props
+|       |   |   SmartBasket.WPF_zjky3sjy_wpftmp.csproj.nuget.g.targets
+|       |   |   
+|       |   \---Debug
+|       |       \---net8.0-windows
+|       |           |   .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+|       |           |   App.baml
+|       |           |   App.g.cs
+|       |           |   apphost.exe
+|       |           |   GeneratedInternalTypeHelper.g.cs
+|       |           |   MainWindow.baml
+|       |           |   MainWindow.g.cs
+|       |           |   SmartBas.A65CC884.Up2Date
+|       |           |   SmartBasket.WPF.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF.assets.cache
+|       |           |   SmartBasket.WPF.csproj.AssemblyReference.cache
+|       |           |   SmartBasket.WPF.csproj.CoreCompileInputs.cache
+|       |           |   SmartBasket.WPF.csproj.FileListAbsolute.txt
+|       |           |   SmartBasket.WPF.dll
+|       |           |   SmartBasket.WPF.g.resources
+|       |           |   SmartBasket.WPF.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF.genruntimeconfig.cache
+|       |           |   SmartBasket.WPF.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF.pdb
+|       |           |   SmartBasket.WPF_0pafdth0_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_0pafdth0_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_0pafdth0_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_0pafdth0_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_0pafdth0_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_0zehx0sq_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_0zehx0sq_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_0zehx0sq_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_0zehx0sq_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_0zehx0sq_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_11fywrw0_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_11fywrw0_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_11fywrw0_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_11fywrw0_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_11fywrw0_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_1a2k0mba_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_1a2k0mba_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_1a2k0mba_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_1a2k0mba_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_1a2k0mba_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_1b2lhpz3_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_1b2lhpz3_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_1b2lhpz3_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_1b2lhpz3_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_1b2lhpz3_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_1qxl4nvp_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_1qxl4nvp_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_1qxl4nvp_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_1qxl4nvp_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_1qxl4nvp_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_1wxvpa3v_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_1wxvpa3v_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_1wxvpa3v_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_1wxvpa3v_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_1wxvpa3v_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_2hwwkwfj_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_2hwwkwfj_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_2hwwkwfj_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_2hwwkwfj_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_2hwwkwfj_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_2nq5mkjj_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_2nq5mkjj_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_2nq5mkjj_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_2nq5mkjj_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_2nq5mkjj_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_2wdkoth3_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_2wdkoth3_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_2wdkoth3_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_2wdkoth3_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_2wdkoth3_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_3guqueni_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_3guqueni_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_3guqueni_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_3guqueni_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_3guqueni_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_3q50z31c_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_3q50z31c_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_3q50z31c_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_3q50z31c_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_3q50z31c_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_3uh2rn0m_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_3uh2rn0m_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_3uh2rn0m_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_3uh2rn0m_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_3uh2rn0m_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_43hnfuhp_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_43hnfuhp_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_43hnfuhp_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_43hnfuhp_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_43hnfuhp_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_4cmgbugi_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_4cmgbugi_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_4cmgbugi_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_4cmgbugi_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_4cmgbugi_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_4j05qag5_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_4j05qag5_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_4j05qag5_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_4j05qag5_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_4j05qag5_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_4rtanbom_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_4rtanbom_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_4rtanbom_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_4rtanbom_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_4rtanbom_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_55iopk3p_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_55iopk3p_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_55iopk3p_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_55iopk3p_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_55iopk3p_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_5ncf02vw_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_5ncf02vw_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_5ncf02vw_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_5ncf02vw_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_5ncf02vw_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_a3ashdel_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_a3ashdel_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_a3ashdel_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_a3ashdel_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_a3ashdel_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_avhzgrtj_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_avhzgrtj_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_avhzgrtj_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_avhzgrtj_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_avhzgrtj_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_bjc31jya_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_bjc31jya_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_bjc31jya_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_bjc31jya_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_bjc31jya_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_cpdqw2zt_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_cpdqw2zt_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_cpdqw2zt_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_cpdqw2zt_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_cpdqw2zt_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_cryddmk4_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_cryddmk4_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_cryddmk4_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_cryddmk4_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_cryddmk4_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_crzojxup_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_crzojxup_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_crzojxup_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_crzojxup_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_crzojxup_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_cucml10r_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_cucml10r_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_cucml10r_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_cucml10r_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_cucml10r_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_d5nuldk0_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_d5nuldk0_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_d5nuldk0_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_d5nuldk0_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_d5nuldk0_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_du3evelg_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_du3evelg_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_du3evelg_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_du3evelg_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_du3evelg_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_ejii1uqg_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_ejii1uqg_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_ejii1uqg_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_ejii1uqg_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_ejii1uqg_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_f4g1uag0_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_f4g1uag0_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_f4g1uag0_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_f4g1uag0_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_f4g1uag0_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_f51ofakk_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_f51ofakk_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_f51ofakk_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_f51ofakk_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_f51ofakk_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_gpo4v2ga_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_gpo4v2ga_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_gpo4v2ga_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_gpo4v2ga_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_gpo4v2ga_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_iqol15hj_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_iqol15hj_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_iqol15hj_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_iqol15hj_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_iqol15hj_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_islmyayz_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_islmyayz_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_islmyayz_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_islmyayz_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_islmyayz_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_k02j2hn0_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_k02j2hn0_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_k02j2hn0_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_k02j2hn0_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_k02j2hn0_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_kzx3p14d_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_kzx3p14d_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_kzx3p14d_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_kzx3p14d_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_kzx3p14d_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_lkqg1uin_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_lkqg1uin_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_lkqg1uin_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_lkqg1uin_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_lkqg1uin_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_lydq4dzv_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_lydq4dzv_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_lydq4dzv_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_lydq4dzv_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_lydq4dzv_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_m0t5tyql_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_m0t5tyql_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_m0t5tyql_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_m0t5tyql_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_m0t5tyql_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_MarkupCompile.cache
+|       |           |   SmartBasket.WPF_MarkupCompile.lref
+|       |           |   SmartBasket.WPF_mlfcfggo_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_mlfcfggo_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_mlfcfggo_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_mlfcfggo_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_mlfcfggo_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_mnxamqpi_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_mnxamqpi_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_mnxamqpi_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_mnxamqpi_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_mnxamqpi_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_nitsc3xu_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_nitsc3xu_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_nitsc3xu_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_nitsc3xu_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_nitsc3xu_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_o15exrrp_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_o15exrrp_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_o15exrrp_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_o15exrrp_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_o15exrrp_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_oa4ji2vf_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_oa4ji2vf_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_oa4ji2vf_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_oa4ji2vf_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_oa4ji2vf_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_of0gxzfe_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_of0gxzfe_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_of0gxzfe_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_of0gxzfe_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_of0gxzfe_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_ojsruffd_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_ojsruffd_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_ojsruffd_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_ojsruffd_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_ojsruffd_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_otdmwkex_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_otdmwkex_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_otdmwkex_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_otdmwkex_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_otdmwkex_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_owezu0ay_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_owezu0ay_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_owezu0ay_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_owezu0ay_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_owezu0ay_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_pahkiawy_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_pahkiawy_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_pahkiawy_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_pahkiawy_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_pahkiawy_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_pv3hlw21_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_pv3hlw21_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_pv3hlw21_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_pv3hlw21_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_pv3hlw21_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_qz4afkek_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_qz4afkek_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_qz4afkek_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_qz4afkek_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_qz4afkek_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_rgngpxed_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_rgngpxed_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_rgngpxed_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_rgngpxed_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_rgngpxed_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_rwfjsjxo_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_rwfjsjxo_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_rwfjsjxo_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_rwfjsjxo_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_rwfjsjxo_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_ss1p2ayj_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_ss1p2ayj_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_ss1p2ayj_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_ss1p2ayj_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_ss1p2ayj_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_sxdltlqg_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_sxdltlqg_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_sxdltlqg_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_sxdltlqg_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_sxdltlqg_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_uigwhu54_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_uigwhu54_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_uigwhu54_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_uigwhu54_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_uigwhu54_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_vfhza2gg_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_vfhza2gg_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_vfhza2gg_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_vfhza2gg_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_vfhza2gg_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_vjk2mszk_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_vjk2mszk_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_vjk2mszk_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_vjk2mszk_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_vjk2mszk_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_vo4caq3v_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_vo4caq3v_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_vo4caq3v_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_vo4caq3v_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_vo4caq3v_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_vpja53kh_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_vpja53kh_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_vpja53kh_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_vpja53kh_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_vpja53kh_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_vsynbst4_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_vsynbst4_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_vsynbst4_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_vsynbst4_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_vsynbst4_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_w45rrmbm_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_w45rrmbm_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_w45rrmbm_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_w45rrmbm_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_w45rrmbm_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_wbe1xbmm_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_wbe1xbmm_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_wbe1xbmm_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_wbe1xbmm_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_wbe1xbmm_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_wj2wxj2e_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_wj2wxj2e_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_wj2wxj2e_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_wj2wxj2e_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_wj2wxj2e_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_xaop5vq2_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_xaop5vq2_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_xaop5vq2_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_xaop5vq2_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_xaop5vq2_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_xjiyhywk_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_xjiyhywk_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_xjiyhywk_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_xjiyhywk_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_xjiyhywk_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_xockc2ti_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_xockc2ti_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_xockc2ti_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_xockc2ti_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_xockc2ti_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_yeb5gtz2_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_yeb5gtz2_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_yeb5gtz2_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_yeb5gtz2_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_yeb5gtz2_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_yi313ks5_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_yi313ks5_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_yi313ks5_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_yi313ks5_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_yi313ks5_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_zczwoapy_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_zczwoapy_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_zczwoapy_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_zczwoapy_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_zczwoapy_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_zjky3sjy_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_zjky3sjy_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_zjky3sjy_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_zjky3sjy_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_zjky3sjy_wpftmp.GlobalUsings.g.cs
+|       |           |   SmartBasket.WPF_zlf5ri51_wpftmp.AssemblyInfo.cs
+|       |           |   SmartBasket.WPF_zlf5ri51_wpftmp.AssemblyInfoInputs.cache
+|       |           |   SmartBasket.WPF_zlf5ri51_wpftmp.assets.cache
+|       |           |   SmartBasket.WPF_zlf5ri51_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
+|       |           |   SmartBasket.WPF_zlf5ri51_wpftmp.GlobalUsings.g.cs
+|       |           |   
+|       |           +---Controls
+|       |           |       PasswordBoxWithReveal.baml
+|       |           |       PasswordBoxWithReveal.g.cs
+|       |           |       
+|       |           +---ref
+|       |           |       SmartBasket.WPF.dll
+|       |           |       
+|       |           +---refint
+|       |           |       SmartBasket.WPF.dll
+|       |           |       
+|       |           +---Themes
+|       |           |       DarkTheme.baml
+|       |           |       Icons.baml
+|       |           |       LightTheme.baml
+|       |           |       SharedStyles.baml
+|       |           |       
+|       |           \---Views
+|       |               |   CategoriesDialog.baml
+|       |               |   CategoriesDialog.g.cs
+|       |               |   CategoriesView.baml
+|       |               |   CategoriesView.g.cs
+|       |               |   ChangeCategoryDialog.baml
+|       |               |   ChangeCategoryDialog.g.cs
+|       |               |   HistoryView.baml
+|       |               |   HistoryView.g.cs
+|       |               |   ItemCardDialog.baml
+|       |               |   ItemCardDialog.g.cs
+|       |               |   LabelDialog.baml
+|       |               |   LabelDialog.g.cs
+|       |               |   LogWindow.baml
+|       |               |   LogWindow.g.cs
+|       |               |   ProductDialog.baml
+|       |               |   ProductDialog.g.cs
+|       |               |   ProductsItemsView.baml
+|       |               |   ProductsItemsView.g.cs
+|       |               |   PromptEditorWindow.baml
+|       |               |   PromptEditorWindow.g.cs
+|       |               |   SettingsView.baml
+|       |               |   SettingsView.g.cs
+|       |               |   
+|       |               \---Settings
+|       |                       AiOperationsSettingsView.baml
+|       |                       AiOperationsSettingsView.g.cs
+|       |                       AiProvidersSettingsView.baml
+|       |                       AiProvidersSettingsView.g.cs
+|       |                       ParsersSettingsView.baml
+|       |                       ParsersSettingsView.g.cs
+|       |                       SettingsWindow.baml
+|       |                       SettingsWindow.g.cs
+|       |                       SourcesSettingsView.baml
+|       |                       SourcesSettingsView.g.cs
+|       |                       
+|       +---Services
+|       |       SettingsService.cs
+|       |       
+|       +---Themes
+|       |       DarkTheme.xaml
+|       |       Icons.xaml
+|       |       LightTheme.xaml
+|       |       SharedStyles.xaml
+|       |       ThemeManager.cs
+|       |       
+|       +---ViewModels
+|       |   |   CategoryViewModels.cs
+|       |   |   MainViewModel.cs
+|       |   |   ProductsItemsViewModel.cs
+|       |   |   
+|       |   \---Settings
+|       |           AiOperationsViewModel.cs
+|       |           AiProviderViewModel.cs
+|       |           ParserViewModel.cs
+|       |           ReceiptSourceViewModel.cs
+|       |           SettingsCategory.cs
+|       |           SettingsCategoryItem.cs
+|       |           SettingsViewModel.cs
+|       |           
+|       \---Views
+|           |   CategoriesDialog.xaml
+|           |   CategoriesDialog.xaml.cs
+|           |   CategoriesView.xaml
+|           |   CategoriesView.xaml.cs
+|           |   ChangeCategoryDialog.xaml
+|           |   ChangeCategoryDialog.xaml.cs
+|           |   HistoryView.xaml
+|           |   HistoryView.xaml.cs
+|           |   ItemCardDialog.xaml
+|           |   ItemCardDialog.xaml.cs
+|           |   LabelDialog.xaml
+|           |   LabelDialog.xaml.cs
+|           |   LogWindow.xaml
+|           |   LogWindow.xaml.cs
+|           |   ProductDialog.xaml
+|           |   ProductDialog.xaml.cs
+|           |   ProductsItemsView.xaml
+|           |   ProductsItemsView.xaml.cs
+|           |   PromptEditorWindow.xaml
+|           |   PromptEditorWindow.xaml.cs
+|           |   SettingsView.xaml
+|           |   SettingsView.xaml.cs
+|           |   
+|           \---Settings
+|                   AiOperationsSettingsView.xaml
+|                   AiOperationsSettingsView.xaml.cs
+|                   AiProvidersSettingsView.xaml
+|                   AiProvidersSettingsView.xaml.cs
+|                   ParsersSettingsView.xaml
+|                   ParsersSettingsView.xaml.cs
+|                   SettingsWindow.xaml
+|                   SettingsWindow.xaml.cs
+|                   SourcesSettingsView.xaml
+|                   SourcesSettingsView.xaml.cs
+|                   
+\---UI-UX-Design
+        files.zip
+        SmartBasket-DesignGuide.md
+        SmartBasket-Implementation-Plan.md
+        SmartBasket-Mockup.html
+        SmartBasket-Products-Mockup.html
+        
+ 
+============================================================ 
+ FILES BY EXTENSION 
+============================================================ 
+ 
+.md files: 11 
+.json files: 33 
+.txt files: 24 
+.bat files: 1 
+.cs files: 269 
+ 
+============================================================ 
+ STATISTICS 
+============================================================ 
+ 
+Directories: 404 
+Files: 1414 
+Total size: 95375781 bytes 
+Total size: 90 MB 
+ 
+============================================================ 
+ LARGEST FILES (TOP 10) 
+============================================================ 
+ 
+Volume Serial Number is FC25-66D4 
+09.12.2025  12:10           569¬†615 –í–∞—à –∑–∞–∫–∞–∑ –≤ –º–∞–≥–∞–∑–∏–Ω–µ –ê–®–ê–ù —Å–æ–±—Ä–∞–Ω.pdf 
+09.12.2025  12:08           128¬†323 –í–∞—à –∑–∞–∫–∞–∑ –≤ –º–∞–≥–∞–∑–∏–Ω–µ –ê–®–ê–ù —Å–æ–±—Ä–∞–Ω.eml 
+12.12.2025  18:39            63¬†614 smart-basket-structure.txt 
+12.12.2025  18:38            62¬†602 smart-basket-structure-temp.txt 
+09.12.2025  09:58            49¬†167 inventory-system-arch.md 
+09.12.2025  09:59            36¬†006 smart-basket-module.md 
+12.12.2025  17:51            25¬†826 WPF_RULES.md 
+12.12.2025  11:36            15¬†804 ARCHITECTURE.md 
+10.12.2025  00:01            14¬†968 ARCHITECTURE-AI.md 
+ 
+============================================================ 
+End of structure export 
+============================================================ 

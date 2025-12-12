@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Basket — Design Mockup</title>
+    <style>
+        :root {
+            /* Light Theme */
+            --bg-base: #FFFFFF;
+            --bg-layer1: #F8F8F8;
+            --bg-layer2: #F0F0F0;
+            --bg-elevated: #FFFFFF;
+            
+            --fg-primary: #1E1E1E;
+            --fg-secondary: #5C5C5C;
+            --fg-tertiary: #9E9E9E;
+            --fg-inverse: #FFFFFF;
+            
+            --border-default: #E0E0E0;
+            --border-strong: #BDBDBD;
+            --border-subtle: #EEEEEE;
+            
+            --accent: #7C4DFF;
+            --accent-hover: #651FFF;
+            --accent-pressed: #5414CC;
+            --accent-subtle: #EDE7F6;
+            --accent-muted: #B39DDB;
+            
+            --success: #4CAF50;
+            --success-subtle: #E8F5E9;
+            --warning: #FF9800;
+            --error: #F44336;
+            --error-subtle: #FFEBEE;
+            
+            /* Category colors - Light */
+            --cat-dairy-bg: #E3F2FD;
+            --cat-dairy-fg: #1565C0;
+            --cat-meat-bg: #FFEBEE;
+            --cat-meat-fg: #C62828;
+            --cat-veg-bg: #E8F5E9;
+            --cat-veg-fg: #2E7D32;
+            --cat-bakery-bg: #FFF3E0;
+            --cat-bakery-fg: #E65100;
+            --cat-drinks-bg: #E0F7FA;
+            --cat-drinks-fg: #00838F;
+            --cat-grocery-bg: #F3E5F5;
+            --cat-grocery-fg: #7B1FA2;
+            
+            --shadow: 0 8px 32px rgba(0,0,0,0.12);
+        }
+        
+        .dark {
+            --bg-base: #1E1E1E;
+            --bg-layer1: #252526;
+            --bg-layer2: #2D2D30;
+            --bg-elevated: #3C3C3C;
+            
+            --fg-primary: #E0E0E0;
+            --fg-secondary: #A0A0A0;
+            --fg-tertiary: #6E6E6E;
+            --fg-inverse: #1E1E1E;
+            
+            --border-default: #3C3C3C;
+            --border-strong: #505050;
+            --border-subtle: #2D2D30;
+            
+            --accent: #B388FF;
+            --accent-hover: #D1C4E9;
+            --accent-pressed: #9575CD;
+            --accent-subtle: #332940;
+            --accent-muted: #7E57C2;
+            
+            --success: #81C784;
+            --success-subtle: #1B3D1F;
+            --error: #E57373;
+            --error-subtle: #3D1F1F;
+            
+            /* Category colors - Dark */
+            --cat-dairy-bg: #1A2D3D;
+            --cat-dairy-fg: #64B5F6;
+            --cat-meat-bg: #3D1F1F;
+            --cat-meat-fg: #E57373;
+            --cat-veg-bg: #1B3D1F;
+            --cat-veg-fg: #81C784;
+            --cat-bakery-bg: #3D2814;
+            --cat-bakery-fg: #FFB74D;
+            --cat-drinks-bg: #14333D;
+            --cat-drinks-fg: #4DD0E1;
+            --cat-grocery-bg: #2D1B3D;
+            --cat-grocery-fg: #CE93D8;
+            
+            --shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 13px;
+            line-height: 1.5;
+            background: var(--bg-base);
+            color: var(--fg-primary);
+            transition: background 0.3s, color 0.3s;
+        }
+        
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            border-left: 1px solid var(--border-default);
+            border-right: 1px solid var(--border-default);
+        }
+        
+        /* ===== TOOLBAR ===== */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            height: 48px;
+            padding: 0 16px;
+            background: var(--bg-layer1);
+            border-bottom: 1px solid var(--border-default);
+            gap: 8px;
+        }
+        
+        .logo {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--accent);
+            margin-right: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--fg-inverse);
+            font-size: 12px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .tab {
+            padding: 12px 16px;
+            background: transparent;
+            border: none;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            font-family: inherit;
+            position: relative;
+            transition: color 0.15s;
+        }
+        
+        .tab:hover {
+            color: var(--fg-primary);
+        }
+        
+        .tab.active {
+            color: var(--fg-primary);
+            font-weight: 600;
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 16px;
+            right: 16px;
+            height: 2px;
+            background: var(--accent);
+        }
+        
+        .toolbar-spacer {
+            flex: 1;
+        }
+        
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            color: var(--fg-inverse);
+        }
+        
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--fg-secondary);
+            padding: 8px;
+        }
+        
+        .btn-ghost:hover {
+            background: var(--bg-layer2);
+            color: var(--fg-primary);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--accent-subtle);
+        }
+        
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border-default);
+            margin: 0 8px;
+        }
+        
+        .stats {
+            color: var(--fg-secondary);
+            font-size: 12px;
+        }
+        
+        .stats strong {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 300px;
+            background: var(--bg-layer1);
+            border-right: 1px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: var(--bg-base);
+            border: 1px solid var(--border-default);
+            border-radius: 4px;
+            padding: 8px 12px;
+            gap: 8px;
+        }
+        
+        .search-box:focus-within {
+            border-color: var(--accent);
+        }
+        
+        .search-box input {
+            border: none;
+            background: transparent;
+            flex: 1;
+            font-size: 13px;
+            color: var(--fg-primary);
+            outline: none;
+            font-family: inherit;
+        }
+        
+        .search-box input::placeholder {
+            color: var(--fg-tertiary);
+        }
+        
+        .search-icon {
+            color: var(--fg-tertiary);
+        }
+        
+        .receipt-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .receipt-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 14px 16px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.1s;
+        }
+        
+        .receipt-item:hover {
+            background: var(--bg-layer2);
+        }
+        
+        .receipt-item.selected {
+            background: var(--accent-subtle);
+            border-left-color: var(--accent);
+        }
+        
+        .receipt-info h3 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .receipt-meta {
+            font-size: 11px;
+            color: var(--fg-secondary);
+        }
+        
+        .receipt-amount {
+            font-size: 13px;
+            font-weight: 600;
+            font-feature-settings: 'tnum';
+            color: var(--fg-primary);
+        }
+        
+        /* ===== CONTENT ===== */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .content-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .content-title {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+        
+        .content-title h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .content-title .date {
+            color: var(--fg-secondary);
+            font-size: 13px;
+        }
+        
+        .content-title .receipt-number {
+            color: var(--fg-tertiary);
+            font-size: 11px;
+        }
+        
+        .content-total {
+            font-size: 24px;
+            font-weight: 600;
+            font-feature-settings: 'tnum';
+            color: var(--accent);
+        }
+        
+        /* ===== TABLE ===== */
+        .items-table {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 24px;
+        }
+        
+        .table-header {
+            display: grid;
+            grid-template-columns: 1fr 80px 100px 100px;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 2px solid var(--border-strong);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--fg-secondary);
+            position: sticky;
+            top: 0;
+            background: var(--bg-base);
+        }
+        
+        .table-header span:not(:first-child) {
+            text-align: right;
+        }
+        
+        .table-row {
+            display: grid;
+            grid-template-columns: 1fr 80px 100px 100px;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-subtle);
+            align-items: start;
+            transition: background 0.1s;
+        }
+        
+        .table-row:hover {
+            background: var(--bg-layer1);
+            margin: 0 -24px;
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+        
+        .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .item-name {
+            font-size: 13px;
+        }
+        
+        .item-category {
+            display: inline-flex;
+        }
+        
+        .tag {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .tag-dairy { background: var(--cat-dairy-bg); color: var(--cat-dairy-fg); }
+        .tag-meat { background: var(--cat-meat-bg); color: var(--cat-meat-fg); }
+        .tag-veg { background: var(--cat-veg-bg); color: var(--cat-veg-fg); }
+        .tag-bakery { background: var(--cat-bakery-bg); color: var(--cat-bakery-fg); }
+        .tag-drinks { background: var(--cat-drinks-bg); color: var(--cat-drinks-fg); }
+        .tag-grocery { background: var(--cat-grocery-bg); color: var(--cat-grocery-fg); }
+        
+        .tag-empty {
+            color: var(--fg-tertiary);
+            font-style: italic;
+            font-size: 11px;
+        }
+        
+        .item-qty, .item-price, .item-total {
+            text-align: right;
+            font-feature-settings: 'tnum';
+        }
+        
+        .item-qty {
+            color: var(--fg-secondary);
+        }
+        
+        .item-price {
+            color: var(--fg-secondary);
+            font-size: 12px;
+        }
+        
+        .item-total {
+            font-weight: 600;
+        }
+        
+        /* ===== STATUS BAR ===== */
+        .statusbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: var(--bg-layer1);
+            border-top: 1px solid var(--border-default);
+            font-size: 11px;
+            color: var(--fg-secondary);
+        }
+        
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+        
+        /* ===== THEME TOGGLE ===== */
+        .theme-toggle {
+            position: fixed;
+            bottom: 60px;
+            right: 24px;
+            display: flex;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: var(--shadow);
+            gap: 4px;
+        }
+        
+        .theme-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            color: var(--fg-secondary);
+            transition: all 0.15s;
+        }
+        
+        .theme-btn.active {
+            background: var(--accent);
+            color: var(--fg-inverse);
+        }
+        
+        /* ===== ICONS (simple SVG) ===== */
+        .icon {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
+        }
+        
+        .icon-20 {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="logo">
+                <div class="logo-icon">🛒</div>
+                Smart Basket
+            </div>
+            
+            <div class="tabs">
+                <button class="tab active">Чеки</button>
+                <button class="tab">Продукты</button>
+            </div>
+            
+            <div class="toolbar-spacer"></div>
+            
+            <div class="stats">
+                <strong>6</strong> чеков · <strong>31,541 ₽</strong>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="toolbar-actions">
+                <button class="btn btn-primary">
+                    ✓ Collect
+                </button>
+                <button class="btn btn-ghost" title="Настройки">⚙</button>
+            </div>
+        </div>
+        
+        <!-- Main -->
+        <div class="main">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Поиск чеков...">
+                    </div>
+                </div>
+                
+                <div class="receipt-list">
+                    <div class="receipt-item selected">
+                        <div class="receipt-info">
+                            <h3>АШАН</h3>
+                            <div class="receipt-meta">03.12.2025 · 30 items</div>
+                        </div>
+                        <div class="receipt-amount">6,130 ₽</div>
+                    </div>
+                    
+                    <div class="receipt-item">
+                        <div class="receipt-info">
+                            <h3>АШАН</h3>
+                            <div class="receipt-meta">26.11.2025 · 32 items</div>
+                        </div>
+                        <div class="receipt-amount">5,805 ₽</div>
+                    </div>
+                    
+                    <div class="receipt-item">
+                        <div class="receipt-info">
+                            <h3>Магнит</h3>
+                            <div class="receipt-meta">06.09.2025 · 22 items</div>
+                        </div>
+                        <div class="receipt-amount">4,183 ₽</div>
+                    </div>
+                    
+                    <div class="receipt-item">
+                        <div class="receipt-info">
+                            <h3>МАГНИТ</h3>
+                            <div class="receipt-meta">26.04.2025 · 28 items</div>
+                        </div>
+                        <div class="receipt-amount">4,911 ₽</div>
+                    </div>
+                    
+                    <div class="receipt-item">
+                        <div class="receipt-info">
+                            <h3>ПЯТЕРОЧКА</h3>
+                            <div class="receipt-meta">07.01.2025 · 27 items</div>
+                        </div>
+                        <div class="receipt-amount">5,329 ₽</div>
+                    </div>
+                    
+                    <div class="receipt-item">
+                        <div class="receipt-info">
+                            <h3>ПЯТЕРОЧКА</h3>
+                            <div class="receipt-meta">08.09.2024 · 23 items</div>
+                        </div>
+                        <div class="receipt-amount">5,183 ₽</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div class="content">
+                <div class="content-header">
+                    <div class="content-title">
+                        <h2>АШАН</h2>
+                        <span class="date">03.12.2025</span>
+                        <span class="receipt-number">#H0325S764114</span>
+                    </div>
+                    <div class="content-total">6,130 ₽</div>
+                </div>
+                
+                <div class="items-table">
+                    <div class="table-header">
+                        <span>Название</span>
+                        <span>Кол-во</span>
+                        <span>Цена</span>
+                        <span>Сумма</span>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Морковь мытая</div>
+                            <div class="item-category">
+                                <span class="tag tag-veg">Овощи</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">0.478 кг</div>
+                        <div class="item-price">59.99 ₽/кг</div>
+                        <div class="item-total">28.68 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Шампиньоны АШАН Красная птица целые 250 г</div>
+                            <div class="item-category">
+                                <span class="tag-empty">Не задана</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">1 г</div>
+                        <div class="item-price">129.99 ₽/шт</div>
+                        <div class="item-total">129.99 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Борщ АШАН Красная птица с курицей, 250 г</div>
+                            <div class="item-category">
+                                <span class="tag-empty">Не задана</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">4 шт</div>
+                        <div class="item-price">109.99 ₽/шт</div>
+                        <div class="item-total">439.96 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Кофе Жокей Классический молотый 250 г</div>
+                            <div class="item-category">
+                                <span class="tag tag-drinks">Напитки</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">1 шт</div>
+                        <div class="item-price">478.99 ₽/шт</div>
+                        <div class="item-total">478.99 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Сметана 15% Простоквашино БЗМЖ 300 г</div>
+                            <div class="item-category">
+                                <span class="tag tag-dairy">Молочные</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">2 шт</div>
+                        <div class="item-price">102.99 ₽/шт</div>
+                        <div class="item-total">205.98 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Лук репчатый</div>
+                            <div class="item-category">
+                                <span class="tag tag-veg">Овощи</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">0.594 кг</div>
+                        <div class="item-price">36.99 ₽/кг</div>
+                        <div class="item-total">21.97 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Молоко 1,5% пастеризованное 930 мл Простоквашино БЗМЖ</div>
+                            <div class="item-category">
+                                <span class="tag tag-dairy">Молочные</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">4 шт</div>
+                        <div class="item-price">93.99 ₽/шт</div>
+                        <div class="item-total">375.96 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Сок Добрый томат 1 л</div>
+                            <div class="item-category">
+                                <span class="tag tag-drinks">Напитки</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">1 л</div>
+                        <div class="item-price">119.99 ₽/л</div>
+                        <div class="item-total">119.99 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Макаронные изделия Makfa Спагетти 450 г</div>
+                            <div class="item-category">
+                                <span class="tag tag-grocery">Бакалея</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">1 г</div>
+                        <div class="item-price">57.99 ₽/шт</div>
+                        <div class="item-total">57.99 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Батон Коломенский пшеничный в нарезке 400 г</div>
+                            <div class="item-category">
+                                <span class="tag tag-bakery">Хлеб</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">2 шт</div>
+                        <div class="item-price">79.99 ₽/шт</div>
+                        <div class="item-total">159.98 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Голень цыпленка-бройлера Куриное Царство с кожей охлажденное ~1 кг</div>
+                            <div class="item-category">
+                                <span class="tag tag-meat">Мясо</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">1 кг</div>
+                        <div class="item-price">320.59 ₽/кг</div>
+                        <div class="item-total">320.59 ₽</div>
+                    </div>
+                    
+                    <div class="table-row">
+                        <div class="item-info">
+                            <div class="item-name">Огурец среднеплодный 180 г</div>
+                            <div class="item-category">
+                                <span class="tag tag-veg">Овощи</span>
+                            </div>
+                        </div>
+                        <div class="item-qty">6 шт</div>
+                        <div class="item-price">69.99 ₽/шт</div>
+                        <div class="item-total">419.94 ₽</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="statusbar">
+            <div class="status-left">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>Ollama: 16 моделей</span>
+                </div>
+                <span>Loaded 6 receipts</span>
+            </div>
+            <div class="status-right">
+                <span>Продуктов: 71 | Товаров: 118</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Theme Toggle -->
+    <div class="theme-toggle">
+        <button class="theme-btn active" onclick="setTheme('light')">☀️ Светлая</button>
+        <button class="theme-btn" onclick="setTheme('dark')">🌙 Тёмная</button>
+    </div>
+    
+    <script>
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                document.body.classList.add('dark');
+            } else {
+                document.body.classList.remove('dark');
+            }
+            
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+        
+        // Make receipt items clickable
+        document.querySelectorAll('.receipt-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.receipt-item').forEach(i => i.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+    </script>
+</body>
+</html>
