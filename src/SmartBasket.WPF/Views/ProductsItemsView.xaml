@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="clr-namespace:SmartBasket.WPF.ViewModels"
+             xmlns:conv="clr-namespace:SmartBasket.WPF.Converters"
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="900"
              Loaded="UserControl_Loaded">
@@ -139,14 +140,26 @@
                     <Grid Grid.Row="1" Margin="4">
                         <TextBox x:Name="MasterSearchBox" Style="{StaticResource TextInput}"
                                  Text="{Binding MasterSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 FontSize="10"/>
+                                 FontSize="10" Padding="4,2,20,2"/>
                         <TextBlock Text="Поиск..." IsHitTestVisible="False"
                                    Style="{StaticResource TextSecondary}" FontSize="10"
                                    VerticalAlignment="Center" Margin="6,0,0,0"
                                    Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
+                        <!-- Search icon (shown when empty) -->
                         <Path Data="{StaticResource IconSearch}" Fill="{DynamicResource TextTertiaryBrush}"
                               Width="10" Height="10" Stretch="Uniform"
-                              HorizontalAlignment="Right" Margin="0,0,6,0"/>
+                              HorizontalAlignment="Right" Margin="0,0,6,0"
+                              Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
+                        <!-- Clear button (shown when has text) -->
+                        <Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Margin="0,0,2,0" Padding="4" Cursor="Hand"
+                                Click="ClearSearchButton_Click"
+                                Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource IntToVis}}"
+                                Style="{StaticResource {x:Type Button}}"
+                                Background="Transparent" BorderThickness="0">
+                            <Path Data="{StaticResource IconCancel}" Fill="{DynamicResource TextSecondaryBrush}"
+                                  Width="12" Height="12" Stretch="Uniform"/>
+                        </Button>
                     </Grid>
 
                     <!-- TreeView for Products -->
@@ -192,7 +205,10 @@
                                                 Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}"
                                                 MouseLeftButtonDown="ProductItem_MouseLeftButtonDown">
                                         <TextBlock Text="{Binding Icon}" FontSize="10" Margin="0,0,4,0"/>
-                                        <TextBlock Text="{Binding Name}" FontSize="11"/>
+                                        <TextBlock FontSize="11"
+                                                   conv:TextBlockHighlight.Text="{Binding Name}"
+                                                   conv:TextBlockHighlight.HighlightText="{Binding SearchText}"
+                                                   conv:TextBlockHighlight.HighlightBrush="{DynamicResource WarningLightBrush}"/>
                                         <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
                                                    Style="{StaticResource TextSecondary}" FontSize="10"/>
                                     </StackPanel>
@@ -213,6 +229,7 @@
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="TreeViewItem">
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVis}}"/>
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>

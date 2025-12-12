@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Media;
 
 namespace SmartBasket.WPF.Converters;
 
@@ -29,6 +32,26 @@ public class InverseBooleanToVisibilityConverter : IValueConverter
             return visibility != Visibility.Visible;
         }
         return false;
+    }
+}
+
+/// <summary>
+/// Converts int to Visibility (int > 0 = Visible, 0 = Collapsed)
+/// </summary>
+public class IntToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int intValue)
+        {
+            return intValue > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        return Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
     }
 }
 
@@ -129,5 +152,106 @@ public class StringToColorConverter : IValueConverter
             return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
         }
         return "#808080";
+    }
+}
+
+/// <summary>
+/// Attached behavior for highlighting search text in TextBlock
+/// </summary>
+public static class TextBlockHighlight
+{
+    public static readonly DependencyProperty TextProperty =
+        DependencyProperty.RegisterAttached(
+            "Text",
+            typeof(string),
+            typeof(TextBlockHighlight),
+            new PropertyMetadata(string.Empty, OnTextChanged));
+
+    public static readonly DependencyProperty HighlightTextProperty =
+        DependencyProperty.RegisterAttached(
+            "HighlightText",
+            typeof(string),
+            typeof(TextBlockHighlight),
+            new PropertyMetadata(string.Empty, OnHighlightTextChanged));
+
+    public static readonly DependencyProperty HighlightBrushProperty =
+        DependencyProperty.RegisterAttached(
+            "HighlightBrush",
+            typeof(Brush),
+            typeof(TextBlockHighlight),
+            new PropertyMetadata(new SolidColorBrush(Color.FromRgb(255, 235, 59)), OnHighlightBrushChanged));
+
+    public static string GetText(DependencyObject obj) => (string)obj.GetValue(TextProperty);
+    public static void SetText(DependencyObject obj, string value) => obj.SetValue(TextProperty, value);
+
+    public static string GetHighlightText(DependencyObject obj) => (string)obj.GetValue(HighlightTextProperty);
+    public static void SetHighlightText(DependencyObject obj, string value) => obj.SetValue(HighlightTextProperty, value);
+
+    public static Brush GetHighlightBrush(DependencyObject obj) => (Brush)obj.GetValue(HighlightBrushProperty);
+    public static void SetHighlightBrush(DependencyObject obj, Brush value) => obj.SetValue(HighlightBrushProperty, value);
+
+    private static void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TextBlock textBlock)
+            UpdateHighlighting(textBlock);
+    }
+
+    private static void OnHighlightTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TextBlock textBlock)
+            UpdateHighlighting(textBlock);
+    }
+
+    private static void OnHighlightBrushChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TextBlock textBlock)
+            UpdateHighlighting(textBlock);
+    }
+
+    private static void UpdateHighlighting(TextBlock textBlock)
+    {
+        var text = GetText(textBlock);
+        var highlightText = GetHighlightText(textBlock);
+        var highlightBrush = GetHighlightBrush(textBlock);
+
+        textBlock.Inlines.Clear();
+
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        if (string.IsNullOrEmpty(highlightText))
+        {
+            textBlock.Inlines.Add(new Run(text));
+            return;
+        }
+
+        // Find all occurrences (case insensitive)
+        var currentIndex = 0;
+        var searchIndex = 0;
+
+        while ((searchIndex = text.IndexOf(highlightText, currentIndex, StringComparison.OrdinalIgnoreCase)) >= 0)
+        {
+            // Add text before match
+            if (searchIndex > currentIndex)
+            {
+                textBlock.Inlines.Add(new Run(text.Substring(currentIndex, searchIndex - currentIndex)));
+            }
+
+            // Add highlighted match (use original case from text)
+            var matchText = text.Substring(searchIndex, highlightText.Length);
+            textBlock.Inlines.Add(new Run(matchText)
+            {
+                Background = highlightBrush,
+                FontWeight = FontWeights.SemiBold
+            });
+
+            currentIndex = searchIndex + highlightText.Length;
+        }
+
+        // Add remaining text
+        if (currentIndex < text.Length)
+        {
+            textBlock.Inlines.Add(new Run(text.Substring(currentIndex)));
+        }
     }
 }

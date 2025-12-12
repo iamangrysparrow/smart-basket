@@ -18,6 +18,7 @@
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
             <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
+            <converters:IntToVisibilityConverter x:Key="IntToVis"/>
             <converters:StringToColorConverter x:Key="StringToColor"/>
             <converters:DoubleToStringConverter x:Key="DoubleToString"/>
         </ResourceDictionary>

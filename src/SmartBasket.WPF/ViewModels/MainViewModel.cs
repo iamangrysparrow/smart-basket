@@ -451,7 +451,11 @@ public partial class MainViewModel : ObservableObject
             var (receipts, shops) = await Task.Run(async () =>
             {
                 // Build query with filters
-                IQueryable<Receipt> query = _dbContext.Receipts.Include(r => r.Items).ThenInclude(i => i.Item);
+                IQueryable<Receipt> query = _dbContext.Receipts
+                    .Include(r => r.Items)
+                        .ThenInclude(i => i.Item)
+                            .ThenInclude(item => item!.ItemLabels)
+                                .ThenInclude(il => il.Label);
 
                 // Apply shop filter
                 if (!string.IsNullOrEmpty(SelectedShopFilter) && SelectedShopFilter != "Все")
@@ -1105,6 +1109,15 @@ public class ReceiptItemViewModel
         Quantity = item.Quantity;
         Amount = item.Amount;
         UnitOfMeasure = item.Item?.UnitOfMeasure;
+
+        // Load labels from Item
+        if (item.Item?.ItemLabels != null)
+        {
+            Labels = item.Item.ItemLabels
+                .Where(il => il.Label != null)
+                .Select(il => new LabelViewModel(il.Label!))
+                .ToList();
+        }
     }
 
     public Guid Id { get; }
@@ -1114,4 +1127,5 @@ public class ReceiptItemViewModel
     public decimal Quantity { get; }
     public decimal? Amount { get; }
     public string? UnitOfMeasure { get; }
+    public List<LabelViewModel> Labels { get; } = new();
 }

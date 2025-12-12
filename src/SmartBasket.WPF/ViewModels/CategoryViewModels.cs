@@ -116,6 +116,24 @@ public partial class ProductTreeItemViewModel : ObservableObject
     [ObservableProperty]
     private string _editName = string.Empty;
 
+    /// <summary>
+    /// Current search text for highlighting
+    /// </summary>
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    /// <summary>
+    /// True if this item matches the search (for highlighting)
+    /// </summary>
+    [ObservableProperty]
+    private bool _isMatching;
+
+    /// <summary>
+    /// True if this item should be visible (matches or has matching children)
+    /// </summary>
+    [ObservableProperty]
+    private bool _isVisible = true;
+
     public bool IsSpecialNode { get; set; }
     public bool IsAllNode { get; set; }
 
@@ -131,6 +149,92 @@ public partial class ProductTreeItemViewModel : ObservableObject
     {
         IsEditing = false;
         EditName = string.Empty;
+    }
+
+    /// <summary>
+    /// Apply search - set IsMatching, IsVisible, and SearchText recursively.
+    /// Returns true if this item or any child matches.
+    /// </summary>
+    public bool ApplySearch(string searchText)
+    {
+        SearchText = searchText;
+        var hasMatch = false;
+
+        // Check if this item matches
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            IsMatching = Name.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            hasMatch = IsMatching;
+        }
+        else
+        {
+            IsMatching = false;
+        }
+
+        // Apply to children recursively
+        foreach (var child in Children)
+        {
+            if (child.ApplySearch(searchText))
+            {
+                hasMatch = true;
+            }
+        }
+
+        // Set visibility: visible if matches or has matching descendants
+        // When no search text - everything is visible
+        IsVisible = string.IsNullOrWhiteSpace(searchText) || hasMatch;
+
+        // Expand if any child matches (to show matching descendants)
+        if (hasMatch && !string.IsNullOrWhiteSpace(searchText))
+        {
+            IsExpanded = true;
+        }
+
+        return hasMatch;
+    }
+
+    /// <summary>
+    /// Clear search highlighting recursively
+    /// </summary>
+    public void ClearSearch()
+    {
+        SearchText = string.Empty;
+        IsMatching = false;
+        IsVisible = true;
+        foreach (var child in Children)
+        {
+            child.ClearSearch();
+        }
+    }
+
+    /// <summary>
+    /// Collect expanded node IDs recursively
+    /// </summary>
+    public void CollectExpandedIds(HashSet<Guid> expandedIds)
+    {
+        if (IsExpanded && Id.HasValue)
+        {
+            expandedIds.Add(Id.Value);
+        }
+        foreach (var child in Children)
+        {
+            child.CollectExpandedIds(expandedIds);
+        }
+    }
+
+    /// <summary>
+    /// Restore expanded state from saved IDs recursively
+    /// </summary>
+    public void RestoreExpandedState(HashSet<Guid> expandedIds)
+    {
+        if (Id.HasValue && expandedIds.Contains(Id.Value))
+        {
+            IsExpanded = true;
+        }
+        foreach (var child in Children)
+        {
+            child.RestoreExpandedState(expandedIds);
+        }
     }
 }
 

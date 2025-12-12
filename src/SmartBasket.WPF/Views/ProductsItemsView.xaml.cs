@@ -42,6 +42,14 @@ public partial class ProductsItemsView : UserControl
         }
     }
 
+    private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel != null)
+        {
+            _viewModel.MasterSearchText = string.Empty;
+        }
+    }
+
     private void ItemsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_viewModel == null) return;
@@ -299,8 +307,23 @@ public partial class ProductsItemsView : UserControl
         // Add as sibling (same parent) of selected product
         Guid? parentId = _viewModel.SelectedProduct?.ParentId;
 
-        await _viewModel.CreateProductAsync("Новый продукт", parentId);
+        var newProduct = await _viewModel.CreateProductAsync("Новый продукт", parentId);
         BuildContextMenus();
+
+        // Scroll to and start editing the new product
+        if (newProduct != null)
+        {
+            var productVm = FindProductById(_viewModel.ProductTree, newProduct.Id);
+            if (productVm != null)
+            {
+                ScrollToAndFocusProduct(productVm);
+                // Start inline editing after UI updates
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+                {
+                    productVm.StartEdit();
+                });
+            }
+        }
     }
 
     private async void AddChildProductInline_Click(object sender, RoutedEventArgs e)
@@ -319,6 +342,21 @@ public partial class ProductsItemsView : UserControl
         _viewModel.SelectedProduct.IsExpanded = true;
 
         BuildContextMenus();
+
+        // Scroll to and start editing the new product
+        if (newProduct != null)
+        {
+            var productVm = FindProductById(_viewModel.ProductTree, newProduct.Id);
+            if (productVm != null)
+            {
+                ScrollToAndFocusProduct(productVm);
+                // Start inline editing after UI updates
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+                {
+                    productVm.StartEdit();
+                });
+            }
+        }
     }
 
     private void RenameProduct_Click(object sender, RoutedEventArgs e)
@@ -428,19 +466,107 @@ public partial class ProductsItemsView : UserControl
         if (_viewModel == null || !product.IsEditing) return;
 
         var newName = product.EditName?.Trim();
+        var productId = product.Id;
+
         if (string.IsNullOrEmpty(newName))
         {
             product.CancelEdit();
             return;
         }
 
-        if (newName != product.Name && product.Id.HasValue)
+        if (newName != product.Name && productId.HasValue)
         {
-            await _viewModel.UpdateProductAsync(product.Id.Value, newName, product.ParentId);
+            await _viewModel.UpdateProductAsync(productId.Value, newName, product.ParentId);
         }
 
         product.CancelEdit();
         BuildContextMenus();
+
+        // Focus and scroll to edited product (find by ID since tree was rebuilt)
+        if (productId.HasValue)
+        {
+            var updatedProduct = FindProductById(_viewModel.ProductTree, productId.Value);
+            ScrollToAndFocusProduct(updatedProduct);
+        }
+    }
+
+    #endregion
+
+    #region TreeView Focus and Scroll Helpers
+
+    /// <summary>
+    /// Scrolls to and focuses on a product in the TreeView
+    /// </summary>
+    private void ScrollToAndFocusProduct(ProductTreeItemViewModel? product)
+    {
+        if (product == null || _viewModel == null) return;
+
+        // Set SelectedProduct in ViewModel
+        _viewModel.SelectedProduct = product;
+
+        // Use dispatcher to ensure UI has updated
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+        {
+            var treeViewItem = FindTreeViewItem(ProductTreeView, product);
+            if (treeViewItem != null)
+            {
+                treeViewItem.IsSelected = true;
+                treeViewItem.BringIntoView();
+                treeViewItem.Focus();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Finds a TreeViewItem for a given data item recursively
+    /// </summary>
+    private TreeViewItem? FindTreeViewItem(ItemsControl container, object item)
+    {
+        if (container == null) return null;
+
+        // Check if the container itself is a TreeViewItem with our data context
+        if (container is TreeViewItem tvi && tvi.DataContext == item)
+        {
+            return tvi;
+        }
+
+        // Iterate through children
+        for (int i = 0; i < container.Items.Count; i++)
+        {
+            var childContainer = container.ItemContainerGenerator.ContainerFromIndex(i) as TreeViewItem;
+            if (childContainer == null) continue;
+
+            if (childContainer.DataContext == item)
+            {
+                return childContainer;
+            }
+
+            // Search recursively in children
+            var result = FindTreeViewItem(childContainer, item);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finds a ProductTreeItemViewModel by ID recursively in the tree
+    /// </summary>
+    private ProductTreeItemViewModel? FindProductById(IEnumerable<ProductTreeItemViewModel> products, Guid id)
+    {
+        foreach (var product in products)
+        {
+            if (product.Id == id)
+                return product;
+
+            var found = FindProductById(product.Children, id);
+            if (found != null)
+                return found;
+        }
+        return null;
     }
 
     #endregion

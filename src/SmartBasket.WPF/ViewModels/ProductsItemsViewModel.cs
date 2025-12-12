@@ -197,55 +197,25 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     private void FilterProductTree()
     {
-        if (string.IsNullOrWhiteSpace(MasterSearchText))
+        var searchText = MasterSearchText?.Trim() ?? string.Empty;
+
+        // Apply search highlighting and expansion to all items
+        foreach (var item in _fullProductTree)
         {
-            // No filter - restore full tree
-            lock (_productTreeLock)
+            if (item.IsAllNode)
             {
-                ProductTree.Clear();
-                foreach (var item in _fullProductTree)
-                {
-                    ProductTree.Add(item);
-                }
+                item.ClearSearch();
             }
-            return;
-        }
-
-        var searchLower = MasterSearchText.ToLowerInvariant();
-
-        lock (_productTreeLock)
-        {
-            ProductTree.Clear();
-
-            foreach (var item in _fullProductTree)
+            else
             {
-                if (item.IsAllNode)
-                {
-                    // Always show "All" node
-                    ProductTree.Add(item);
-                }
-                else if (MatchesSearch(item, searchLower))
-                {
-                    ProductTree.Add(item);
-                }
+                item.ApplySearch(searchText);
             }
         }
-    }
 
-    private bool MatchesSearch(ProductTreeItemViewModel item, string searchLower)
-    {
-        // Match if name contains search text
-        if (item.Name.ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Match if any child matches
-        foreach (var child in item.Children)
-        {
-            if (MatchesSearch(child, searchLower))
-                return true;
-        }
-
-        return false;
+        // If no search - just show full tree (highlighting already cleared)
+        // If search - show items that match (already expanded via ApplySearch)
+        // We don't hide non-matching items because the tree structure is needed
+        // Instead we just highlight matching items
     }
 
     private void FilterLabels()
@@ -293,11 +263,28 @@ public partial class ProductsItemsViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadProductTreeAsync()
     {
+        await LoadProductTreeAsync(preserveState: false);
+    }
+
+    private async Task LoadProductTreeAsync(bool preserveState, Guid? selectProductId = null)
+    {
         if (IsBusy) return;
         IsBusy = true;
 
         try
         {
+            // Save current state before reload
+            HashSet<Guid> expandedIds = new();
+            var selectedId = selectProductId ?? SelectedProduct?.Id;
+
+            if (preserveState)
+            {
+                foreach (var item in _fullProductTree)
+                {
+                    item.CollectExpandedIds(expandedIds);
+                }
+            }
+
             var products = await _productService.GetAllWithHierarchyAsync();
 
             lock (_productTreeLock)
@@ -326,6 +313,21 @@ public partial class ProductsItemsViewModel : ObservableObject
                     ProductTree.Add(treeItem);
                     _fullProductTree.Add(treeItem);
                 }
+
+                // Restore expanded state
+                if (preserveState && expandedIds.Count > 0)
+                {
+                    foreach (var item in _fullProductTree)
+                    {
+                        item.RestoreExpandedState(expandedIds);
+                    }
+                }
+            }
+
+            // Restore selection
+            if (selectedId.HasValue)
+            {
+                SelectedProduct = FindProductById(ProductTree, selectedId.Value);
             }
 
             var (totalProducts, totalItems) = await _productService.GetStatisticsAsync();
@@ -526,17 +528,10 @@ public partial class ProductsItemsViewModel : ObservableObject
     {
         if (IsProductsMode)
         {
-            // Save selected product ID
-            var selectedId = SelectedProduct?.Id;
+            await LoadProductTreeAsync(preserveState: true);
 
-            await LoadProductTreeAsync();
-
-            // Restore selection
-            if (selectedId.HasValue)
-            {
-                SelectedProduct = FindProductById(ProductTree, selectedId.Value);
-            }
-            else if (ProductTree.Count > 0)
+            // Ensure selection is valid
+            if (SelectedProduct == null && ProductTree.Count > 0)
             {
                 SelectedProduct = ProductTree[0]; // Select "All"
             }
@@ -624,21 +619,21 @@ public partial class ProductsItemsViewModel : ObservableObject
 
         if (success)
         {
-            await LoadProductTreeAsync();
+            await LoadProductTreeAsync(preserveState: true);
         }
     }
 
     public async Task<Product> CreateProductAsync(string name, Guid? parentId)
     {
         var product = await _productService.CreateAsync(name, parentId);
-        await LoadProductTreeAsync();
+        await LoadProductTreeAsync(preserveState: true, selectProductId: product.Id);
         return product;
     }
 
     public async Task<Product> UpdateProductAsync(Guid id, string name, Guid? parentId)
     {
         var product = await _productService.UpdateAsync(id, name, parentId);
-        await LoadProductTreeAsync();
+        await LoadProductTreeAsync(preserveState: true, selectProductId: id);
         return product;
     }
 

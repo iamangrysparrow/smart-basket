@@ -167,6 +167,22 @@
                                                     <TextBlock Text="{Binding ProductName}" Style="{StaticResource TextSecondary}" FontSize="10"
                                                                Foreground="{DynamicResource AccentBrush}"/>
                                                 </StackPanel>
+                                                <!-- Labels -->
+                                                <ItemsControl ItemsSource="{Binding Labels}" Margin="0,2,0,0">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel Orientation="Horizontal"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="{Binding Color, Converter={StaticResource StringToColor}}"
+                                                                    CornerRadius="2" Padding="4,1" Margin="0,0,3,0">
+                                                                <TextBlock Text="{Binding Name}" FontSize="9" Foreground="White"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
                                                 <TextBlock Style="{StaticResource PriceText}" Text="{Binding Amount, StringFormat={}{0:N2} ₽}"/>
