@@ -36,6 +36,9 @@
                 <ResourceDictionary Source="Themes/Controls/ListBoxStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/TagStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/ComboBoxStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/TreeViewStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/DataGridStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/TabControlStyles.xaml"/>
 
             </ResourceDictionary.MergedDictionaries>
 

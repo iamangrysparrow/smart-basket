@@ -92,10 +92,23 @@ public partial class ProductsItemsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditProduct))]
     [NotifyPropertyChangedFor(nameof(CanDeleteProduct))]
+    [NotifyPropertyChangedFor(nameof(CanAddChildProduct))]
     private ProductTreeItemViewModel? _selectedProduct;
 
     public bool CanEditProduct => SelectedProduct != null && !SelectedProduct.IsSpecialNode;
-    public bool CanDeleteProduct => SelectedProduct != null && !SelectedProduct.IsSpecialNode;
+
+    /// <summary>
+    /// Can add child: any product except "All" node
+    /// </summary>
+    public bool CanAddChildProduct => SelectedProduct != null && !SelectedProduct.IsAllNode;
+
+    /// <summary>
+    /// Can delete: must be non-special, have no children and no items
+    /// </summary>
+    public bool CanDeleteProduct => SelectedProduct != null
+                                    && !SelectedProduct.IsSpecialNode
+                                    && !SelectedProduct.HasChildren
+                                    && SelectedProduct.ItemCount == 0;
 
     partial void OnSelectedProductChanged(ProductTreeItemViewModel? value)
     {

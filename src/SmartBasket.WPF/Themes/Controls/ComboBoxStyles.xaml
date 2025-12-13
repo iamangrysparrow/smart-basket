@@ -286,4 +286,11 @@
         </Setter>
     </Style>
 
+    <!-- FilterComboBox Style (for toolbar filters) -->
+    <Style x:Key="FilterComboBox" TargetType="ComboBox" BasedOn="{StaticResource DefaultComboBox}">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="Padding" Value="8,4"/>
+    </Style>
+
 </ResourceDictionary>

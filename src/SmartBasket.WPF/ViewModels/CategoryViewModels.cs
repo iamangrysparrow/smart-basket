@@ -139,6 +139,11 @@ public partial class ProductTreeItemViewModel : ObservableObject
 
     public ObservableCollection<ProductTreeItemViewModel> Children { get; } = new();
 
+    /// <summary>
+    /// True if this item has children (for styling parent items differently)
+    /// </summary>
+    public bool HasChildren => Children.Count > 0;
+
     public void StartEdit()
     {
         EditName = Name;

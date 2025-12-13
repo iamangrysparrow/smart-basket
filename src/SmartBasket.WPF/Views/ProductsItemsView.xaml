@@ -6,18 +6,18 @@
              xmlns:vm="clr-namespace:SmartBasket.WPF.ViewModels"
              xmlns:conv="clr-namespace:SmartBasket.WPF.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="500" d:DesignWidth="900"
+             d:DesignHeight="600" d:DesignWidth="1000"
+             Background="{DynamicResource BackgroundBaseBrush}"
              Loaded="UserControl_Loaded">
 
-    <Grid Margin="6">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
-        <Border Grid.Row="0" Style="{StaticResource Card}" Padding="4" Margin="0,0,0,4">
+        <!-- Sub Toolbar (filters row) -->
+        <Border Grid.Row="0" Style="{StaticResource SubToolbar}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -27,169 +27,201 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Mode Switcher -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <RadioButton x:Name="ProductsModeBtn" Content="Продукты"
-                                 IsChecked="{Binding IsProductsMode, Mode=TwoWay}"
-                                 Style="{StaticResource {x:Type ToggleButton}}"
-                                 Margin="0,0,2,0" Padding="8,3" FontSize="11"/>
-                    <RadioButton Content="Метки"
-                                 IsChecked="{Binding IsLabelsMode, Mode=OneWay}"
-                                 Style="{StaticResource {x:Type ToggleButton}}"
-                                 Padding="8,3" FontSize="11"/>
-                </StackPanel>
+                <!-- Mode Switcher (Products/Labels) -->
+                <Border Grid.Column="0" Style="{StaticResource ViewTabsContainer}">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="ProductsModeBtn" Content="Продукты"
+                                     IsChecked="{Binding IsProductsMode, Mode=TwoWay}"
+                                     Style="{StaticResource ViewTabButton}"/>
+                        <RadioButton Content="Метки"
+                                     IsChecked="{Binding IsLabelsMode, Mode=OneWay}"
+                                     Style="{StaticResource ViewTabButton}"/>
+                    </StackPanel>
+                </Border>
 
-                <Separator Grid.Column="1" Style="{StaticResource ToolbarSeparator}" Margin="8,0"/>
+                <Border Grid.Column="1" Style="{StaticResource ToolbarDivider}"/>
 
                 <!-- Filters -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <TextBlock Text="Магазин:" Style="{StaticResource TextSecondary}"
-                               VerticalAlignment="Center" Margin="0,0,4,0"/>
-                    <ComboBox Width="100" FontSize="10"
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Магазин:" Style="{StaticResource FilterLabel}"/>
+                    <ComboBox Width="120"
                               ItemsSource="{Binding ShopFilters}"
-                              SelectedItem="{Binding SelectedShopFilter}"/>
+                              SelectedItem="{Binding SelectedShopFilter}"
+                              Style="{StaticResource FilterComboBox}"/>
 
-                    <CheckBox Content="С дочерними" Margin="8,0,0,0" FontSize="10"
+                    <CheckBox Content="С дочерними" Style="{StaticResource FilterCheckBox}"
                               IsChecked="{Binding IncludeChildrenItems}"
-                              Visibility="{Binding ShowIncludeChildren, Converter={StaticResource BoolToVis}}"
-                              VerticalAlignment="Center"/>
+                              Visibility="{Binding ShowIncludeChildren, Converter={StaticResource BoolToVis}}"/>
 
                     <!-- Labels emptiness filter (only in labels mode) -->
-                    <TextBlock Text="Показать:" Style="{StaticResource TextSecondary}"
-                               VerticalAlignment="Center" Margin="8,0,4,0"
+                    <TextBlock Text="Показать:" Style="{StaticResource FilterLabel}"
+                               Margin="16,0,6,0"
                                Visibility="{Binding IsLabelsMode, Converter={StaticResource BoolToVis}}"/>
-                    <ComboBox Width="80" FontSize="10"
+                    <ComboBox Width="100"
                               ItemsSource="{Binding LabelEmptinessFilters}"
                               SelectedItem="{Binding SelectedLabelEmptinessFilter}"
+                              Style="{StaticResource FilterComboBox}"
                               Visibility="{Binding IsLabelsMode, Converter={StaticResource BoolToVis}}"/>
                 </StackPanel>
 
-                <!-- Statistics -->
-                <Border Grid.Column="3" Style="{StaticResource Badge}" Margin="8,0" VerticalAlignment="Center"
-                        HorizontalAlignment="Left">
-                    <TextBlock Style="{StaticResource TextSecondary}" FontSize="9">
-                        <Run Text="Продуктов:"/>
-                        <Run Text="{Binding TotalProductsCount}" FontWeight="Bold"/>
-                        <Run Text=" | Товаров:"/>
-                        <Run Text="{Binding TotalItemsCount}" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                <!-- Spacer -->
+                <Border Grid.Column="3"/>
+
+                <!-- Statistics Badge -->
+                <Border Grid.Column="4" Style="{StaticResource StatsBadge}">
+                    <TextBlock Style="{StaticResource StatsBadgeText}">
+                        <Run Text="Продуктов: "/>
+                        <Run Text="{Binding TotalProductsCount}"/>
+                        <Run Text=" | Товаров: "/>
+                        <Run Text="{Binding TotalItemsCount}"/>
                     </TextBlock>
                 </Border>
-
-                <!-- Action Buttons -->
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                    <Button Style="{StaticResource PrimaryButton}" Click="AddButton_Click"
-                            ToolTip="Добавить" Padding="6,3">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource IconAdd}" Fill="White" Width="10" Height="10" Stretch="Uniform"/>
-                            <TextBlock Text="Добавить" Margin="4,0,0,0" FontSize="10"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Click="EditButton_Click"
-                            ToolTip="Редактировать" Margin="2,0,0,0">
-                        <Path Data="{StaticResource IconEdit}" Fill="{DynamicResource AccentBrush}"
-                              Width="12" Height="12" Stretch="Uniform"/>
-                    </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Click="DeleteButton_Click"
-                            ToolTip="Удалить" Margin="2,0,0,0">
-                        <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}"
-                              Width="12" Height="12" Stretch="Uniform"/>
-                    </Button>
-                    <Separator Style="{StaticResource ToolbarSeparator}"/>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding RefreshCommand}"
-                            IsEnabled="{Binding IsNotBusy}" ToolTip="Обновить">
-                        <Path Data="{StaticResource IconRefresh}" Fill="#107C10" Width="12" Height="12" Stretch="Uniform"/>
-                    </Button>
-                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Content: Master-Detail -->
-        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="240" MinWidth="180"/>
-                    <ColumnDefinition Width="6"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+        <!-- Main Content: Master-Detail Layout -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" MinWidth="200"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                <!-- Master Panel (Left) -->
-                <Grid Grid.Column="0">
+            <!-- Master Panel (Left - Tree/List) -->
+            <Border Grid.Column="0" Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="0,0,1,0">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Border Grid.Row="0" Style="{StaticResource SectionHeader}" CornerRadius="4,0,0,0">
-                        <TextBlock>
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource H3}">
-                                    <Setter Property="Text" Value="Продукты"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsLabelsMode}" Value="True">
-                                            <Setter Property="Text" Value="Метки"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                    <!-- Panel Header with action buttons -->
+                    <Border Grid.Row="0" Style="{StaticResource PanelHeader}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Style="{StaticResource PanelHeaderText}">
+                                <TextBlock.Text>
+                                    <Binding Path="IsLabelsMode">
+                                        <Binding.Converter>
+                                            <conv:BoolToStringConverter TrueValue="МЕТКИ" FalseValue="ПРОДУКТЫ"/>
+                                        </Binding.Converter>
+                                    </Binding>
+                                </TextBlock.Text>
+                            </TextBlock>
+
+                            <!-- Action buttons (only in Products mode) -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                        Visibility="{Binding IsProductsMode, Converter={StaticResource BoolToVis}}">
+                                <Button x:Name="AddProductBtn" Style="{StaticResource GhostButton}"
+                                        Click="AddProductInline_Click" ToolTip="Добавить продукт"
+                                        Padding="4" Margin="0,0,2,0">
+                                    <Path Data="{StaticResource IconAdd}" Fill="{DynamicResource AccentBrush}"
+                                          Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                                <Button x:Name="AddChildProductBtn" Style="{StaticResource GhostButton}"
+                                        Click="AddChildProductInline_Click" ToolTip="Добавить подуровень"
+                                        Padding="4" Margin="0,0,2,0"
+                                        IsEnabled="{Binding CanAddChildProduct}">
+                                    <Path Data="{StaticResource IconAddChild}" Fill="{DynamicResource SuccessBrush}"
+                                          Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                                <Button x:Name="DeleteProductBtn" Style="{StaticResource GhostButton}"
+                                        Click="DeleteProductInline_Click" ToolTip="Удалить"
+                                        Padding="4" Margin="0,0,2,0"
+                                        IsEnabled="{Binding CanDeleteProduct}">
+                                    <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}"
+                                          Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                                <Button Style="{StaticResource GhostButton}" Command="{Binding RefreshCommand}"
+                                        IsEnabled="{Binding IsNotBusy}" ToolTip="Обновить"
+                                        Padding="4">
+                                    <Path Data="{StaticResource IconRefresh}" Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                          Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
                     </Border>
 
-                    <!-- Search -->
-                    <Grid Grid.Row="1" Margin="4">
-                        <TextBox x:Name="MasterSearchBox" Style="{StaticResource TextInput}"
-                                 Text="{Binding MasterSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 FontSize="10" Padding="4,2,20,2"/>
-                        <TextBlock Text="Поиск..." IsHitTestVisible="False"
-                                   Style="{StaticResource TextSecondary}" FontSize="10"
-                                   VerticalAlignment="Center" Margin="6,0,0,0"
-                                   Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
-                        <!-- Search icon (shown when empty) -->
-                        <Path Data="{StaticResource IconSearch}" Fill="{DynamicResource TextTertiaryBrush}"
-                              Width="10" Height="10" Stretch="Uniform"
-                              HorizontalAlignment="Right" Margin="0,0,6,0"
-                              Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
-                        <!-- Clear button (shown when has text) -->
-                        <Button HorizontalAlignment="Right" VerticalAlignment="Center"
-                                Margin="0,0,2,0" Padding="4" Cursor="Hand"
-                                Click="ClearSearchButton_Click"
-                                Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource IntToVis}}"
-                                Style="{StaticResource {x:Type Button}}"
-                                Background="Transparent" BorderThickness="0">
-                            <Path Data="{StaticResource IconCancel}" Fill="{DynamicResource TextSecondaryBrush}"
-                                  Width="12" Height="12" Stretch="Uniform"/>
-                        </Button>
+                    <!-- Search Box -->
+                    <Grid Grid.Row="1" Margin="12,12,12,8">
+                        <Border Background="{DynamicResource BackgroundBaseBrush}"
+                                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                BorderThickness="1" CornerRadius="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Path Grid.Column="0" Data="{StaticResource IconSearch}"
+                                      Fill="{DynamicResource ForegroundTertiaryBrush}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      Margin="10,0,8,0" VerticalAlignment="Center"/>
+
+                                <TextBox x:Name="MasterSearchBox" Grid.Column="1"
+                                         Text="{Binding MasterSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="Transparent" BorderThickness="0"
+                                         Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                                         FontSize="12" Padding="0,6"
+                                         VerticalContentAlignment="Center"/>
+
+                                <TextBlock Grid.Column="1" Text="Поиск..." IsHitTestVisible="False"
+                                           Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                           FontSize="12" VerticalAlignment="Center" Margin="0,0,0,0"
+                                           Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
+
+                                <Button Grid.Column="2" Click="ClearSearchButton_Click"
+                                        Visibility="{Binding Text.Length, ElementName=MasterSearchBox, Converter={StaticResource IntToVis}}"
+                                        Background="Transparent" BorderThickness="0"
+                                        Padding="8,6" Cursor="Hand">
+                                    <Path Data="{StaticResource IconCancel}"
+                                          Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                          Width="10" Height="10" Stretch="Uniform"/>
+                                </Button>
+                            </Grid>
+                        </Border>
                     </Grid>
 
                     <!-- TreeView for Products -->
                     <TreeView Grid.Row="2" x:Name="ProductTreeView"
                               ItemsSource="{Binding ProductTree}"
                               SelectedItemChanged="ProductTree_SelectedItemChanged"
-                              Style="{StaticResource ModernTreeView}" FontSize="11"
+                              Style="{StaticResource ProductsTreeView}"
+                              Padding="8,0"
                               Visibility="{Binding IsProductsMode, Converter={StaticResource BoolToVis}}">
                         <TreeView.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Добавить" Click="AddProductInline_Click">
+                                <MenuItem Header="Добавить продукт" Click="AddProductInline_Click">
                                     <MenuItem.Icon>
                                         <Path Data="{StaticResource IconAdd}" Fill="{DynamicResource AccentBrush}"
                                               Width="12" Height="12" Stretch="Uniform"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="Добавить подуровень" Click="AddChildProductInline_Click">
+                                <MenuItem Header="Добавить подуровень" Click="AddChildProductInline_Click"
+                                          IsEnabled="{Binding CanAddChildProduct}">
                                     <MenuItem.Icon>
-                                        <Path Data="{StaticResource IconAdd}" Fill="{DynamicResource SuccessBrush}"
+                                        <Path Data="{StaticResource IconAddChild}" Fill="{DynamicResource SuccessBrush}"
                                               Width="12" Height="12" Stretch="Uniform"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <Separator/>
-                                <MenuItem Header="Переименовать" Click="RenameProduct_Click" InputGestureText="F2">
+                                <MenuItem Header="Переименовать" Click="RenameProduct_Click" InputGestureText="F2"
+                                          IsEnabled="{Binding CanEditProduct}">
                                     <MenuItem.Icon>
-                                        <Path Data="{StaticResource IconEdit}" Fill="{DynamicResource AccentBrush}"
+                                        <Path Data="{StaticResource IconEdit}" Fill="{DynamicResource ForegroundSecondaryBrush}"
                                               Width="12" Height="12" Stretch="Uniform"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="Удалить" Click="DeleteProductContext_Click">
+                                <MenuItem Header="Удалить" Click="DeleteProductContext_Click"
+                                          IsEnabled="{Binding CanDeleteProduct}">
                                     <MenuItem.Icon>
                                         <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}"
                                               Width="12" Height="12" Stretch="Uniform"/>
@@ -201,23 +233,37 @@
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                 <Grid>
                                     <!-- Normal view -->
-                                    <StackPanel Orientation="Horizontal" Margin="1"
+                                    <StackPanel Orientation="Horizontal"
                                                 Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}"
                                                 MouseLeftButtonDown="ProductItem_MouseLeftButtonDown">
-                                        <TextBlock Text="{Binding Icon}" FontSize="10" Margin="0,0,4,0"/>
-                                        <TextBlock FontSize="11"
-                                                   conv:TextBlockHighlight.Text="{Binding Name}"
+                                        <!-- Color dot for leaf items (no children) -->
+                                        <Ellipse Style="{StaticResource TreeItemIcon}"
+                                                 Fill="{DynamicResource AccentMutedBrush}"
+                                                 Visibility="{Binding HasChildren, Converter={StaticResource InverseBoolToVis}}"/>
+                                        <TextBlock conv:TextBlockHighlight.Text="{Binding Name}"
                                                    conv:TextBlockHighlight.HighlightText="{Binding SearchText}"
-                                                   conv:TextBlockHighlight.HighlightBrush="{DynamicResource WarningLightBrush}"/>
+                                                   conv:TextBlockHighlight.HighlightBrush="{DynamicResource WarningSubtleBrush}"
+                                                   FontSize="13"
+                                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasChildren}" Value="True">
+                                                            <Setter Property="FontWeight" Value="Medium"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
-                                                   Style="{StaticResource TextSecondary}" FontSize="10"/>
+                                                   Style="{StaticResource TreeItemCount}"/>
                                     </StackPanel>
                                     <!-- Edit view -->
-                                    <StackPanel Orientation="Horizontal" Margin="1"
+                                    <StackPanel Orientation="Horizontal"
                                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding Icon}" FontSize="10" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                         <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
-                                                 FontSize="11" MinWidth="100" Padding="2"
+                                                 FontSize="13" MinWidth="120" Padding="4,2"
                                                  x:Name="EditTextBox"
                                                  KeyDown="EditTextBox_KeyDown"
                                                  LostFocus="EditTextBox_LostFocus"
@@ -227,7 +273,7 @@
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
                         <TreeView.ItemContainerStyle>
-                            <Style TargetType="TreeViewItem">
+                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource ProductsTreeViewItem}">
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                 <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVis}}"/>
                             </Style>
@@ -238,139 +284,148 @@
                     <ListBox Grid.Row="2" x:Name="LabelsListBox"
                              ItemsSource="{Binding Labels}"
                              SelectedItem="{Binding SelectedLabel}"
-                             Style="{StaticResource ReceiptListBox}" FontSize="11"
+                             Style="{StaticResource SidebarListBox}"
+                             Padding="8,0"
                              Visibility="{Binding IsLabelsMode, Converter={StaticResource BoolToVis}}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource SidebarListBoxItem}"/>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="2">
-                                    <Ellipse Width="10" Height="10" Margin="0,0,6,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center">
                                         <Ellipse.Fill>
                                             <SolidColorBrush Color="{Binding Color}"/>
                                         </Ellipse.Fill>
                                     </Ellipse>
-                                    <TextBlock Text="{Binding Name}" FontSize="11"/>
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource TreeItemText}"/>
                                     <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
-                                               Style="{StaticResource TextSecondary}" FontSize="10"/>
+                                               Style="{StaticResource TreeItemCount}"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Grid>
+            </Border>
 
-                <!-- GridSplitter -->
-                <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"
-                              Background="Transparent" Cursor="SizeWE"/>
+            <!-- GridSplitter -->
+            <GridSplitter Grid.Column="1" Width="1" HorizontalAlignment="Center"
+                          Background="{DynamicResource BorderDefaultBrush}" Cursor="SizeWE"/>
 
-                <!-- Detail Panel (Right) - Items DataGrid -->
-                <Grid Grid.Column="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <!-- Detail Panel (Right - Items DataGrid) -->
+            <Grid Grid.Column="2" Background="{DynamicResource BackgroundBaseBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Border Grid.Row="0" Style="{StaticResource SectionHeader}" CornerRadius="0,4,0,0">
+                <!-- Search for Items -->
+                <Grid Grid.Row="0" Margin="24,16,24,12">
+                    <Border Background="{DynamicResource BackgroundBaseBrush}"
+                            BorderBrush="{DynamicResource BorderDefaultBrush}"
+                            BorderThickness="1" CornerRadius="4">
                         <Grid>
-                            <TextBlock Text="Товары" Style="{StaticResource H3}"/>
-                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextSecondary}"
-                                       FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Path Grid.Column="0" Data="{StaticResource IconSearch}"
+                                  Fill="{DynamicResource ForegroundTertiaryBrush}"
+                                  Width="12" Height="12" Stretch="Uniform"
+                                  Margin="12,0,8,0" VerticalAlignment="Center"/>
+
+                            <TextBox x:Name="ItemSearchBox" Grid.Column="1"
+                                     Text="{Binding ItemSearchText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
+                                     Background="Transparent" BorderThickness="0"
+                                     Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                                     FontSize="12" Padding="0,8"
+                                     VerticalContentAlignment="Center"/>
+
+                            <TextBlock Grid.Column="1" Text="Поиск товаров..." IsHitTestVisible="False"
+                                       Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center"
+                                       Visibility="{Binding Text.Length, ElementName=ItemSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
                         </Grid>
                     </Border>
-
-                    <!-- Search -->
-                    <Grid Grid.Row="1" Margin="4">
-                        <TextBox x:Name="ItemSearchBox" Style="{StaticResource TextInput}"
-                                 Text="{Binding ItemSearchText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
-                                 FontSize="10"/>
-                        <TextBlock Text="Поиск товаров..." IsHitTestVisible="False"
-                                   Style="{StaticResource TextSecondary}" FontSize="10"
-                                   VerticalAlignment="Center" Margin="6,0,0,0"
-                                   Visibility="{Binding Text.Length, ElementName=ItemSearchBox, Converter={StaticResource InverseBoolToVis}}"/>
-                        <Path Data="{StaticResource IconSearch}" Fill="{DynamicResource TextTertiaryBrush}"
-                              Width="10" Height="10" Stretch="Uniform"
-                              HorizontalAlignment="Right" Margin="0,0,6,0"/>
-                    </Grid>
-
-                    <!-- DataGrid -->
-                    <DataGrid Grid.Row="2" x:Name="ItemsDataGrid"
-                              ItemsSource="{Binding Items}"
-                              SelectedItem="{Binding SelectedItem}"
-                              Style="{StaticResource ModernDataGrid}"
-                              AutoGenerateColumns="False" IsReadOnly="True"
-                              SelectionMode="Extended"
-                              SelectionChanged="ItemsDataGrid_SelectionChanged"
-                              MouseDoubleClick="ItemsDataGrid_MouseDoubleClick">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn Header="Ед." Binding="{Binding UnitOfMeasure}" Width="40"/>
-                            <DataGridTextColumn Header="Кол-во" Binding="{Binding PurchaseCount}" Width="50"/>
-                            <DataGridTextColumn Header="Магазин" Binding="{Binding Shop}" Width="80"/>
-                            <!-- Labels column -->
-                            <DataGridTemplateColumn Header="Метки" Width="Auto" MinWidth="60">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <ItemsControl ItemsSource="{Binding Labels}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border CornerRadius="8" Padding="6,2" Margin="0,0,3,0"
-                                                            VerticalAlignment="Center">
-                                                        <Border.Background>
-                                                            <SolidColorBrush Color="{Binding Color}" Opacity="0.2"/>
-                                                        </Border.Background>
-                                                        <Border.BorderBrush>
-                                                            <SolidColorBrush Color="{Binding Color}" Opacity="0.5"/>
-                                                        </Border.BorderBrush>
-                                                        <Border.BorderThickness>1</Border.BorderThickness>
-                                                        <TextBlock Text="{Binding Name}" FontSize="9"
-                                                                   VerticalAlignment="Center">
-                                                            <TextBlock.Foreground>
-                                                                <SolidColorBrush Color="{Binding Color}"/>
-                                                            </TextBlock.Foreground>
-                                                        </TextBlock>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Переместить в продукт" x:Name="MoveToProductMenuItem"/>
-                                <MenuItem Header="Назначить метку" x:Name="AssignLabelMenuItem"/>
-                                <Separator/>
-                                <MenuItem Header="Снять все метки" Command="{Binding RemoveAllLabelsFromItemsCommand}"/>
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                    </DataGrid>
                 </Grid>
-            </Grid>
-        </Border>
 
-        <!-- Status Bar -->
-        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="6,3" Margin="0,4,0,0">
-            <Grid>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Style="{StaticResource TextSecondary}" FontSize="10">
-                        <Run Text="Продуктов:"/>
-                        <Run Text="{Binding TotalProductsCount}" FontWeight="SemiBold"/>
-                        <Run Text=" | Товаров:"/>
-                        <Run Text="{Binding TotalItemsCount}" FontWeight="SemiBold"/>
-                        <Run Text=" | Выбрано:"/>
-                        <Run Text="{Binding SelectedItemsCount}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
-                    </TextBlock>
-                </StackPanel>
-                <ProgressBar Width="60" Height="4" IsIndeterminate="{Binding IsBusy}"
-                             HorizontalAlignment="Right"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+                <!-- DataGrid -->
+                <DataGrid Grid.Row="1" x:Name="ItemsDataGrid"
+                          ItemsSource="{Binding Items}"
+                          SelectedItem="{Binding SelectedItem}"
+                          Style="{StaticResource ProductsDataGrid}"
+                          ColumnHeaderStyle="{StaticResource ProductsDataGridColumnHeader}"
+                          RowStyle="{StaticResource ProductsDataGridRow}"
+                          CellStyle="{StaticResource ProductsDataGridCell}"
+                          SelectionChanged="ItemsDataGrid_SelectionChanged"
+                          MouseDoubleClick="ItemsDataGrid_MouseDoubleClick"
+                          Margin="24,0,24,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="НАЗВАНИЕ" Binding="{Binding Name}" Width="*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DataGridTextStyle}">
+                                    <Setter Property="Padding" Value="12,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="ЕД." Binding="{Binding UnitOfMeasure}" Width="60">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DataGridTextCentered}"/>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="КОЛ-ВО" Binding="{Binding PurchaseCount}" Width="70">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DataGridTextCentered}"/>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="МАГАЗИН" Binding="{Binding Shop}" Width="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DataGridTextSecondary}"/>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <!-- Labels column -->
+                        <DataGridTemplateColumn Header="МЕТКИ" Width="140">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ItemsControl ItemsSource="{Binding Labels}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="4" Padding="8,2" Margin="0,0,4,0"
+                                                        VerticalAlignment="Center">
+                                                    <Border.Background>
+                                                        <SolidColorBrush Color="{Binding Color}" Opacity="0.15"/>
+                                                    </Border.Background>
+                                                    <TextBlock Text="{Binding Name}" FontSize="10"
+                                                               FontWeight="Medium"
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Foreground>
+                                                            <SolidColorBrush Color="{Binding Color}"/>
+                                                        </TextBlock.Foreground>
+                                                    </TextBlock>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Переместить в продукт" x:Name="MoveToProductMenuItem"/>
+                            <MenuItem Header="Назначить метку" x:Name="AssignLabelMenuItem"/>
+                            <Separator/>
+                            <MenuItem Header="Снять все метки" Command="{Binding RemoveAllLabelsFromItemsCommand}"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
             </Grid>
-        </Border>
+        </Grid>
     </Grid>
 </UserControl>

@@ -365,10 +365,10 @@ public partial class ProductsItemsView : UserControl
         // Add as child of selected product
         Guid? parentId = _viewModel.SelectedProduct.Id;
 
-        var newProduct = await _viewModel.CreateProductAsync("Новый продукт", parentId);
-
-        // Expand parent to show new child
+        // Expand parent BEFORE creating child so state will be preserved when tree is rebuilt
         _viewModel.SelectedProduct.IsExpanded = true;
+
+        var newProduct = await _viewModel.CreateProductAsync("Новый продукт", parentId);
 
         BuildContextMenus();
 
@@ -397,20 +397,26 @@ public partial class ProductsItemsView : UserControl
 
     private async void DeleteProductContext_Click(object sender, RoutedEventArgs e)
     {
+        await DeleteSelectedProductAsync();
+    }
+
+    private async void DeleteProductInline_Click(object sender, RoutedEventArgs e)
+    {
+        await DeleteSelectedProductAsync();
+    }
+
+    private async Task DeleteSelectedProductAsync()
+    {
         if (_viewModel == null) return;
 
-        // Reuse the existing delete logic
         if (_viewModel.IsProductsMode && _viewModel.SelectedProduct?.Id != null)
         {
-            var (canDelete, itemsCount, childrenCount) = await _viewModel.CanDeleteProductAsync(
-                _viewModel.SelectedProduct.Id.Value);
-
-            if (!canDelete)
+            // Button is already disabled if can't delete, but double-check
+            if (!_viewModel.CanDeleteProduct)
             {
                 MessageBox.Show(
                     $"Нельзя удалить продукт \"{_viewModel.SelectedProduct.Name}\":\n\n" +
-                    $"- Связано товаров: {itemsCount}\n" +
-                    $"- Дочерних продуктов: {childrenCount}\n\n" +
+                    "Продукт содержит товары или дочерние продукты.\n" +
                     "Сначала переместите товары и удалите дочерние продукты.",
                     "Удаление невозможно",
                     MessageBoxButton.OK,

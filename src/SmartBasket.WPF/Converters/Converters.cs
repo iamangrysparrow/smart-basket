@@ -164,6 +164,33 @@ public class StringToColorConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts boolean to string values
+/// </summary>
+public class BoolToStringConverter : IValueConverter
+{
+    public string TrueValue { get; set; } = "True";
+    public string FalseValue { get; set; } = "False";
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool boolValue)
+        {
+            return boolValue ? TrueValue : FalseValue;
+        }
+        return FalseValue;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is string stringValue)
+        {
+            return stringValue == TrueValue;
+        }
+        return false;
+    }
+}
+
+/// <summary>
 /// Attached behavior for highlighting search text in TextBlock
 /// </summary>
 public static class TextBlockHighlight

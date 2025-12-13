@@ -369,14 +369,17 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Right: Stats -->
+                <!-- Right: Stats (from ProductsItemsViewModel) -->
                 <TextBlock Style="{StaticResource CaptionText}"
                            DockPanel.Dock="Right"
                            VerticalAlignment="Center">
                     <Run Text="Продуктов: "/>
-                    <Run Text="{Binding ProductsCount, Mode=OneWay, FallbackValue=0}"/>
+                    <Run Text="{Binding DataContext.TotalProductsCount, ElementName=ProductsItemsViewControl, Mode=OneWay, FallbackValue=0}"/>
                     <Run Text=" | Товаров: "/>
-                    <Run Text="{Binding ItemsCount, Mode=OneWay, FallbackValue=0}"/>
+                    <Run Text="{Binding DataContext.TotalItemsCount, ElementName=ProductsItemsViewControl, Mode=OneWay, FallbackValue=0}"/>
+                    <Run Text=" | Выбрано: "/>
+                    <Run Text="{Binding DataContext.SelectedItemsCount, ElementName=ProductsItemsViewControl, Mode=OneWay, FallbackValue=0}"
+                         Foreground="{DynamicResource AccentBrush}"/>
                 </TextBlock>
 
                 <!-- Center: Progress (when processing) -->
