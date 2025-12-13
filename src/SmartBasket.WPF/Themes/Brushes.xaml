@@ -44,4 +44,49 @@
     <SolidColorBrush x:Key="CategoryDefaultBgBrush" Color="{DynamicResource CategoryDefaultBg}"/>
     <SolidColorBrush x:Key="CategoryDefaultFgBrush" Color="{DynamicResource CategoryDefaultFg}"/>
 
+    <!-- ============================================= -->
+    <!-- LEGACY ALIASES - for backward compatibility  -->
+    <!-- Old settings views use these names           -->
+    <!-- ============================================= -->
+
+    <!-- Background aliases -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundBase}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource BackgroundBase}"/>
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="{DynamicResource BackgroundLayer1}"/>
+    <SolidColorBrush x:Key="ToolbarBrush" Color="{DynamicResource BackgroundLayer1}"/>
+
+    <!-- Text aliases -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource ForegroundPrimary}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource ForegroundSecondary}"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource ForegroundTertiary}"/>
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource ForegroundInverse}"/>
+
+    <!-- Border aliases -->
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderDefault}"/>
+    <SolidColorBrush x:Key="BorderLightBrush" Color="{DynamicResource BorderSubtle}"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="{DynamicResource BorderSubtle}"/>
+
+    <!-- Accent aliases -->
+    <SolidColorBrush x:Key="AccentLightBrush" Color="{DynamicResource AccentSubtle}"/>
+
+    <!-- Semantic aliases -->
+    <SolidColorBrush x:Key="ErrorLightBrush" Color="{DynamicResource ErrorSubtle}"/>
+    <SolidColorBrush x:Key="SuccessLightBrush" Color="{DynamicResource SuccessSubtle}"/>
+    <SolidColorBrush x:Key="WarningLightBrush" Color="{DynamicResource WarningSubtle}"/>
+    <SolidColorBrush x:Key="InfoLightBrush" Color="{DynamicResource InfoSubtle}"/>
+
+    <!-- Interactive state aliases -->
+    <SolidColorBrush x:Key="HoverBrush" Color="{DynamicResource BackgroundLayer2}"/>
+    <SolidColorBrush x:Key="SelectedBrush" Color="{DynamicResource AccentSubtle}"/>
+    <SolidColorBrush x:Key="PressedBrush" Color="{DynamicResource AccentSubtle}"/>
+
+    <!-- Log panel aliases -->
+    <SolidColorBrush x:Key="LogBackgroundBrush" Color="{DynamicResource BackgroundLayer1}"/>
+    <SolidColorBrush x:Key="LogHeaderBrush" Color="{DynamicResource BackgroundLayer2}"/>
+    <SolidColorBrush x:Key="LogTextBrush" Color="{DynamicResource ForegroundPrimary}"/>
+
+    <!-- Badge aliases -->
+    <SolidColorBrush x:Key="BadgeDefaultBrush" Color="{DynamicResource BackgroundLayer2}"/>
+    <SolidColorBrush x:Key="BadgeDefaultTextBrush" Color="{DynamicResource ForegroundSecondary}"/>
+
 </ResourceDictionary>

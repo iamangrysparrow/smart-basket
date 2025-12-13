@@ -10,7 +10,7 @@
         Height="600" Width="900"
         MinHeight="500" MinWidth="700"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource BackgroundBrush}">
+        Background="{DynamicResource BackgroundBaseBrush}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
@@ -18,7 +18,7 @@
         <!-- TreeView Item Style -->
         <Style x:Key="CategoryTreeItem" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Padding" Value="4,2"/>
         </Style>
@@ -41,8 +41,8 @@
 
         <!-- Left Panel: Navigation Tree -->
         <Border Grid.Column="0" Grid.Row="0"
-                Background="{DynamicResource SurfaceAltBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderDefaultBrush}"
                 BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
@@ -52,19 +52,23 @@
                 </Grid.RowDefinitions>
 
                 <!-- Header -->
-                <Border Grid.Row="0" Style="{StaticResource SectionHeader}">
-                    <TextBlock Text="Категории" Style="{StaticResource H2}"/>
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BackgroundLayer2Brush}"
+                        Padding="12,10">
+                    <TextBlock Text="Категории"
+                               Style="{StaticResource SubtitleText}"/>
                 </Border>
 
                 <!-- Tree -->
                 <TreeView Grid.Row="1" x:Name="CategoryTree"
-                          Style="{StaticResource ModernTreeView}"
+                          Background="Transparent"
+                          BorderThickness="0"
                           ItemsSource="{Binding Categories}"
                           SelectedItemChanged="CategoryTree_SelectedItemChanged">
                     <TreeView.ItemContainerStyle>
                         <Style TargetType="TreeViewItem">
                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
                             <Setter Property="FontSize" Value="12"/>
                             <Setter Property="Padding" Value="2"/>
                             <Setter Property="Margin" Value="0,1"/>
@@ -118,7 +122,7 @@
                       Width="3"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Stretch"
-                      Background="{DynamicResource BorderBrush}"/>
+                      Background="{DynamicResource BorderDefaultBrush}"/>
 
         <!-- Right Panel: Content -->
         <Border Grid.Column="2" Grid.Row="0" Padding="12">
@@ -143,8 +147,8 @@
 
         <!-- Bottom Panel: Status and Buttons -->
         <Border Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="1"
-                Background="{DynamicResource SurfaceAltBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderDefaultBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="12,8">
             <Grid>
@@ -155,7 +159,7 @@
 
                 <!-- Status -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource TextSecondary}"/>
+                    <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource CaptionText}"/>
                     <TextBlock Text=" *" Foreground="{DynamicResource WarningBrush}"
                                Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}"
                                FontWeight="Bold"/>

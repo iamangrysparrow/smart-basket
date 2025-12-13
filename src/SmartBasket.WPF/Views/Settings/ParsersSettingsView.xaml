@@ -41,14 +41,12 @@
                          ItemsSource="{Binding Parsers}"
                          SelectedItem="{Binding SelectedParser}"
                          Height="140"
-                         Background="Transparent"
-                         BorderThickness="1"
-                         BorderBrush="{DynamicResource BorderBrush}"
+                         Style="{StaticResource SettingsListBox}"
                          ScrollViewer.IsDeferredScrollingEnabled="False"
                          VirtualizingPanel.ScrollUnit="Pixel">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:ParserViewModel}">
-                            <Grid Margin="4,4">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -77,10 +75,11 @@
 
                                 <!-- Name and Type -->
                                 <StackPanel Grid.Column="1" Grid.Row="0" Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                                    <Border Background="{DynamicResource AccentBrush}" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
                                             Visibility="{Binding RequiresAI, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="AI" FontSize="9" Foreground="White"/>
+                                        <TextBlock Text="AI" FontSize="9" Foreground="{DynamicResource ForegroundInverseBrush}"/>
                                     </Border>
                                     <TextBlock Text="{Binding Type, StringFormat=' [{0}]'}" Style="{StaticResource TextSecondary}"
                                                VerticalAlignment="Center" FontSize="10"/>
@@ -99,7 +98,7 @@
                                                 <Setter Property="ToolTip" Value="Включен"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsEnabled}" Value="False">
-                                                        <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}"/>
+                                                        <Setter Property="Fill" Value="{DynamicResource ForegroundTertiaryBrush}"/>
                                                         <Setter Property="ToolTip" Value="Отключен"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>

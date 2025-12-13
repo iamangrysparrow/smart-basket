@@ -20,25 +20,26 @@
                 <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/SkinDefault.xaml"/>
                 <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/Theme.xaml"/>
 
-                <!-- 5. Legacy theme for backward compatibility -->
-                <ResourceDictionary Source="Themes/LightTheme.xaml"/>
-
-                <!-- 6. Icons -->
+                <!-- 5. Icons -->
                 <ResourceDictionary Source="Themes/Icons.xaml"/>
 
-                <!-- 7. Shared Styles -->
+                <!-- 6. Shared Styles -->
                 <ResourceDictionary Source="Themes/SharedStyles.xaml"/>
 
-                <!-- 8. Control Styles (override defaults) -->
+                <!-- 7. Control Styles (override defaults) -->
                 <ResourceDictionary Source="Themes/Controls/ButtonStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/TextBlockStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/TextBoxStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Controls/CheckBoxStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/ListBoxStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/TagStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/ComboBoxStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/TreeViewStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/DataGridStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Controls/TabControlStyles.xaml"/>
+
+                <!-- 8. HandyControl overrides - MUST be LAST to override HC and our styles -->
+                <ResourceDictionary Source="Themes/HandyControlOverrides.xaml"/>
 
             </ResourceDictionary.MergedDictionaries>
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 
 namespace SmartBasket.WPF.Themes;
@@ -36,8 +37,8 @@ public static class ThemeManager
 
         var resources = app.Resources.MergedDictionaries;
 
-        // Find and remove current theme color dictionary (both old and new format)
-        ResourceDictionary? themeDict = null;
+        // Find and remove current theme color dictionary, Brushes.xaml, and HandyControlOverrides.xaml
+        var toRemove = new List<ResourceDictionary>();
         foreach (var dict in resources)
         {
             var source = dict.Source?.OriginalString;
@@ -45,19 +46,20 @@ public static class ThemeManager
                 source.Contains("Colors.Light") ||
                 source.Contains("Colors.Dark") ||
                 source.Contains("LightTheme") ||
-                source.Contains("DarkTheme")))
+                source.Contains("DarkTheme") ||
+                source.Contains("Brushes.xaml") ||
+                source.Contains("HandyControlOverrides.xaml")))
             {
-                themeDict = dict;
-                break;
+                toRemove.Add(dict);
             }
         }
 
-        if (themeDict != null)
+        foreach (var dict in toRemove)
         {
-            resources.Remove(themeDict);
+            resources.Remove(dict);
         }
 
-        // Add new theme dictionary
+        // Add new theme colors dictionary first
         var newThemeUri = theme switch
         {
             AppTheme.Light => new Uri("Themes/Colors.Light.xaml", UriKind.Relative),
@@ -66,6 +68,12 @@ public static class ThemeManager
         };
 
         resources.Insert(0, new ResourceDictionary { Source = newThemeUri });
+
+        // Re-add Brushes.xaml AFTER colors so it picks up new color values
+        resources.Insert(1, new ResourceDictionary { Source = new Uri("Themes/Brushes.xaml", UriKind.Relative) });
+
+        // Add HandyControlOverrides at the END to override everything
+        resources.Add(new ResourceDictionary { Source = new Uri("Themes/HandyControlOverrides.xaml", UriKind.Relative) });
 
         ThemeChanged?.Invoke(null, theme);
     }

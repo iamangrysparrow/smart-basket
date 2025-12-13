@@ -30,10 +30,10 @@
             <Border Margin="0,8,0,0" Padding="8,6" CornerRadius="4">
                 <Border.Style>
                     <Style TargetType="Border">
-                        <Setter Property="Background" Value="#1A4CAF50"/>
+                        <Setter Property="Background" Value="{DynamicResource SuccessSubtleBrush}"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsOllamaAvailable}" Value="False">
-                                <Setter Property="Background" Value="#1AF44336"/>
+                                <Setter Property="Background" Value="{DynamicResource ErrorSubtleBrush}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -51,11 +51,12 @@
                             </Style>
                         </Ellipse.Style>
                     </Ellipse>
-                    <TextBlock Text="{Binding OllamaStatusMessage}" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding OllamaStatusMessage}" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
                     <TextBlock Margin="12,0,0,0" FontSize="11" VerticalAlignment="Center"
                                Visibility="{Binding IsOllamaAvailable, Converter={StaticResource InverseBoolToVis}}">
                         <Hyperlink NavigateUri="https://ollama.ai" RequestNavigate="Hyperlink_RequestNavigate"
-                                   Foreground="{DynamicResource PrimaryBrush}">
+                                   Foreground="{DynamicResource AccentBrush}">
                             Скачать Ollama
                         </Hyperlink>
                     </TextBlock>
@@ -77,15 +78,14 @@
                          ItemsSource="{Binding AiProviders}"
                          SelectedItem="{Binding SelectedAiProvider}"
                          Height="100"
-                         Background="Transparent"
-                         BorderThickness="1"
-                         BorderBrush="{DynamicResource BorderBrush}"
+                         Style="{StaticResource SettingsListBox}"
                          ScrollViewer.IsDeferredScrollingEnabled="False"
                          VirtualizingPanel.ScrollUnit="Pixel">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:AiProviderViewModel}">
-                            <StackPanel Orientation="Horizontal" Margin="4,2">
-                                <TextBlock Text="{Binding Key}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Key}" VerticalAlignment="Center" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
                                 <TextBlock Text=" (" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding Provider}" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                 <TextBlock Text=")" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>

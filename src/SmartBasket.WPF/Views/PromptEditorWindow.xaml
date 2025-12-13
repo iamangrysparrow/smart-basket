@@ -6,7 +6,9 @@
         MinWidth="500" MinHeight="400"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        Background="{DynamicResource BackgroundBrush}">
+        Background="{DynamicResource BackgroundBaseBrush}"
+        Foreground="{DynamicResource ForegroundPrimaryBrush}"
+        TextElement.Foreground="{DynamicResource ForegroundPrimaryBrush}">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>

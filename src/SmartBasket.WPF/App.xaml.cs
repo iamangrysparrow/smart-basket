@@ -1,6 +1,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,9 @@ public partial class App : Application
             ? AppTheme.Dark
             : AppTheme.Light;
         ThemeManager.ApplyTheme(theme);
+
+        // Diagnostic: Log color/brush values after theme applied
+        LogColorDiagnostics();
 
         var services = new ServiceCollection();
         ConfigureServices(services);
@@ -155,5 +159,67 @@ public partial class App : Application
         // Silently handle - prevent crash
         System.Diagnostics.Debug.WriteLine($"TASK ERROR: {e.Exception?.Message}");
         e.SetObserved();
+    }
+
+    private void LogColorDiagnostics()
+    {
+        System.Diagnostics.Debug.WriteLine("========== COLOR DIAGNOSTICS ==========");
+
+        // Log merged dictionaries order
+        System.Diagnostics.Debug.WriteLine("\n--- Merged Dictionaries Order ---");
+        int index = 0;
+        foreach (var dict in Resources.MergedDictionaries)
+        {
+            var source = dict.Source?.OriginalString ?? "[inline]";
+            System.Diagnostics.Debug.WriteLine($"  [{index}] {source}");
+            index++;
+        }
+
+        // Log key colors
+        System.Diagnostics.Debug.WriteLine("\n--- Color Values ---");
+        LogResourceValue("AccentDefault", isColor: true);
+        LogResourceValue("AccentHover", isColor: true);
+        LogResourceValue("PrimaryColor", isColor: true);
+        LogResourceValue("DarkPrimaryColor", isColor: true);
+
+        // Log key brushes
+        System.Diagnostics.Debug.WriteLine("\n--- Brush Values ---");
+        LogResourceValue("AccentBrush", isColor: false);
+        LogResourceValue("AccentHoverBrush", isColor: false);
+        LogResourceValue("PrimaryBrush", isColor: false);
+        LogResourceValue("DarkPrimaryBrush", isColor: false);
+
+        System.Diagnostics.Debug.WriteLine("\n========================================");
+    }
+
+    private void LogResourceValue(string key, bool isColor)
+    {
+        try
+        {
+            var value = Resources[key];
+            if (value == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"  {key}: NOT FOUND");
+                return;
+            }
+
+            if (isColor && value is Color color)
+            {
+                System.Diagnostics.Debug.WriteLine($"  {key}: {color} (A={color.A}, R={color.R}, G={color.G}, B={color.B})");
+            }
+            else if (!isColor && value is SolidColorBrush brush)
+            {
+                var c = brush.Color;
+                System.Diagnostics.Debug.WriteLine($"  {key}: {c} (A={c.A}, R={c.R}, G={c.G}, B={c.B})");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"  {key}: {value.GetType().Name} = {value}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"  {key}: ERROR - {ex.Message}");
+        }
     }
 }

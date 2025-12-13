@@ -360,14 +360,6 @@
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
-    <!-- GroupBox Style -->
-    <Style x:Key="ModernGroupBox" TargetType="GroupBox">
-        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="6"/>
-        <Setter Property="Margin" Value="0,0,0,6"/>
-        <Setter Property="FontSize" Value="11"/>
-    </Style>
+    <!-- ModernGroupBox is now defined in HandyControlOverrides.xaml -->
 
 </ResourceDictionary>
