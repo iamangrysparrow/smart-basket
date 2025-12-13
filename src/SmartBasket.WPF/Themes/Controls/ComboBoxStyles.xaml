@@ -5,7 +5,7 @@
     <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
+                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="20"/>
             </Grid.ColumnDefinitions>
             <Border x:Name="Border"
@@ -85,6 +85,8 @@
                                       Template="{StaticResource ComboBoxToggleButton}"
                                       Focusable="False"
                                       ClickMode="Press"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
                         <ContentPresenter x:Name="ContentSite"
                                           IsHitTestVisible="False"
@@ -93,8 +95,16 @@
                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                           Margin="10,3,28,3"
                                           VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"
-                                          TextElement.Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                                          HorizontalAlignment="Left">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+                                    <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+                                    <Setter Property="FontFamily" Value="Segoe UI"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                         <TextBox x:Name="PART_EditableTextBox"
                                  Style="{x:Null}"
                                  Template="{StaticResource ComboBoxTextBox}"
@@ -178,8 +188,16 @@
                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                           Margin="8,3,23,3"
                                           VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"
-                                          TextElement.Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                                          HorizontalAlignment="Left">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+                                    <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+                                    <Setter Property="FontFamily" Value="Segoe UI"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                         <TextBox x:Name="PART_EditableTextBox"
                                  Style="{x:Null}"
                                  Template="{StaticResource ComboBoxTextBox}"

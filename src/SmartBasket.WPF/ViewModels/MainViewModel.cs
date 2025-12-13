@@ -496,6 +496,8 @@ public partial class MainViewModel : ObservableObject
             });
 
             // Update shop filters (thread-safe via EnableCollectionSynchronization)
+            // Save current selection to restore after clearing
+            var currentFilter = SelectedShopFilter;
             lock (_shopFiltersLock)
             {
                 ShopFilters.Clear();
@@ -505,6 +507,8 @@ public partial class MainViewModel : ObservableObject
                     ShopFilters.Add(shop);
                 }
             }
+            // Restore selection (must be done after collection is updated)
+            SelectedShopFilter = ShopFilters.Contains(currentFilter) ? currentFilter : "Все";
 
             // Update collection (thread-safe via EnableCollectionSynchronization)
             lock (_receiptsLock)
@@ -522,6 +526,13 @@ public partial class MainViewModel : ObservableObject
 
             Log($"Loaded {receipts.Count} receipts, total: {TotalSum:N2}\u20BD");
             StatusText = $"Loaded {receipts.Count} receipts";
+
+            // Select first receipt if none selected
+            if (SelectedReceipt == null && Receipts.Count > 0)
+            {
+                SelectedReceipt = Receipts[0];
+            }
+
             _receiptsLoaded = true;
         }
         catch (Exception ex)

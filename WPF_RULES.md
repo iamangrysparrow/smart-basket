@@ -315,14 +315,40 @@ var dialog = new SettingsWindow(vm);
 dialog.ShowDialog();  // Log calls won't block now
 ```
 
-### 12. ObservableCollection - don't Clear() if bound to ComboBox
-```csharp
-// BAD - clears selection in bound ComboBox/ListBox
-AvailableItems.Clear();
-foreach (var item in newItems)
-    AvailableItems.Add(item);
+### 12. ObservableCollection + ComboBox SelectedItem binding - CRITICAL!
 
-// GOOD - sync without losing selection
+**Problem**: When `Clear()` is called on collection bound to ComboBox's `ItemsSource`, the `SelectedItem` becomes invalid (element no longer exists in collection). ComboBox shows empty even though `SelectedItem` property still has a value.
+
+```csharp
+// BAD - SelectedItem becomes orphaned after Clear()
+public ObservableCollection<string> ShopFilters { get; } = new() { "Все" };
+[ObservableProperty] private string _selectedShopFilter = "Все";
+
+// Later in code:
+ShopFilters.Clear();           // SelectedShopFilter is still "Все" but...
+ShopFilters.Add("Все");        // ...this is a NEW string instance!
+ShopFilters.Add("АШАН");       // ComboBox shows EMPTY because old "Все" ≠ new "Все"
+```
+
+**Solution 1: Restore SelectedItem after updating collection**
+```csharp
+// Save current selection BEFORE clearing
+var currentFilter = SelectedShopFilter;
+
+lock (_shopFiltersLock)
+{
+    ShopFilters.Clear();
+    ShopFilters.Add("Все");
+    foreach (var shop in shops)
+        ShopFilters.Add(shop);
+}
+
+// Restore selection AFTER collection is updated
+SelectedShopFilter = ShopFilters.Contains(currentFilter) ? currentFilter : "Все";
+```
+
+**Solution 2: Sync without Clear() (preserves selection)**
+```csharp
 private void SyncCollection(IList<string> newItems)
 {
     // Remove extra
@@ -344,6 +370,8 @@ private void SyncCollection(IList<string> newItems)
     }
 }
 ```
+
+**Key insight**: `SelectedItem` binding works by reference equality. After `Clear()`, even if you add the same string value, it's a different object instance, so WPF considers nothing selected.
 
 ### 13. Track renames for cascading updates
 ```csharp
