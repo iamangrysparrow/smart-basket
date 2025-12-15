@@ -9,6 +9,7 @@ using SmartBasket.Core.Configuration;
 using SmartBasket.Data;
 using SmartBasket.Services;
 using SmartBasket.Services.Email;
+using SmartBasket.Services.Export;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Products;
@@ -124,6 +125,9 @@ public partial class App : Application
         services.AddTransient<IProductService, ProductService>();
         services.AddTransient<ILabelService, LabelService>();
         services.AddTransient<IItemService, ItemService>();
+
+        // Export service
+        services.AddSingleton<IReceiptExportService, ReceiptExportService>();
 
         // ViewModels
         services.AddTransient<MainViewModel>();

@@ -60,6 +60,14 @@
                          ItemsSource="{Binding Receipts}"
                          SelectedItem="{Binding SelectedReceipt}"
                          Style="{StaticResource SidebarListBox}">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Экспорт JSON (полный)"
+                                      Command="{Binding ExportReceiptFullCommand}"/>
+                            <MenuItem Header="Экспорт JSON (минимальный)"
+                                      Command="{Binding ExportReceiptMinimalCommand}"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid>

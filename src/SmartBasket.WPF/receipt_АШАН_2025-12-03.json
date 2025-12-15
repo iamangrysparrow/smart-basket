@@ -1,0 +1,187 @@
+{
+  "shopName": "АШАН",
+  "date": "2025-12-03",
+  "totalAmount": 6129.81,
+  "items": [
+    {
+      "name": "Морковь мытая",
+      "quantity": 0.478,
+      "pricePerUnit": 59.99,
+      "totalPrice": 28.68
+    },
+    {
+      "name": "Шампиньоны АШАН Красная птица целые 250 г",
+      "quantity": 1.000,
+      "pricePerUnit": 129.99,
+      "totalPrice": 129.99
+    },
+    {
+      "name": "Борщ АШАН Красная птица с курицей, 250 г",
+      "quantity": 4.000,
+      "pricePerUnit": 109.99,
+      "totalPrice": 439.96
+    },
+    {
+      "name": "Кофе Жокей Классический молотый 250 г",
+      "quantity": 1.000,
+      "pricePerUnit": 478.99,
+      "totalPrice": 478.99
+    },
+    {
+      "name": "Сметана 15% Простоквашино БЗМЖ 300 г",
+      "quantity": 2.000,
+      "pricePerUnit": 102.99,
+      "totalPrice": 205.98
+    },
+    {
+      "name": "Лук репчатый",
+      "quantity": 0.594,
+      "pricePerUnit": 36.99,
+      "totalPrice": 21.97
+    },
+    {
+      "name": "Молоко 1,5% пастеризованное 930 мл Простоквашино БЗМЖ",
+      "quantity": 4.000,
+      "pricePerUnit": 93.99,
+      "totalPrice": 375.96
+    },
+    {
+      "name": "Сок Добрый томат 1 л",
+      "quantity": 1.000,
+      "pricePerUnit": 119.99,
+      "totalPrice": 119.99
+    },
+    {
+      "name": "Макаронные изделия Makfa Спагетти 450 г",
+      "quantity": 1.000,
+      "pricePerUnit": 57.99,
+      "totalPrice": 57.99
+    },
+    {
+      "name": "Батон Коломенский пшеничный в нарезке 400 г",
+      "quantity": 2.000,
+      "pricePerUnit": 79.99,
+      "totalPrice": 159.98
+    },
+    {
+      "name": "Голень цыпленка-бройлера Куриное Царство с кожей охлажденное ~1 кг",
+      "quantity": 1.000,
+      "pricePerUnit": 320.59,
+      "totalPrice": 320.59
+    },
+    {
+      "name": "Огурец среднеплодный 180 г",
+      "quantity": 6.000,
+      "pricePerUnit": 69.99,
+      "totalPrice": 419.94
+    },
+    {
+      "name": "Свекла",
+      "quantity": 0.568,
+      "pricePerUnit": 30.99,
+      "totalPrice": 17.60
+    },
+    {
+      "name": "Колбаса вареная Клинский Докторская 400 г",
+      "quantity": 2.000,
+      "pricePerUnit": 259.99,
+      "totalPrice": 519.98
+    },
+    {
+      "name": "Огурцы Каждый День маринованные 680 г",
+      "quantity": 1.000,
+      "pricePerUnit": 119.98,
+      "totalPrice": 119.98
+    },
+    {
+      "name": "Подсолнечное масло Затея рафинированное дезодорированное 1 л",
+      "quantity": 1.000,
+      "pricePerUnit": 139.99,
+      "totalPrice": 139.99
+    },
+    {
+      "name": "Мандарины с листочком",
+      "quantity": 1.052,
+      "pricePerUnit": 179.99,
+      "totalPrice": 189.35
+    },
+    {
+      "name": "Томаты красные",
+      "quantity": 0.328,
+      "pricePerUnit": 108.99,
+      "totalPrice": 35.75
+    },
+    {
+      "name": "Сыр полутвердый Брест-Литовск Финский 45% БЗМЖ 200 г",
+      "quantity": 1.000,
+      "pricePerUnit": 179.99,
+      "totalPrice": 179.99
+    },
+    {
+      "name": "Сахар песок 1 кг",
+      "quantity": 1.000,
+      "pricePerUnit": 52.99,
+      "totalPrice": 52.99
+    },
+    {
+      "name": "Картофель Лайт 2 кг",
+      "quantity": 1.000,
+      "pricePerUnit": 169.99,
+      "totalPrice": 169.99
+    },
+    {
+      "name": "Яблоки Ред Делишес новый урожай",
+      "quantity": 0.558,
+      "pricePerUnit": 159.99,
+      "totalPrice": 89.27
+    },
+    {
+      "name": "Варенье Вологодское варенье Домашнее малиновое 370 г",
+      "quantity": 1.000,
+      "pricePerUnit": 269.99,
+      "totalPrice": 269.99
+    },
+    {
+      "name": "Горошек АШАН Красная птица зеленый консервированный 400 г",
+      "quantity": 1.000,
+      "pricePerUnit": 69.99,
+      "totalPrice": 69.99
+    },
+    {
+      "name": "Бедро куриное «Петелинка» с кожей охлажденное, ~ 1 кг",
+      "quantity": 2.000,
+      "pricePerUnit": 316.19,
+      "totalPrice": 632.38
+    },
+    {
+      "name": "Яйцо куриное Экстра СО коричневое 10 шт",
+      "quantity": 1.000,
+      "pricePerUnit": 139.99,
+      "totalPrice": 139.99
+    },
+    {
+      "name": "Конфеты шоколадные Акконд Птица дивная с суфлейной начинкой",
+      "quantity": 0.224,
+      "pricePerUnit": 649.99,
+      "totalPrice": 145.60
+    },
+    {
+      "name": "Рис Увелка бурый в варочных пакетиках 80 г х 5 шт",
+      "quantity": 1.000,
+      "pricePerUnit": 139.99,
+      "totalPrice": 139.99
+    },
+    {
+      "name": "Вода питьевая Сенежская газированная 1,5 л",
+      "quantity": 3.000,
+      "pricePerUnit": 50.99,
+      "totalPrice": 152.97
+    },
+    {
+      "name": "Сок J7 апельсиновый 970 мл",
+      "quantity": 1.000,
+      "pricePerUnit": 303.99,
+      "totalPrice": 303.99
+    }
+  ]
+}

@@ -9,7 +9,9 @@ using Microsoft.EntityFrameworkCore;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
+using Microsoft.Win32;
 using SmartBasket.Services;
+using SmartBasket.Services.Export;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Products;
 using SmartBasket.WPF.Models;
@@ -41,6 +43,7 @@ public partial class MainViewModel : ObservableObject
     private readonly SmartBasketDbContext _dbContext;
     private readonly IReceiptCollectionService _receiptCollectionService;
     private readonly IProductCleanupService _productCleanupService;
+    private readonly IReceiptExportService _receiptExportService;
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
     private CancellationTokenSource? _cts;
@@ -49,12 +52,14 @@ public partial class MainViewModel : ObservableObject
         SmartBasketDbContext dbContext,
         IReceiptCollectionService receiptCollectionService,
         IProductCleanupService productCleanupService,
+        IReceiptExportService receiptExportService,
         AppSettings settings,
         SettingsService settingsService)
     {
         _dbContext = dbContext;
         _receiptCollectionService = receiptCollectionService;
         _productCleanupService = productCleanupService;
+        _receiptExportService = receiptExportService;
         _settings = settings;
         _settingsService = settingsService;
     }
@@ -566,6 +571,112 @@ public partial class MainViewModel : ObservableObject
             LoadReceiptsCommand.Execute(null);
         }
     }
+
+    #region Receipt Export
+
+    /// <summary>
+    /// Экспорт выбранного чека в полный JSON формат
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportReceiptFullAsync()
+    {
+        if (SelectedReceipt == null)
+        {
+            Log("Не выбран чек для экспорта", LogLevel.Warning);
+            return;
+        }
+
+        try
+        {
+            // Получаем полные данные чека из БД
+            var receipt = await _dbContext.Receipts
+                .Include(r => r.Items)
+                    .ThenInclude(i => i.Item)
+                        .ThenInclude(item => item!.Product)
+                            .ThenInclude(p => p!.Parent)
+                .Include(r => r.Items)
+                    .ThenInclude(i => i.Item)
+                        .ThenInclude(item => item!.ItemLabels)
+                            .ThenInclude(il => il.Label)
+                .FirstOrDefaultAsync(r => r.Id == SelectedReceipt.Id);
+
+            if (receipt == null)
+            {
+                Log($"Чек не найден: {SelectedReceipt.Id}", LogLevel.Error);
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Экспорт чека (полный формат)",
+                Filter = "JSON файлы (*.json)|*.json",
+                DefaultExt = ".json",
+                FileName = $"receipt_{receipt.Shop}_{receipt.ReceiptDate:yyyy-MM-dd}_full.json"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                await _receiptExportService.SaveToFileFullAsync(receipt, dialog.FileName);
+                Log($"Чек экспортирован: {dialog.FileName}", LogLevel.Info);
+                StatusText = $"Экспортировано: {System.IO.Path.GetFileName(dialog.FileName)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "ExportReceiptFull");
+            StatusText = "Ошибка экспорта";
+        }
+    }
+
+    /// <summary>
+    /// Экспорт выбранного чека в минимальный JSON формат
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportReceiptMinimalAsync()
+    {
+        if (SelectedReceipt == null)
+        {
+            Log("Не выбран чек для экспорта", LogLevel.Warning);
+            return;
+        }
+
+        try
+        {
+            // Получаем данные чека из БД (минимальный набор)
+            var receipt = await _dbContext.Receipts
+                .Include(r => r.Items)
+                    .ThenInclude(i => i.Item)
+                .FirstOrDefaultAsync(r => r.Id == SelectedReceipt.Id);
+
+            if (receipt == null)
+            {
+                Log($"Чек не найден: {SelectedReceipt.Id}", LogLevel.Error);
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Экспорт чека (минимальный формат)",
+                Filter = "JSON файлы (*.json)|*.json",
+                DefaultExt = ".json",
+                FileName = $"receipt_{receipt.Shop}_{receipt.ReceiptDate:yyyy-MM-dd}.json"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                await _receiptExportService.SaveToFileMinimalAsync(receipt, dialog.FileName);
+                Log($"Чек экспортирован: {dialog.FileName}", LogLevel.Info);
+                StatusText = $"Экспортировано: {System.IO.Path.GetFileName(dialog.FileName)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "ExportReceiptMinimal");
+            StatusText = "Ошибка экспорта";
+        }
+    }
+
+    #endregion
 
     [RelayCommand]
     private async Task InitializeDatabaseAsync()
