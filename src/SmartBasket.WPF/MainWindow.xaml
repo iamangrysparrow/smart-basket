@@ -57,6 +57,21 @@
 
                 <!-- Actions (Right) -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <!-- AI Chat Button -->
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Click="OpenAiChat_Click"
+                            ToolTip="AI консультант"
+                            Padding="12,6"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconAiChat}"
+                                  Fill="{DynamicResource AccentBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"
+                                  Margin="0,0,6,0"/>
+                            <TextBlock Text="AI Chat"/>
+                        </StackPanel>
+                    </Button>
+
                     <!-- Collect Button (Primary) -->
                     <Button Style="{StaticResource PrimaryButton}"
                             Command="{Binding CollectReceiptsCommand}"
@@ -167,7 +182,42 @@
             <TabItem>
                 <views:ProductsItemsView x:Name="ProductsItemsViewControl"/>
             </TabItem>
+
+            <!-- Tab 3: AI консультант (динамически добавляется/удаляется) -->
         </TabControl>
+
+        <!-- AI Chat Tab Header (показывается когда вкладка открыта) -->
+        <Border x:Name="AiChatTabHeader"
+                Grid.Row="1"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Right"
+                Margin="0,8,16,0"
+                Visibility="Collapsed"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12,6">
+            <StackPanel Orientation="Horizontal">
+                <Path Data="{StaticResource IconAiChat}"
+                      Fill="{DynamicResource AccentBrush}"
+                      Width="14" Height="14" Stretch="Uniform"
+                      Margin="0,0,6,0"/>
+                <TextBlock Text="AI консультант"
+                           Style="{StaticResource BodyText}"
+                           Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                           VerticalAlignment="Center"/>
+                <Button Style="{StaticResource ToolbarIconButton}"
+                        Click="CloseAiChat_Click"
+                        ToolTip="Закрыть"
+                        Margin="8,0,0,0"
+                        Padding="4">
+                    <Path Data="{StaticResource IconClose}"
+                          Fill="{DynamicResource ForegroundSecondaryBrush}"
+                          Width="10" Height="10" Stretch="Uniform"/>
+                </Button>
+            </StackPanel>
+        </Border>
 
         <!-- Log Panel -->
         <GridSplitter Grid.Row="2" Height="3" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}"

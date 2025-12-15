@@ -20,6 +20,13 @@ public class YandexGptLlmProvider : ILlmProvider
 
     public string Name => $"YandexGPT/{_config.Model}";
 
+    public bool SupportsConversationReset => false;
+
+    public void ResetConversation()
+    {
+        // YandexGPT не хранит состояние — ничего не делаем
+    }
+
     public YandexGptLlmProvider(
         IHttpClientFactory httpClientFactory,
         ILogger<YandexGptLlmProvider> logger,
@@ -296,6 +303,231 @@ public class YandexGptLlmProvider : ILlmProvider
             result.IsSuccess = false;
             result.ErrorMessage = $"Error: {ex.Message}";
             _logger.LogError(ex, "YandexGPT generation error");
+        }
+
+        return result;
+    }
+
+    public async Task<LlmGenerationResult> ChatAsync(
+        IEnumerable<LlmChatMessage> messages,
+        int maxTokens = 2000,
+        double temperature = 0.7,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new LlmGenerationResult();
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_config.ApiKey))
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = "YandexGPT API key is not configured";
+                return result;
+            }
+
+            if (string.IsNullOrWhiteSpace(_config.FolderId))
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = "YandexGPT Folder ID is not configured";
+                return result;
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
+            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+
+            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
+            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
+
+            string modelUri;
+            if (_config.Model.StartsWith("general:"))
+            {
+                modelUri = $"gpt://{_config.FolderId}/{_config.Model}";
+            }
+            else
+            {
+                modelUri = $"gpt://{_config.FolderId}/{_config.Model}/latest";
+            }
+
+            // Конвертируем сообщения в формат YandexGPT
+            var yandexMessages = messages.Select(m => new YandexMessage
+            {
+                Role = m.Role,
+                Text = m.Content
+            }).ToArray();
+
+            var request = new YandexGptRequest
+            {
+                ModelUri = modelUri,
+                CompletionOptions = new YandexCompletionOptions
+                {
+                    Stream = true,
+                    Temperature = actualTemperature,
+                    MaxTokens = actualMaxTokens.ToString()
+                },
+                Messages = yandexMessages
+            };
+
+            _logger.LogInformation("[YandexGPT Chat] ========================================");
+            _logger.LogInformation("[YandexGPT Chat] >>> ЗАПРОС К YandexGPT");
+            _logger.LogInformation("[YandexGPT Chat] Model: {Model}", modelUri);
+            _logger.LogInformation("[YandexGPT Chat] Messages count: {Count}", yandexMessages.Length);
+
+            progress?.Report($"[YandexGPT Chat] >>> ЗАПРОС");
+            progress?.Report($"[YandexGPT Chat] Model: {modelUri}, Messages: {yandexMessages.Length}");
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(request),
+                    Encoding.UTF8,
+                    "application/json")
+            };
+
+            if (_config.ApiKey.StartsWith("t1.") || _config.ApiKey.StartsWith("y"))
+            {
+                httpRequest.Headers.Add("Authorization", $"Bearer {_config.ApiKey}");
+            }
+            else
+            {
+                httpRequest.Headers.Add("Authorization", $"Api-Key {_config.ApiKey}");
+            }
+
+            httpRequest.Headers.Add("x-folder-id", _config.FolderId);
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = $"YandexGPT timeout after {timeoutSeconds}s";
+                return result;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                result.IsSuccess = false;
+                result.ErrorMessage = $"YandexGPT returned {response.StatusCode}: {errorContent}";
+                _logger.LogError("[YandexGPT Chat] Ошибка HTTP: {StatusCode}, Body: {Body}", response.StatusCode, errorContent);
+                return result;
+            }
+
+            var fullResponse = new StringBuilder();
+            var lineBuffer = new StringBuilder();
+
+            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream)
+            {
+                linkedCts.Token.ThrowIfCancellationRequested();
+
+                var line = await reader.ReadLineAsync(linkedCts.Token);
+                if (string.IsNullOrEmpty(line)) continue;
+
+                try
+                {
+                    var chunk = JsonSerializer.Deserialize<YandexStreamChunk>(line,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (chunk?.Result?.Alternatives?.Length > 0)
+                    {
+                        var alternative = chunk.Result.Alternatives[0];
+                        var text = alternative.Message?.Text ?? string.Empty;
+
+                        var newText = text;
+                        if (text.Length > fullResponse.Length)
+                        {
+                            newText = text.Substring(fullResponse.Length);
+                        }
+                        else
+                        {
+                            newText = text.Length == fullResponse.Length ? "" : text;
+                        }
+
+                        if (!string.IsNullOrEmpty(newText))
+                        {
+                            foreach (var ch in newText)
+                            {
+                                if (ch == '\n')
+                                {
+                                    progress?.Report($"  {lineBuffer}");
+                                    lineBuffer.Clear();
+                                }
+                                else
+                                {
+                                    lineBuffer.Append(ch);
+                                }
+                            }
+                        }
+
+                        if (text.Length > fullResponse.Length)
+                        {
+                            fullResponse.Clear();
+                            fullResponse.Append(text);
+                        }
+
+                        if (alternative.Status == "ALTERNATIVE_STATUS_FINAL" ||
+                            alternative.Status == "ALTERNATIVE_STATUS_COMPLETE")
+                        {
+                            if (lineBuffer.Length > 0)
+                            {
+                                progress?.Report($"  {lineBuffer}");
+                                lineBuffer.Clear();
+                            }
+                            break;
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Skip malformed lines
+                }
+            }
+
+            stopwatch.Stop();
+
+            if (fullResponse.Length > 0)
+            {
+                result.IsSuccess = true;
+                result.Response = fullResponse.ToString();
+                _logger.LogInformation("[YandexGPT Chat] <<< ОТВЕТ ПОЛУЧЕН ({Time}s)", stopwatch.Elapsed.TotalSeconds);
+                _logger.LogInformation("[YandexGPT Chat] Response length: {Length} chars", result.Response.Length);
+            }
+            else
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = "YandexGPT returned empty response";
+            }
+
+            _logger.LogInformation("[YandexGPT Chat] ========================================");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            result.IsSuccess = false;
+            result.ErrorMessage = "Operation cancelled by user";
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            result.IsSuccess = false;
+            result.ErrorMessage = "Generation timed out";
+        }
+        catch (Exception ex)
+        {
+            result.IsSuccess = false;
+            result.ErrorMessage = $"Error: {ex.Message}";
+            _logger.LogError(ex, "[YandexGPT Chat] Исключение: {Message}", ex.Message);
         }
 
         return result;

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using SmartBasket.Core.Configuration;
+using SmartBasket.Services.Llm;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
@@ -20,16 +21,20 @@ public partial class MainWindow : Window
     private readonly AppSettings _appSettings;
     private readonly SettingsService _settingsService;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IAiProviderFactory _aiProviderFactory;
     private LogWindow? _logWindow;
     private bool _userScrolledUp;
     private ScrollViewer? _logScrollViewer;
+    private TabItem? _aiChatTabItem;
+    private AiChatView? _aiChatView;
 
     public MainWindow(
         MainViewModel viewModel,
         ProductsItemsViewModel productsItemsViewModel,
         AppSettings appSettings,
         SettingsService settingsService,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IAiProviderFactory aiProviderFactory)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -37,6 +42,7 @@ public partial class MainWindow : Window
         _appSettings = appSettings;
         _settingsService = settingsService;
         _httpClientFactory = httpClientFactory;
+        _aiProviderFactory = aiProviderFactory;
         DataContext = viewModel;
 
         // Enable thread-safe collection access BEFORE any async operations
@@ -96,6 +102,23 @@ public partial class MainWindow : Window
     {
         // Only handle tab control selection changes (not nested controls)
         if (e.Source != MainTabControl) return;
+
+        // Показываем/скрываем заголовок AI чата в зависимости от выбранной вкладки
+        if (_aiChatTabItem != null)
+        {
+            AiChatTabHeader.Visibility = MainTabControl.SelectedItem == _aiChatTabItem
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        // Обрабатываем стандартные вкладки
+        if (MainTabControl.SelectedItem == _aiChatTabItem)
+        {
+            // AI Chat tab - снимаем выделение с RadioButton'ов
+            TabReceipts.IsChecked = false;
+            TabProducts.IsChecked = false;
+            return;
+        }
 
         switch (MainTabControl.SelectedIndex)
         {
@@ -197,6 +220,67 @@ public partial class MainWindow : Window
             Owner = this
         };
         settingsWindow.ShowDialog();
+    }
+
+    private void OpenAiChat_Click(object sender, RoutedEventArgs e)
+    {
+        // Если вкладка уже открыта - просто переключаемся на неё
+        if (_aiChatTabItem != null)
+        {
+            MainTabControl.SelectedItem = _aiChatTabItem;
+            return;
+        }
+
+        // Логгер для AI Chat - пишет в системный лог
+        Action<string> log = message =>
+        {
+            Dispatcher.BeginInvoke(() => _viewModel.AddLogEntry(message));
+        };
+
+        // Создаём новую вкладку
+        var aiChatViewModel = new AiChatViewModel(_aiProviderFactory, log);
+        _aiChatView = new AiChatView
+        {
+            DataContext = aiChatViewModel
+        };
+
+        _aiChatTabItem = new TabItem
+        {
+            Content = _aiChatView
+        };
+
+        MainTabControl.Items.Add(_aiChatTabItem);
+        MainTabControl.SelectedItem = _aiChatTabItem;
+
+        // Показываем заголовок вкладки с крестиком
+        AiChatTabHeader.Visibility = Visibility.Visible;
+
+        // Снимаем выделение с RadioButton'ов
+        TabReceipts.IsChecked = false;
+        TabProducts.IsChecked = false;
+    }
+
+    private void CloseAiChat_Click(object sender, RoutedEventArgs e)
+    {
+        if (_aiChatTabItem == null) return;
+
+        // Запоминаем был ли AI чат активным
+        var wasSelected = MainTabControl.SelectedItem == _aiChatTabItem;
+
+        // Удаляем вкладку
+        MainTabControl.Items.Remove(_aiChatTabItem);
+        _aiChatTabItem = null;
+        _aiChatView = null;
+
+        // Скрываем заголовок
+        AiChatTabHeader.Visibility = Visibility.Collapsed;
+
+        // Если вкладка была активной - переключаемся на первую
+        if (wasSelected)
+        {
+            MainTabControl.SelectedIndex = 0;
+            TabReceipts.IsChecked = true;
+        }
     }
 
     private void UpdateThemeIcon()

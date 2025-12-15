@@ -1,12 +1,167 @@
 # SmartBasket AI Architecture
 
-Документация по интеграции с Ollama LLM для обработки чеков и классификации товаров.
+Документация по интеграции с LLM провайдерами (Ollama, YandexGPT, YandexAgent) для обработки чеков, классификации товаров и AI-чата.
+
+## LLM Providers Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           ILlmProvider                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│  GenerateAsync(prompt)              - одиночный запрос                  │
+│  ChatAsync(messages[])              - чат с историей сообщений          │
+│  SupportsConversationReset          - поддержка сброса диалога          │
+│  ResetConversation()                - сброс истории (для stateful API)  │
+└─────────────────────────────────────────────────────────────────────────┘
+              ▲                    ▲                       ▲
+              │                    │                       │
+┌─────────────┴─────────┐ ┌───────┴────────┐ ┌────────────┴────────────┐
+│  OllamaLlmProvider    │ │ YandexGpt      │ │ YandexAgentLlmProvider  │
+│                       │ │ LlmProvider    │ │                         │
+│  /api/generate        │ │                │ │ /v1/responses           │
+│  /api/chat            │ │ /completion    │ │                         │
+│                       │ │ messages[]     │ │ previous_response_id    │
+│  Stateless            │ │ Stateless      │ │ Stateful                │
+│                       │ │                │ │                         │
+│  SupportsReset: false │ │ SupportsReset: │ │ SupportsReset: true     │
+│                       │ │ false          │ │ _lastResponseId хранит  │
+│                       │ │                │ │ ID для продолжения      │
+└───────────────────────┘ └────────────────┘ └─────────────────────────┘
+```
+
+### Типы провайдеров
+
+| Провайдер | API Endpoint | Метод передачи истории | Stateful |
+|-----------|--------------|------------------------|----------|
+| Ollama | `/api/chat` | `messages[]` в каждом запросе | Нет |
+| YandexGPT | `/completion` | `messages[]` в каждом запросе | Нет |
+| YandexAgent | `/v1/responses` | `previous_response_id` | Да |
+
+### ILlmProvider Interface
+
+```csharp
+public interface ILlmProvider
+{
+    string Name { get; }
+
+    Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default);
+
+    // Одиночный запрос (для парсинга чеков, классификации)
+    Task<LlmGenerationResult> GenerateAsync(
+        string prompt,
+        int maxTokens = 2000,
+        double temperature = 0.1,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    // Чат с историей (для AI Chat UI)
+    Task<LlmGenerationResult> ChatAsync(
+        IEnumerable<LlmChatMessage> messages,
+        int maxTokens = 2000,
+        double temperature = 0.7,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    bool SupportsConversationReset { get; }
+    void ResetConversation();
+}
+
+public class LlmChatMessage
+{
+    public string Role { get; set; } = "user";  // user, assistant, system
+    public string Content { get; set; } = string.Empty;
+}
+
+public class LlmGenerationResult
+{
+    public bool IsSuccess { get; set; }
+    public string? Response { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? ResponseId { get; set; }  // Для YandexAgent
+}
+```
+
+## ChatAsync Implementation Details
+
+### Ollama (`/api/chat`)
+
+```json
+// Запрос
+{
+  "model": "llama3.2:3b",
+  "messages": [
+    {"role": "user", "content": "Привет!"},
+    {"role": "assistant", "content": "Привет! Чем могу помочь?"},
+    {"role": "user", "content": "Расскажи о погоде"}
+  ],
+  "stream": true,
+  "options": {
+    "temperature": 0.7,
+    "num_predict": 2000
+  }
+}
+
+// Streaming response
+{"message":{"role":"assistant","content":"Сегодня"},"done":false}
+{"message":{"role":"assistant","content":" солнечно"},"done":false}
+{"message":{"role":"assistant","content":"!"},"done":true}
+```
+
+### YandexGPT (`/completion`)
+
+```json
+// Запрос
+{
+  "modelUri": "gpt://folder_id/yandexgpt-lite/latest",
+  "completionOptions": {
+    "stream": true,
+    "temperature": 0.7,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {"role": "user", "text": "Привет!"},
+    {"role": "assistant", "text": "Привет! Чем могу помочь?"},
+    {"role": "user", "text": "Расскажи о погоде"}
+  ]
+}
+
+// Streaming response (NDJSON)
+{"result":{"alternatives":[{"message":{"role":"assistant","text":"Сегодня солнечно!"},"status":"ALTERNATIVE_STATUS_FINAL"}]}}
+```
+
+### YandexAgent (`/v1/responses` с `previous_response_id`)
+
+```json
+// Первый запрос (новый диалог)
+{
+  "prompt": {"id": "agent_id"},
+  "input": "Привет!",
+  "stream": true
+}
+
+// SSE Response включает response.id
+data:{"response":{"id":"resp_abc123","output_text":"Привет!"}}
+event:response.completed
+
+// Следующий запрос (продолжение диалога)
+{
+  "prompt": {"id": "agent_id"},
+  "input": "Расскажи о погоде",
+  "stream": true,
+  "previous_response_id": "resp_abc123"  // ← ID предыдущего ответа
+}
+```
+
+**Особенность YandexAgent:**
+- Сервер хранит историю диалога
+- Клиент передаёт только `previous_response_id` и текущее сообщение
+- При вызове `ResetConversation()` очищается `_lastResponseId`
 
 ## AI Services Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         SmartBasket.Services.Ollama                      │
+│                         SmartBasket.Services                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  ┌──────────────────┐    ┌────────────────────────┐    ┌─────────────┐  │
@@ -22,6 +177,16 @@
 │  │                  │    │                        │    │  labels.txt │  │
 │  └──────────────────┘    └────────────────────────┘    └─────────────┘  │
 │                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                        SmartBasket.Services.Llm                   │   │
+│  │  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────┐ │   │
+│  │  │OllamaLlmProvider│ │YandexGptProvider│ │YandexAgentProvider  │ │   │
+│  │  └─────────────────┘ └─────────────────┘ └─────────────────────┘ │   │
+│  │  ┌─────────────────┐ ┌─────────────────────────────────────────┐ │   │
+│  │  │ ILlmProvider    │ │ IAiProviderFactory                      │ │   │
+│  │  └─────────────────┘ └─────────────────────────────────────────┘ │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -33,7 +198,7 @@ Email Body (HTML)
       ▼
 ┌─────────────────┐
 │ OllamaService   │  ← prompt_template.txt
-│ ParseReceiptAsync│
+│ ParseReceiptAsync│     (использует GenerateAsync)
 └────────┬────────┘
          │
          ▼
@@ -44,7 +209,7 @@ Email Body (HTML)
          ▼
 ┌─────────────────────────┐
 │ProductClassificationSvc │  ← prompt_classify_products.txt
-│ ClassifyAsync           │
+│ ClassifyAsync           │     (использует GenerateAsync)
 │ (batch processing)      │
 └────────┬────────────────┘
          │
@@ -56,7 +221,7 @@ Email Body (HTML)
          ▼
 ┌─────────────────────────┐
 │ LabelAssignmentService  │  ← prompt_assign_labels.txt
-│ AssignLabelsAsync       │
+│ AssignLabelsAsync       │     (использует GenerateAsync)
 │ (per new item)          │
 └────────┬────────────────┘
          │
@@ -70,6 +235,102 @@ Email Body (HTML)
    - Item, Product
    - ItemLabel, ProductLabel
 ```
+
+## AI Chat UI
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         AiChatViewModel                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  AvailableProviders[]  ← IAiProviderFactory.GetAvailableProviders()     │
+│  SelectedProvider      ← ComboBox выбор                                  │
+│  Messages[]            ← История UI (ChatMessage)                        │
+│                                                                          │
+│  SendMessageAsync():                                                     │
+│    1. Messages.Add(userMessage)                                          │
+│    2. chatMessages = BuildChatMessages()  // → LlmChatMessage[]         │
+│    3. provider.ChatAsync(chatMessages)                                   │
+│    4. Messages.Add(assistantMessage)                                     │
+│                                                                          │
+│  OnSelectedProviderChanged():                                            │
+│    - oldProvider.ResetConversation() если SupportsConversationReset     │
+│    - Messages.Clear()                                                    │
+│                                                                          │
+│  ClearChat():                                                            │
+│    - provider.ResetConversation() если SupportsConversationReset        │
+│    - Messages.Clear()                                                    │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Configuration
+
+### appsettings.json
+
+```json
+{
+  "AiProviders": [
+    {
+      "Key": "ollama-llama",
+      "Type": "Ollama",
+      "Model": "llama3.2:3b",
+      "BaseUrl": "http://localhost:11434",
+      "TimeoutSeconds": 120,
+      "Temperature": 0.7,
+      "MaxTokens": 2000
+    },
+    {
+      "Key": "yandex-gpt-lite",
+      "Type": "YandexGPT",
+      "Model": "yandexgpt-lite",
+      "FolderId": "b1g...",
+      "ApiKey": "AQVN...",
+      "TimeoutSeconds": 60,
+      "Temperature": 0.7,
+      "MaxTokens": 2000
+    },
+    {
+      "Key": "yandex-agent-receipts",
+      "Type": "YandexAgent",
+      "AgentId": "fvt...",
+      "FolderId": "b1g...",
+      "ApiKey": "y0_...",
+      "TimeoutSeconds": 120
+    }
+  ],
+
+  "AiOperations": {
+    "ReceiptParsing": {
+      "Provider": "ollama-llama",
+      "PromptFile": "prompt_template.txt"
+    },
+    "ProductClassification": {
+      "Provider": "ollama-llama",
+      "PromptFile": "prompt_classify_products.txt"
+    },
+    "LabelAssignment": {
+      "Provider": "ollama-llama",
+      "PromptFile": "prompt_assign_labels.txt"
+    }
+  }
+}
+```
+
+### Параметры провайдеров
+
+| Параметр | Ollama | YandexGPT | YandexAgent |
+|----------|--------|-----------|-------------|
+| Key | ✓ | ✓ | ✓ |
+| Type | "Ollama" | "YandexGPT" | "YandexAgent" |
+| Model | ✓ | ✓ | - |
+| BaseUrl | ✓ (default: localhost:11434) | - | - |
+| FolderId | - | ✓ | ✓ |
+| ApiKey | - | ✓ | ✓ |
+| AgentId | - | - | ✓ |
+| TimeoutSeconds | ✓ | ✓ | ✓ |
+| Temperature | ✓ | ✓ | - (в настройках агента) |
+| MaxTokens | ✓ | ✓ | - (в настройках агента) |
 
 ## Service Descriptions
 
@@ -178,42 +439,13 @@ Task<LabelAssignmentResult> AssignLabelsAsync(
 ["Молочные продукты", "Для завтрака"]
 ```
 
-## Configuration
-
-**appsettings.json:**
-```json
-{
-  "Ollama": {
-    "BaseUrl": "http://localhost:11434",
-    "Model": "MFDoom/deepseek-r1-tool-calling:8b",
-    "Temperature": 0.1,
-    "TimeoutSeconds": 300
-  }
-}
-```
-
-**Параметры:**
-- `BaseUrl` - URL сервера Ollama
-- `Model` - модель LLM (рекомендуется модели с поддержкой JSON)
-- `Temperature` - 0.1 для детерминированных ответов
-- `TimeoutSeconds` - таймаут для streaming-запросов (300 для классификации)
-
 ## Streaming Response Pattern
 
-Все сервисы используют streaming для получения ответов от Ollama:
+Все провайдеры используют streaming для получения ответов:
 
 ```csharp
-var request = new OllamaGenerateRequest
-{
-    Model = settings.Model,
-    Prompt = prompt,
-    Stream = true,  // Включаем streaming
-    Options = new OllamaOptions
-    {
-        Temperature = 0.1,
-        NumPredict = 4096  // Максимум токенов
-    }
-};
+// ResponseHeadersRead - не ждём полного ответа
+response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
 
 // Streaming читаем построчно
 using var stream = await response.Content.ReadAsStreamAsync(token);
@@ -224,64 +456,59 @@ var lineBuffer = new StringBuilder();
 
 while (!reader.EndOfStream)
 {
+    linkedCts.Token.ThrowIfCancellationRequested();
+
     var line = await reader.ReadLineAsync(token);
-    var chunk = JsonSerializer.Deserialize<OllamaStreamChunk>(line);
+    // Parse JSON chunk and append to fullResponse
 
-    if (chunk?.Response != null)
+    // Построчный вывод в progress
+    foreach (var ch in chunk.Response)
     {
-        fullResponse.Append(chunk.Response);
-
-        // Построчный вывод в лог
-        foreach (var ch in chunk.Response)
+        if (ch == '\n')
         {
-            if (ch == '\n')
-            {
-                progress?.Report($"  {lineBuffer}");
-                lineBuffer.Clear();
-            }
-            else
-            {
-                lineBuffer.Append(ch);
-            }
+            progress?.Report($"  {lineBuffer}");
+            lineBuffer.Clear();
+        }
+        else
+        {
+            lineBuffer.Append(ch);
         }
     }
-
-    if (chunk?.Done == true) break;
 }
 ```
 
 ## Logging Convention
 
-Все AI-сервисы используют единый формат логирования:
+Все LLM провайдеры используют единый формат логирования:
 
 ```
-[Service] === PROMPT START ===
-<полный текст промпта>
-[Service] === PROMPT END ===
-[Service] Sending STREAMING request to http://localhost:11434/api/generate (model: ..., timeout: ...s)...
-[Service] === STREAMING RESPONSE ===
-<построчный вывод ответа модели в реальном времени>
-[Service] === END STREAMING (12.3s) ===
-[Service] Total response: 1234 chars
+[Provider] ========================================
+[Provider] >>> ЗАПРОС К API
+[Provider] Config.Model: llama3.2:3b
+[Provider] Messages count: 3
+[Provider] URL: http://localhost:11434/api/chat
+[Provider] === STREAMING RESPONSE ===
+  <построчный вывод ответа модели в реальном времени>
+[Provider] <<< ОТВЕТ ПОЛУЧЕН
+[Provider] Response length: 1234 chars
+[Provider] ========================================
 ```
 
 **Prefixes:**
-- `[Ollama]` - OllamaService (парсинг чеков)
+- `[Ollama]` / `[Ollama Chat]` - OllamaLlmProvider
+- `[YandexGPT]` / `[YandexGPT Chat]` - YandexGptLlmProvider
+- `[YandexAgent]` / `[YandexAgent Chat]` - YandexAgentLlmProvider
 - `[Classify]` - ProductClassificationService
 - `[Labels]` - LabelAssignmentService
+- `[AI Chat]` - AiChatViewModel
 
 ## Error Handling
 
 ### NullableDecimalConverter
 
-Ollama может возвращать `""` (пустую строку) вместо числа или `null` для полей типа `decimal?`. Конвертер обрабатывает это gracefully:
+Ollama может возвращать `""` (пустую строку) вместо числа или `null`:
 
 ```csharp
-/// <summary>
-/// Конвертер для decimal? который обрабатывает пустые строки как null.
-/// Нужен потому что Ollama иногда возвращает "" вместо числа или null
-/// когда не может определить значение (например unit_quantity для товара без веса в названии).
-/// </summary>
 public class NullableDecimalConverter : JsonConverter<decimal?>
 {
     public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -298,15 +525,6 @@ public class NullableDecimalConverter : JsonConverter<decimal?>
         return null;
     }
 }
-```
-
-**Применение:**
-```csharp
-[JsonConverter(typeof(NullableDecimalConverter))]
-public decimal? Amount { get; set; }
-
-[JsonConverter(typeof(NullableDecimalConverter))]
-public decimal? UnitQuantity { get; set; }
 ```
 
 ### Cancellation Handling
@@ -330,7 +548,30 @@ catch (OperationCanceledException)
 {
     // Внутренний таймаут - возвращаем ошибку, не бросаем
     result.IsSuccess = false;
-    result.Message = "Request timed out";
+    result.ErrorMessage = "Request timed out";
+}
+```
+
+### Conversation Reset
+
+При смене провайдера или очистке чата:
+
+```csharp
+// AiChatViewModel
+partial void OnSelectedProviderChanged(string? oldValue, string? newValue)
+{
+    // Сбрасываем диалог у старого провайдера (если поддерживает)
+    if (!string.IsNullOrEmpty(oldValue))
+    {
+        var oldProvider = _aiProviderFactory.GetProvider(oldValue);
+        if (oldProvider?.SupportsConversationReset == true)
+        {
+            oldProvider.ResetConversation();
+        }
+    }
+
+    // Очищаем UI историю
+    Messages.Clear();
 }
 ```
 
@@ -357,7 +598,8 @@ catch (OperationCanceledException)
 ```
 
 ### 4. Low Temperature
-Используй `Temperature: 0.1` для детерминированных JSON-ответов.
+Используй `Temperature: 0.1` для детерминированных JSON-ответов (парсинг, классификация).
+Используй `Temperature: 0.7` для чата (более творческие ответы).
 
 ### 5. Batch Size
 Для классификации используй батчи по 5 товаров - баланс между скоростью и качеством.
@@ -369,19 +611,31 @@ src/SmartBasket.WPF/
 ├── prompt_template.txt          # Парсинг чеков
 ├── prompt_classify_products.txt # Классификация товаров
 ├── prompt_assign_labels.txt     # Назначение меток
-└── user_labels.txt              # Доступные метки пользователя
+├── user_labels.txt              # Доступные метки пользователя
+└── ViewModels/
+    └── AiChatViewModel.cs       # AI Chat UI
 
-src/SmartBasket.Services/Ollama/
-├── OllamaService.cs                    # Парсинг чеков
-├── IOllamaService.cs
-├── ParsedReceiptItem.cs                # DTO + NullableDecimalConverter
-├── ProductClassificationService.cs     # Классификация
-├── IProductClassificationService.cs
-├── ProductClassificationResult.cs      # DTO
-├── LabelAssignmentService.cs           # Метки
-├── ILabelAssignmentService.cs
-├── CategoryService.cs                  # (legacy)
-└── ICategoryService.cs
+src/SmartBasket.Services/
+├── Llm/
+│   ├── ILlmProvider.cs              # Интерфейс + LlmChatMessage + LlmGenerationResult
+│   ├── OllamaLlmProvider.cs         # Ollama провайдер
+│   ├── YandexGptLlmProvider.cs      # YandexGPT провайдер
+│   ├── YandexAgentLlmProvider.cs    # YandexAgent провайдер (stateful)
+│   └── IAiProviderFactory.cs        # Фабрика провайдеров
+├── Ollama/
+│   ├── OllamaService.cs                    # Парсинг чеков
+│   ├── IOllamaService.cs
+│   ├── ParsedReceiptItem.cs                # DTO + NullableDecimalConverter
+│   ├── ProductClassificationService.cs     # Классификация
+│   ├── IProductClassificationService.cs
+│   ├── ProductClassificationResult.cs      # DTO
+│   ├── LabelAssignmentService.cs           # Метки
+│   └── ILabelAssignmentService.cs
+└── AI/
+    └── ... (дополнительные AI сервисы)
+
+src/SmartBasket.Core/Configuration/
+└── AiProviderConfig.cs          # Конфигурация провайдеров
 ```
 
 ## Testing via CLI
@@ -397,3 +651,7 @@ dotnet run --project src/SmartBasket.CLI -- classify
 # - Промпты отображаются между === PROMPT START === и === PROMPT END ===
 # - Ответы модели стримятся построчно между === STREAMING RESPONSE === и === END STREAMING ===
 ```
+
+---
+
+*Последнее обновление: 15.12.2025*
