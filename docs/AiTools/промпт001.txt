@@ -1,0 +1,19 @@
+Реализуй систему Tools для Smart Basket.
+
+Прочитай:
+1. CLAUDE.md
+2. WPF_RULES.md  
+3. docs/TOOLS-SPEC.md
+4. docs/TOOLS-IMPLEMENTATION.md
+
+Задача Phase 1:
+Создай src/SmartBasket.Services/Tools/ со структурой:
+- IToolExecutor.cs, ToolExecutor.cs, IToolHandler.cs
+- ToolServiceExtensions.cs (регистрация в DI)
+- Models/ToolDefinition.cs, ToolResult.cs
+- Models/Args/GetReceiptsArgs.cs, GetReceiptItemsArgs.cs
+- Handlers/GetReceiptsHandler.cs, GetReceiptItemsHandler.cs
+
+Реализуй get_receipts и get_receipt_items по спецификации из TOOLS-SPEC.md.
+Добавь services.AddTools() в App.xaml.cs.
+Проверь сборку: dotnet build D:\AI\smart-basket\src\SmartBasket.sln
