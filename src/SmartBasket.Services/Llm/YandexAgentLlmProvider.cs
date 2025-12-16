@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
+using SmartBasket.Services.Tools.Models;
 
 namespace SmartBasket.Services.Llm;
 
@@ -25,6 +26,8 @@ public class YandexAgentLlmProvider : ILlmProvider
     public string Name => $"YandexAgent/{_config.AgentId}";
 
     public bool SupportsConversationReset => true;
+
+    public bool SupportsTools => true; // YandexAgent поддерживает function calling через REST API
 
     public void ResetConversation()
     {
@@ -288,10 +291,55 @@ public class YandexAgentLlmProvider : ILlmProvider
 
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
+        IEnumerable<ToolDefinition>? tools = null,
         int maxTokens = 2000,
         double temperature = 0.7,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
+    {
+        // Retry logic: до 2 повторных попыток при ошибке API
+        const int maxRetries = 2;
+        var messageList = messages.ToList();
+
+        for (var attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            var result = await ChatAsyncInternal(messageList, tools, maxTokens, temperature, progress, cancellationToken);
+
+            // Успех или отмена пользователем - возвращаем сразу
+            if (result.IsSuccess || cancellationToken.IsCancellationRequested)
+            {
+                return result;
+            }
+
+            // Если это была последняя попытка - возвращаем ошибку
+            if (attempt >= maxRetries)
+            {
+                return result;
+            }
+
+            // Логируем retry
+            var delay = (attempt + 1) * 1000; // 1s, 2s
+            _logger.LogWarning("[YandexAgent Chat] Ошибка: {Error}. Повтор {Attempt}/{MaxRetries} через {Delay}ms...",
+                result.ErrorMessage, attempt + 1, maxRetries, delay);
+            progress?.Report($"[YandexAgent Chat] ⚠️ Ошибка, повтор {attempt + 1}/{maxRetries}...");
+
+            // НЕ сбрасываем previous_response_id - история хранится 30 дней
+            // Сброс происходит только при status != completed (в ChatAsyncInternal)
+
+            await Task.Delay(delay, cancellationToken);
+        }
+
+        // Не должны сюда попасть, но на всякий случай
+        return new LlmGenerationResult { IsSuccess = false, ErrorMessage = "Unexpected retry loop exit" };
+    }
+
+    private async Task<LlmGenerationResult> ChatAsyncInternal(
+        List<LlmChatMessage> messageList,
+        IEnumerable<ToolDefinition>? tools,
+        int maxTokens,
+        double temperature,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
     {
         var result = new LlmGenerationResult();
 
@@ -317,28 +365,43 @@ public class YandexAgentLlmProvider : ILlmProvider
                 result.ErrorMessage = "YandexAgent Agent ID is not configured";
                 return result;
             }
-
-            // Берём последнее сообщение пользователя
-            var messageList = messages.ToList();
-            var lastUserMessage = messageList.LastOrDefault(m => m.Role == "user");
-            if (lastUserMessage == null)
-            {
-                result.IsSuccess = false;
-                result.ErrorMessage = "No user message found in chat history";
-                return result;
-            }
-
             var client = _httpClientFactory.CreateClient();
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 120);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            // REST Assistant API формат запроса с previous_response_id для истории
+            // Конвертируем tools в формат Yandex API
+            var yandexTools = tools != null ? ConvertTools(tools).ToList() : null;
+
+            // Определяем что отправлять в input:
+            // - Если есть previous_response_id, YandexAgent уже знает историю - отправляем только новое
+            // - Если нет previous_response_id, отправляем весь контекст
+            object inputData;
+            int inputItemsCount;
+
+            if (_lastResponseId != null)
+            {
+                // Есть история - отправляем только последние сообщения после предыдущего ответа
+                // Это могут быть: tool results или новое сообщение пользователя
+                var newMessages = GetNewMessagesForContinuation(messageList);
+                inputData = newMessages;
+                inputItemsCount = newMessages.Count;
+            }
+            else
+            {
+                // Новый диалог - отправляем весь контекст
+                var inputList = ConvertMessagesToInput(messageList);
+                inputData = inputList;
+                inputItemsCount = inputList.Count;
+            }
+
+            // REST Assistant API формат запроса
             var request = new RestAssistantChatRequest
             {
                 Prompt = new PromptInfo { Id = _config.AgentId },
-                Input = lastUserMessage.Content,
+                Input = inputData,
                 Stream = true,
-                PreviousResponseId = _lastResponseId  // null при первом запросе
+                PreviousResponseId = _lastResponseId,
+                Tools = yandexTools
             };
 
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions
@@ -347,16 +410,29 @@ public class YandexAgentLlmProvider : ILlmProvider
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             });
 
+            // Подсчёт размера контекста для диагностики
+            var contextChars = messageList.Sum(m => m.Content?.Length ?? 0);
+            var estimatedTokens = contextChars / 4; // Грубая оценка: ~4 символа на токен
+
             // Логирование
             _logger.LogInformation("[YandexAgent Chat] ========================================");
             _logger.LogInformation("[YandexAgent Chat] >>> ЗАПРОС К /v1/responses");
             _logger.LogInformation("[YandexAgent Chat] Agent: {AgentId}", _config.AgentId);
             _logger.LogInformation("[YandexAgent Chat] PreviousResponseId: {Id}", _lastResponseId ?? "(null - new conversation)");
-            _logger.LogInformation("[YandexAgent Chat] Messages count: {Count}", messageList.Count);
+            _logger.LogInformation("[YandexAgent Chat] Input items: {Count} (total history: {TotalCount}), Tools: {ToolsCount}",
+                inputItemsCount, messageList.Count, yandexTools?.Count ?? 0);
+            _logger.LogDebug("[YandexAgent Chat] Request JSON: {Json}", requestJson);
 
             progress?.Report($"[YandexAgent Chat] >>> ЗАПРОС К /v1/responses");
             progress?.Report($"[YandexAgent Chat] Agent: {_config.AgentId}");
-            progress?.Report($"[YandexAgent Chat] PreviousResponseId: {_lastResponseId ?? "(new conversation)"}");
+            if (_lastResponseId != null)
+            {
+                progress?.Report($"[YandexAgent Chat] Продолжение диалога: отправляю {inputItemsCount} новых элементов");
+            }
+            else
+            {
+                progress?.Report($"[YandexAgent Chat] Новый диалог: ~{contextChars} chars (~{estimatedTokens} tokens), Tools: {yandexTools?.Count ?? 0}");
+            }
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -398,8 +474,8 @@ public class YandexAgentLlmProvider : ILlmProvider
             // Читаем SSE streaming ответ
             progress?.Report($"[YandexAgent Chat] === STREAMING RESPONSE ===");
             var fullResponse = new StringBuilder();
-            var lineBuffer = new StringBuilder();
             string? responseId = null;
+            var toolCalls = new List<LlmToolCall>();
 
             using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
             using var reader = new StreamReader(stream);
@@ -424,49 +500,153 @@ public class YandexAgentLlmProvider : ILlmProvider
 
                     try
                     {
-                        var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                        if (eventType == "response.output_text.delta" && eventObj?.Delta != null)
+                        if (eventType == "response.output_text.delta")
                         {
-                            fullResponse.Append(eventObj.Delta);
+                            var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData,
+                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                            foreach (var ch in eventObj.Delta)
+                            if (eventObj?.Delta != null)
                             {
-                                if (ch == '\n')
+                                fullResponse.Append(eventObj.Delta);
+
+                                // Отправляем каждую дельту сразу для real-time streaming в UI
+                                // Формат "  delta" - два пробела в начале сигнализируют что это текстовая дельта
+                                progress?.Report($"  {eventObj.Delta}");
+                            }
+                        }
+                        else if (eventType == "response.output_item.done")
+                        {
+                            // Проверяем на function_call
+                            var itemEvent = JsonSerializer.Deserialize<OutputItemDoneEvent>(currentData,
+                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                            if (itemEvent?.Item?.Type == "function_call")
+                            {
+                                // Приоритетно используем id (уникальный идентификатор), затем call_id
+                                var toolCall = new LlmToolCall
                                 {
-                                    progress?.Report($"  {lineBuffer}");
-                                    lineBuffer.Clear();
-                                }
-                                else
-                                {
-                                    lineBuffer.Append(ch);
-                                }
+                                    Id = itemEvent.Item.Id ?? itemEvent.Item.CallId ?? Guid.NewGuid().ToString(),
+                                    Name = itemEvent.Item.Name ?? "",
+                                    Arguments = itemEvent.Item.Arguments ?? "{}"
+                                };
+                                toolCalls.Add(toolCall);
+
+                                _logger.LogInformation("[YandexAgent Chat] Function call: id={Id}, name={Name}, args={Args}",
+                                    toolCall.Id, toolCall.Name, toolCall.Arguments);
+                                progress?.Report($"[YandexAgent Chat] 🔧 Tool call: {toolCall.Name} (id={toolCall.Id})");
                             }
                         }
                         else if (eventType == "response.completed")
                         {
-                            // Получаем ID ответа для следующего запроса
-                            responseId = eventObj?.Response?.Id;
+                            var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData,
+                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                            if (eventObj?.Response?.OutputText != null && fullResponse.Length == 0)
+                            var status = eventObj?.Response?.Status;
+                            var id = eventObj?.Response?.Id;
+                            var outputText = eventObj?.Response?.OutputText;
+
+                            _logger.LogInformation("[YandexAgent Chat] response.completed: id={Id}, status={Status}, outputText={OutputLen} chars",
+                                id ?? "(null)", status ?? "(null)", outputText?.Length ?? 0);
+
+                            // Диагностика: показываем полный JSON при пустом ответе
+                            if (fullResponse.Length == 0 && string.IsNullOrEmpty(outputText))
                             {
-                                fullResponse.Append(eventObj.Response.OutputText);
+                                _logger.LogWarning("[YandexAgent Chat] ДИАГНОСТИКА: Пустой response.completed! Full data: {Data}",
+                                    currentData.Length > 500 ? currentData[..500] + "..." : currentData);
+                                progress?.Report($"[YandexAgent Chat] ⚠️ Пустой ответ! status={status ?? "null"}");
                             }
 
-                            if (lineBuffer.Length > 0)
+                            // Сохраняем ID только если статус completed
+                            if (string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase))
                             {
-                                progress?.Report($"  {lineBuffer}");
-                                lineBuffer.Clear();
+                                responseId = id;
+                            }
+                            else
+                            {
+                                // Статус incomplete/failed - сбрасываем previous_response_id
+                                // Это единственный случай когда нужен сброс (response пришёл, но не завершён)
+                                _logger.LogWarning("[YandexAgent Chat] Response status={Status} (не completed!). Сбрасываю previous_response_id.", status);
+                                progress?.Report($"[YandexAgent Chat] ⚠️ status={status} - сброс диалога");
+                                _lastResponseId = null;
                             }
 
-                            _logger.LogInformation("[YandexAgent Chat] response.completed, id: {Id}", responseId ?? "(null)");
+                            if (outputText != null && fullResponse.Length == 0)
+                            {
+                                fullResponse.Append(outputText);
+                            }
+
+                            break;
+                        }
+                        else if (eventType == "response.failed" || eventType == "error")
+                        {
+                            // Обработка ошибки от API
+                            _logger.LogError("[YandexAgent Chat] API Error event: {EventType}, Data: {Data}",
+                                eventType, currentData);
+
+                            // Попробуем извлечь сообщение об ошибке
+                            string errorMessage;
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(currentData);
+
+                                // Пробуем разные форматы ошибок
+                                if (doc.RootElement.TryGetProperty("error", out var errProp))
+                                {
+                                    // Формат: {"error": {"message": "...", "code": "..."}} или {"error": "..."}
+                                    if (errProp.ValueKind == JsonValueKind.Object)
+                                    {
+                                        var msg = errProp.TryGetProperty("message", out var msgProp)
+                                            ? msgProp.GetString()
+                                            : null;
+                                        var code = errProp.TryGetProperty("code", out var codeProp)
+                                            ? codeProp.GetString()
+                                            : null;
+                                        errorMessage = !string.IsNullOrEmpty(msg)
+                                            ? (code != null ? $"{code}: {msg}" : msg)
+                                            : currentData;
+                                    }
+                                    else
+                                    {
+                                        errorMessage = errProp.GetString() ?? currentData;
+                                    }
+                                }
+                                else if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                                {
+                                    errorMessage = msgProp.GetString() ?? currentData;
+                                }
+                                else
+                                {
+                                    errorMessage = currentData;
+                                }
+                            }
+                            catch
+                            {
+                                errorMessage = currentData;
+                            }
+
+                            // ВАЖНО: Показываем содержимое ошибки пользователю!
+                            progress?.Report($"[YandexAgent Chat] ❌ API ERROR: {errorMessage}");
+
+                            // Проверяем специфичные ошибки, требующие сброса диалога
+                            if (errorMessage.Contains("tool results does not match") ||
+                                errorMessage.Contains("tool calls"))
+                            {
+                                // Ошибка сопоставления tool results - сбрасываем previous_response_id
+                                // чтобы следующая попытка отправила полный контекст
+                                _logger.LogWarning("[YandexAgent Chat] Tool results mismatch - resetting conversation");
+                                progress?.Report($"[YandexAgent Chat] ⚠️ Сброс диалога из-за ошибки tool results");
+                                _lastResponseId = null;
+                            }
+
+                            result.ErrorMessage = $"API Error: {errorMessage}";
+                            result.IsSuccess = false;
                             break;
                         }
                     }
-                    catch (JsonException)
+                    catch (JsonException ex)
                     {
-                        // Skip malformed events
+                        _logger.LogWarning("[YandexAgent Chat] JSON parse error for event {EventType}: {Error}",
+                            eventType, ex.Message);
                     }
 
                     currentData = null;
@@ -476,19 +656,54 @@ public class YandexAgentLlmProvider : ILlmProvider
             stopwatch.Stop();
             progress?.Report($"[YandexAgent Chat] === END STREAMING ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
 
-            if (fullResponse.Length > 0)
+            // Диагностика при пустом ответе
+            if (fullResponse.Length == 0 && toolCalls.Count == 0 && result.ErrorMessage == null)
+            {
+                _logger.LogWarning("[YandexAgent Chat] Empty response! responseId: {ResponseId}, lastResponseId: {LastResponseId}",
+                    responseId ?? "(null)", _lastResponseId ?? "(null)");
+                progress?.Report($"[YandexAgent Chat] ДИАГНОСТИКА: Пустой ответ, responseId={responseId ?? "null"}, lastResponseId={_lastResponseId ?? "null"}");
+            }
+
+            // Сохраняем ID для следующего запроса в этом диалоге
+            if (!string.IsNullOrEmpty(responseId))
+            {
+                _lastResponseId = responseId;
+                _logger.LogInformation("[YandexAgent Chat] Saved response ID for next request: {Id}", responseId);
+            }
+            // НЕ сбрасываем _lastResponseId при ошибке API (rate limit и т.п.)
+            // История хранится 30 дней, retry с тем же previous_response_id должен работать
+            // Сброс только при явном status=incomplete в response.completed (происходит выше)
+
+            // Парсим текстовые tool calls [TOOL_CALL_START] если native не получены
+            if (toolCalls.Count == 0 && fullResponse.Length > 0)
+            {
+                var textToolCalls = TryParseTextToolCalls(fullResponse.ToString());
+                if (textToolCalls.Count > 0)
+                {
+                    toolCalls.AddRange(textToolCalls);
+                    _logger.LogInformation("[YandexAgent Chat] Parsed {Count} tool call(s) from text [TOOL_CALL_START] format",
+                        textToolCalls.Count);
+                    progress?.Report($"[YandexAgent Chat] Parsed {textToolCalls.Count} tool call(s) from text");
+                }
+            }
+
+            // Если есть tool calls - возвращаем их
+            if (toolCalls.Count > 0)
+            {
+                // Извлекаем текст до tool call (рассуждения модели)
+                var responseText = ExtractTextBeforeToolCall(fullResponse.ToString());
+
+                result.IsSuccess = true;
+                result.Response = responseText;
+                result.ResponseId = responseId;
+                result.ToolCalls = toolCalls;
+                progress?.Report($"[YandexAgent Chat] {toolCalls.Count} tool call(s) received");
+            }
+            else if (fullResponse.Length > 0)
             {
                 result.IsSuccess = true;
                 result.Response = fullResponse.ToString();
                 result.ResponseId = responseId;
-
-                // Сохраняем ID для следующего запроса в этом диалоге
-                if (!string.IsNullOrEmpty(responseId))
-                {
-                    _lastResponseId = responseId;
-                    _logger.LogInformation("[YandexAgent Chat] Saved response ID for next request: {Id}", responseId);
-                }
-
                 progress?.Report($"[YandexAgent Chat] Total response: {fullResponse.Length} chars");
             }
             else
@@ -517,6 +732,156 @@ public class YandexAgentLlmProvider : ILlmProvider
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Конвертация истории сообщений в формат input для REST API
+    /// </summary>
+    private List<object> ConvertMessagesToInput(List<LlmChatMessage> messages)
+    {
+        var inputList = new List<object>();
+
+        foreach (var msg in messages)
+        {
+            if (msg.Role == "user")
+            {
+                // Обычное текстовое сообщение пользователя
+                inputList.Add(new { type = "message", role = "user", content = msg.Content });
+            }
+            else if (msg.Role == "assistant")
+            {
+                if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
+                {
+                    // Assistant с вызовами инструментов - добавляем function_call элементы
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        inputList.Add(new
+                        {
+                            type = "function_call",
+                            call_id = tc.Id,
+                            name = tc.Name,
+                            arguments = tc.Arguments
+                        });
+                    }
+                }
+                else if (!string.IsNullOrEmpty(msg.Content))
+                {
+                    // Обычное текстовое сообщение ассистента
+                    inputList.Add(new { type = "message", role = "assistant", content = msg.Content });
+                }
+            }
+            else if (msg.Role == "tool")
+            {
+                // Результат выполнения инструмента
+                inputList.Add(new
+                {
+                    type = "function_call_output",
+                    call_id = msg.ToolCallId,
+                    output = msg.Content
+                });
+            }
+            else if (msg.Role == "system")
+            {
+                // Системный промпт - добавляем как первое сообщение
+                inputList.Insert(0, new { type = "message", role = "system", content = msg.Content });
+            }
+        }
+
+        return inputList;
+    }
+
+    /// <summary>
+    /// Получает только новые сообщения для продолжения диалога
+    /// Когда есть previous_response_id, YandexAgent уже знает историю
+    /// Нужно отправить: function_call + function_call_output пары, или новое сообщение пользователя
+    /// ВАЖНО: API требует чтобы function_call СРАЗУ следовал function_call_output с тем же call_id
+    /// Порядок: [function_call(a), function_call_output(a), function_call(b), function_call_output(b)]
+    /// </summary>
+    private List<object> GetNewMessagesForContinuation(List<LlmChatMessage> messages)
+    {
+        var result = new List<object>();
+
+        // Собираем tool results (role="tool") в словарь по call_id
+        var toolResults = new Dictionary<string, string>();
+        for (var i = messages.Count - 1; i >= 0; i--)
+        {
+            var msg = messages[i];
+            if (msg.Role == "assistant") break; // Дошли до assistant
+            if (msg.Role == "tool" && msg.ToolCallId != null)
+            {
+                toolResults[msg.ToolCallId] = msg.Content;
+            }
+        }
+
+        // Ищем assistant с tool calls
+        for (var i = messages.Count - 1; i >= 0; i--)
+        {
+            var msg = messages[i];
+
+            if (msg.Role == "assistant")
+            {
+                // Если у assistant есть tool calls - добавляем пары [function_call, function_call_output]
+                if (msg.ToolCalls?.Count > 0)
+                {
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        // Сначала function_call
+                        result.Add(new
+                        {
+                            type = "function_call",
+                            call_id = tc.Id,
+                            name = tc.Name,
+                            arguments = tc.Arguments
+                        });
+
+                        // Сразу за ним function_call_output
+                        if (toolResults.TryGetValue(tc.Id, out var output))
+                        {
+                            result.Add(new
+                            {
+                                type = "function_call_output",
+                                call_id = tc.Id,
+                                output = output
+                            });
+                        }
+                    }
+                }
+                break;
+            }
+
+            if (msg.Role == "user")
+            {
+                // Новое сообщение пользователя - добавляем в начало
+                result.Insert(0, new { type = "message", role = "user", content = msg.Content });
+            }
+            // tool messages обрабатываются выше через toolResults
+        }
+
+        // Если ничего не нашли (странная ситуация) - отправляем последнее сообщение
+        if (result.Count == 0 && messages.Count > 0)
+        {
+            var last = messages[^1];
+            if (last.Role == "user")
+            {
+                result.Add(new { type = "message", role = "user", content = last.Content });
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Конвертация tools в формат Yandex API
+    /// </summary>
+    private IEnumerable<YandexAgentTool> ConvertTools(IEnumerable<ToolDefinition> tools)
+    {
+        return tools.Select(t => new YandexAgentTool
+        {
+            Type = "function",
+            Name = t.Name,
+            Description = t.Description,
+            Parameters = t.ParametersSchema
+        });
     }
 
     // DTOs для REST Assistant API
@@ -585,20 +950,64 @@ public class YandexAgentLlmProvider : ILlmProvider
         public string? Status { get; set; }
     }
 
-    // DTOs для Chat API с previous_response_id
+    // DTOs для Chat API с previous_response_id и tools
     private class RestAssistantChatRequest
     {
         [JsonPropertyName("prompt")]
         public PromptInfo Prompt { get; set; } = new();
 
         [JsonPropertyName("input")]
-        public string Input { get; set; } = string.Empty;
+        public object Input { get; set; } = string.Empty; // string или List<object>
 
         [JsonPropertyName("stream")]
         public bool Stream { get; set; }
 
         [JsonPropertyName("previous_response_id")]
         public string? PreviousResponseId { get; set; }
+
+        [JsonPropertyName("tools")]
+        public List<YandexAgentTool>? Tools { get; set; }
+    }
+
+    // DTO для tools в формате Yandex API
+    private class YandexAgentTool
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "function";
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = string.Empty;
+
+        [JsonPropertyName("parameters")]
+        public object Parameters { get; set; } = new { };
+    }
+
+    // DTO для парсинга function_call из streaming
+    private class OutputItemDoneEvent
+    {
+        [JsonPropertyName("item")]
+        public FunctionCallItem? Item { get; set; }
+    }
+
+    private class FunctionCallItem
+    {
+        [JsonPropertyName("type")]
+        public string? Type { get; set; }
+
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("call_id")]
+        public string? CallId { get; set; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("arguments")]
+        public string? Arguments { get; set; }
     }
 
     private class StreamEventWithId
@@ -629,5 +1038,168 @@ public class YandexAgentLlmProvider : ILlmProvider
 
         [JsonPropertyName("status")]
         public string? Status { get; set; }
+    }
+
+    /// <summary>
+    /// Парсит текстовые tool calls в формате [TOOL_CALL_START]name\n{json}\n[TOOL_CALL_END]
+    /// YandexAgent модель иногда выводит вызовы инструментов в таком текстовом формате
+    /// </summary>
+    private List<LlmToolCall> TryParseTextToolCalls(string text)
+    {
+        var result = new List<LlmToolCall>();
+
+        try
+        {
+            // Ищем паттерн: [TOOL_CALL_START]tool_name\n{...json...}
+            // Опционально: [TOOL_CALL_END]
+            const string startTag = "[TOOL_CALL_START]";
+            const string endTag = "[TOOL_CALL_END]";
+
+            var startIndex = text.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+            while (startIndex >= 0)
+            {
+                var afterTag = startIndex + startTag.Length;
+
+                // Ищем имя инструмента (до конца строки или до {)
+                var nameEnd = text.IndexOfAny(new[] { '\n', '\r', '{' }, afterTag);
+                if (nameEnd < 0) break;
+
+                var toolName = text.Substring(afterTag, nameEnd - afterTag).Trim();
+                if (string.IsNullOrEmpty(toolName))
+                {
+                    startIndex = text.IndexOf(startTag, afterTag, StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                // Ищем JSON - начинается с {
+                var jsonStart = text.IndexOf('{', nameEnd);
+                if (jsonStart < 0) break;
+
+                // Ищем конец JSON - либо до [TOOL_CALL_END], либо до следующего [TOOL_CALL_START], либо до конца
+                var endTagIndex = text.IndexOf(endTag, jsonStart, StringComparison.OrdinalIgnoreCase);
+                var nextStartIndex = text.IndexOf(startTag, jsonStart, StringComparison.OrdinalIgnoreCase);
+
+                int jsonEnd;
+                if (endTagIndex >= 0 && (nextStartIndex < 0 || endTagIndex < nextStartIndex))
+                {
+                    // Есть [TOOL_CALL_END] до следующего [TOOL_CALL_START]
+                    jsonEnd = endTagIndex;
+                }
+                else if (nextStartIndex >= 0)
+                {
+                    // Есть следующий [TOOL_CALL_START]
+                    jsonEnd = nextStartIndex;
+                }
+                else
+                {
+                    // До конца строки
+                    jsonEnd = text.Length;
+                }
+
+                // Извлекаем JSON и находим закрывающую }
+                var jsonCandidate = text.Substring(jsonStart, jsonEnd - jsonStart).Trim();
+
+                // Парсим JSON, находя сбалансированные скобки
+                var jsonText = ExtractBalancedJson(jsonCandidate);
+                if (!string.IsNullOrEmpty(jsonText))
+                {
+                    // Валидируем JSON
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(jsonText);
+
+                        result.Add(new LlmToolCall
+                        {
+                            Id = Guid.NewGuid().ToString("N")[..8],
+                            Name = toolName,
+                            Arguments = jsonText
+                        });
+
+                        _logger.LogDebug("[YandexAgent] Parsed text tool call: {Name}({Args})",
+                            toolName, jsonText.Length > 100 ? jsonText[..100] + "..." : jsonText);
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger.LogWarning("[YandexAgent] Invalid JSON in tool call {Name}: {Error}",
+                            toolName, ex.Message);
+                    }
+                }
+
+                // Ищем следующий
+                startIndex = text.IndexOf(startTag, jsonStart + 1, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("[YandexAgent] Error parsing text tool calls: {Error}", ex.Message);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Извлекает JSON с балансировкой скобок из начала строки
+    /// </summary>
+    private static string? ExtractBalancedJson(string text)
+    {
+        if (string.IsNullOrEmpty(text) || !text.StartsWith("{"))
+            return null;
+
+        var depth = 0;
+        var inString = false;
+        var escape = false;
+
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (ch == '\\' && inString)
+            {
+                escape = true;
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString) continue;
+
+            if (ch == '{') depth++;
+            else if (ch == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return text[..(i + 1)];
+                }
+            }
+        }
+
+        return null; // Не сбалансировано
+    }
+
+    /// <summary>
+    /// Извлекает текст до [TOOL_CALL_START] (рассуждения модели)
+    /// </summary>
+    private static string ExtractTextBeforeToolCall(string text)
+    {
+        const string startTag = "[TOOL_CALL_START]";
+        var index = text.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+
+        if (index > 0)
+        {
+            return text[..index].Trim();
+        }
+
+        return index == 0 ? "" : text;
     }
 }

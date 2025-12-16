@@ -9,7 +9,8 @@ namespace SmartBasket.Services.Llm;
 public enum AiOperation
 {
     Classification,
-    Labels
+    Labels,
+    Chat
 }
 
 /// <summary>
@@ -79,6 +80,7 @@ public class AiProviderFactory : IAiProviderFactory
         {
             AiOperation.Classification => _settings.AiOperations.Classification,
             AiOperation.Labels => _settings.AiOperations.Labels,
+            AiOperation.Chat => _settings.AiOperations.Chat,
             _ => null
         };
 

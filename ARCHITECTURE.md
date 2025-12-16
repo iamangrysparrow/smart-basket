@@ -1,6 +1,6 @@
 # SmartBasket Architecture
 
-> **AI Integration:** См. [ARCHITECTURE-AI.md](ARCHITECTURE-AI.md) для документации по интеграции с Ollama LLM.
+> **AI Integration:** См. [ARCHITECTURE-AI.md](ARCHITECTURE-AI.md) для документации по интеграции с LLM провайдерами и Tool Calling.
 
 ## Overview
 
@@ -284,10 +284,22 @@ EF Core DbContext. PostgreSQL / SQLite.
 - `LlmUniversalParser` (AI)
 - `ReceiptTextParserFactory`
 
-**AI:**
+**AI/LLM:**
 - `ILlmProvider`, `OllamaLlmProvider`, `YandexGptLlmProvider`, `YandexAgentLlmProvider`
 - `IAiProviderFactory`
 - `IResponseParser` — унифицированный парсинг JSON из LLM ответов
+
+**Chat:**
+- `IChatService`, `ChatService` — чат с поддержкой Tool Calling
+- Tool Loop: выполняет инструменты и возвращает результаты в LLM
+- Поддержка native tools и fallback (prompt injection)
+
+**Tools:**
+- `IToolExecutor`, `ToolExecutor` — исполнитель инструментов
+- `IToolHandler` — интерфейс обработчика инструмента
+- **2 универсальных инструмента** (вместо множества специализированных):
+  - `describe_data` — схема БД + примеры данных для LLM контекста
+  - `query` — SqlKata-based универсальный SELECT (JOIN, агрегаты, GROUP BY, HAVING)
 
 **Services:**
 - `ReceiptCollectionService` — оркестрация сбора

@@ -130,20 +130,37 @@
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center"/>
 
-                <!-- Clear button -->
-                <Button Grid.Column="2"
-                        Style="{StaticResource SecondaryButton}"
-                        Command="{Binding ClearChatCommand}"
-                        ToolTip="Очистить чат"
-                        Padding="8,4">
-                    <StackPanel Orientation="Horizontal">
-                        <Path Data="{StaticResource IconClear}"
-                              Fill="{DynamicResource ForegroundSecondaryBrush}"
-                              Width="14" Height="14" Stretch="Uniform"
-                              Margin="0,0,4,0"/>
-                        <TextBlock Text="Очистить"/>
-                    </StackPanel>
-                </Button>
+                <!-- Buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Prompt button -->
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Click="PromptButton_Click"
+                            ToolTip="Редактировать системный промпт"
+                            Padding="8,4"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconEdit}"
+                                  Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"
+                                  Margin="0,0,4,0"/>
+                            <TextBlock Text="Промпт"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Clear button -->
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ClearChatCommand}"
+                            ToolTip="Очистить чат"
+                            Padding="8,4">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconClear}"
+                                  Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"
+                                  Margin="0,0,4,0"/>
+                            <TextBlock Text="Очистить"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -153,27 +170,102 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Background="{DynamicResource BackgroundBaseBrush}">
-            <ItemsControl ItemsSource="{Binding Messages}" Margin="0,8">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <ContentControl Content="{Binding}">
-                            <ContentControl.Style>
-                                <Style TargetType="ContentControl">
-                                    <Setter Property="ContentTemplate" Value="{StaticResource AssistantMessageTemplate}"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsUser}" Value="True">
-                                            <Setter Property="ContentTemplate" Value="{StaticResource UserMessageTemplate}"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsSystem}" Value="True">
-                                            <Setter Property="ContentTemplate" Value="{StaticResource SystemMessageTemplate}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ContentControl.Style>
-                        </ContentControl>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding Messages}" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ContentControl Content="{Binding}">
+                                <ContentControl.Style>
+                                    <Style TargetType="ContentControl">
+                                        <Setter Property="ContentTemplate" Value="{StaticResource AssistantMessageTemplate}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource UserMessageTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSystem}" Value="True">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource SystemMessageTemplate}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ContentControl.Style>
+                            </ContentControl>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Typing indicator (visible when processing) -->
+                <Border Style="{StaticResource AssistantMessageBorder}"
+                        Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}}"
+                        Margin="12,4,60,8">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Animated dots -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse x:Name="Dot1" Width="8" Height="8" Fill="{DynamicResource AccentBrush}" Margin="0,0,4,0">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsProcessing}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.3" To="1" Duration="0:0:0.4"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <Ellipse x:Name="Dot2" Width="8" Height="8" Fill="{DynamicResource AccentBrush}" Margin="0,0,4,0">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsProcessing}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard RepeatBehavior="Forever" BeginTime="0:0:0.15">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.3" To="1" Duration="0:0:0.4"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <Ellipse x:Name="Dot3" Width="8" Height="8" Fill="{DynamicResource AccentBrush}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsProcessing}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard RepeatBehavior="Forever" BeginTime="0:0:0.3">
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0.3" To="1" Duration="0:0:0.4"
+                                                                             AutoReverse="True"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                        </StackPanel>
+                        <TextBlock Text="Модель думает..."
+                                   Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                   FontStyle="Italic"
+                                   VerticalAlignment="Center"
+                                   Margin="12,0,0,0"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- Empty state -->

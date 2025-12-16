@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SmartBasket.Core\SmartBasket.Core.csproj" />
+    <ProjectReference Include="..\SmartBasket.Data\SmartBasket.Data.csproj" />
     <ProjectReference Include="..\SmartBasket.Services\SmartBasket.Services.csproj" />
   </ItemGroup>
 

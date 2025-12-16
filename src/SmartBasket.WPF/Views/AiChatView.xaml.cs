@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -33,6 +34,20 @@ public partial class AiChatView : UserControl
                     });
                 };
             }
+
+            // Subscribe to IsProcessing changes for auto-scroll when typing indicator appears
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AiChatViewModel.IsProcessing))
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                MessagesScrollViewer.ScrollToEnd();
+            });
         }
     }
 
@@ -45,6 +60,23 @@ public partial class AiChatView : UserControl
                 viewModel.SendMessageCommand.Execute(null);
                 e.Handled = true;
             }
+        }
+    }
+
+    private void PromptButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not AiChatViewModel viewModel)
+            return;
+
+        var dialog = new PromptEditorDialog(viewModel.SystemPrompt)
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            viewModel.SystemPrompt = dialog.PromptText;
+            viewModel.ApplySystemPromptCommand.Execute(null);
         }
     }
 }

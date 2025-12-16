@@ -14,6 +14,8 @@ using SmartBasket.Services.Llm;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Products;
 using SmartBasket.Services.Sources;
+using SmartBasket.Services.Tools;
+using SmartBasket.Services.Chat;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
@@ -128,6 +130,12 @@ public partial class App : Application
 
         // Export service
         services.AddSingleton<IReceiptExportService, ReceiptExportService>();
+
+        // Tools (for AI chat and brain services)
+        services.AddTools();
+
+        // Chat service (with tool-use loop)
+        services.AddTransient<IChatService, ChatService>();
 
         // ViewModels
         services.AddTransient<MainViewModel>();

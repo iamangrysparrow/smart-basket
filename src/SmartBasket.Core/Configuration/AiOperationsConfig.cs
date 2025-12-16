@@ -17,6 +17,11 @@ public class AiOperationsConfig
     public string? Labels { get; set; }
 
     /// <summary>
+    /// Ключ провайдера для AI чата с пользователем
+    /// </summary>
+    public string? Chat { get; set; }
+
+    /// <summary>
     /// Кастомные промпты для операций в связке с провайдером.
     /// Ключ: "Operation/ProviderKey", например "Classification/Ollama/llama3.2:3b"
     /// Значение: текст промпта

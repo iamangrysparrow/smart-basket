@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Helpers;
 using SmartBasket.Services.Email;
+using SmartBasket.Services.Tools.Handlers;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -120,6 +121,9 @@ switch (mode)
         var model = args.Length > 1 ? args[1] : ollamaProvider.Model;
         return await TestClassificationAsync(ollamaProvider, model);
 
+    case "test-query":
+        return await TestQueryHandlerAsync(settings);
+
     default:
         Console.WriteLine("=== SmartBasket CLI ===");
         Console.WriteLine();
@@ -127,6 +131,7 @@ switch (mode)
         Console.WriteLine("  dotnet run -- test-ollama [count]  - Test Ollama performance (default: 3 runs)");
         Console.WriteLine("  dotnet run -- test-agent-stream    - Test YandexAgent streaming API (raw HTTP)");
         Console.WriteLine("  dotnet run -- test-agent-provider  - Test YandexAgent via LlmProvider (streaming)");
+        Console.WriteLine("  dotnet run -- test-query           - Test QueryHandler (SQL queries to all tables)");
         Console.WriteLine("  dotnet run -- email                - Fetch and save emails");
         Console.WriteLine("  dotnet run -- parse                - Fetch emails and parse with Ollama");
         Console.WriteLine("  dotnet run -- classify [model]     - Test classification pipeline");
@@ -975,4 +980,129 @@ async Task<int> TestYandexAgentProviderAsync(AiProviderConfig provider)
     }
 
     return result.IsSuccess ? 0 : 1;
+}
+
+// ============= TEST QUERY HANDLER =============
+async Task<int> TestQueryHandlerAsync(AppSettings appSettings)
+{
+    Console.WriteLine("=== QueryHandler Integration Test ===");
+    Console.WriteLine($"Database: {appSettings.Database.ConnectionString?.Substring(0, Math.Min(50, appSettings.Database.ConnectionString?.Length ?? 0))}...");
+    Console.WriteLine();
+
+    var services = new ServiceCollection();
+    services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
+    services.AddSingleton(appSettings);
+    services.AddTransient<QueryHandler>();
+    var serviceProvider = services.BuildServiceProvider();
+
+    var queryHandler = serviceProvider.GetRequiredService<QueryHandler>();
+
+    var testCases = new List<(string name, string json)>
+    {
+        // 1. Simple SELECT from each table
+        ("Receipts - COUNT", """{"table": "Receipts", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("Receipts - SUM Total", """{"table": "Receipts", "aggregates": [{"function": "SUM", "column": "Total", "alias": "total_sum"}]}"""),
+        ("Receipts - SELECT top 3", """{"table": "Receipts", "columns": ["Id", "Shop", "Total", "ReceiptDate"], "order_by": [{"column": "ReceiptDate", "direction": "DESC"}], "limit": 3}"""),
+
+        ("ReceiptItems - COUNT", """{"table": "ReceiptItems", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("ReceiptItems - SELECT top 3", """{"table": "ReceiptItems", "columns": ["Id", "ReceiptId", "ItemId", "Quantity", "Amount"], "limit": 3}"""),
+
+        ("Items - COUNT", """{"table": "Items", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("Items - SELECT top 3", """{"table": "Items", "columns": ["Id", "Name", "Shop"], "limit": 3}"""),
+        ("Items - ILIKE search", """{"table": "Items", "columns": ["Id", "Name"], "where": [{"column": "Name", "op": "ILIKE", "value": "%молоко%"}], "limit": 5}"""),
+
+        ("Products - COUNT", """{"table": "Products", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("Products - SELECT top 3", """{"table": "Products", "columns": ["Id", "Name", "ParentId"], "limit": 3}"""),
+
+        ("Labels - COUNT", """{"table": "Labels", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("Labels - SELECT all", """{"table": "Labels", "columns": ["Id", "Name", "Color"], "limit": 10}"""),
+
+        ("ItemLabels - COUNT", """{"table": "ItemLabels", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("ProductLabels - COUNT", """{"table": "ProductLabels", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+
+        // 2. JOINs
+        ("JOIN: ReceiptItems + Items", """{"table": "ReceiptItems", "joins": [{"table": "Items", "on": ["Items.Id", "ReceiptItems.ItemId"]}], "columns": ["ReceiptItems.Id", "Items.Name", "ReceiptItems.Quantity", "ReceiptItems.Amount"], "limit": 5}"""),
+
+        ("JOIN: ReceiptItems + Receipts", """{"table": "ReceiptItems", "joins": [{"table": "Receipts", "on": ["Receipts.Id", "ReceiptItems.ReceiptId"]}], "columns": ["Receipts.Shop", "Receipts.ReceiptDate", "ReceiptItems.Amount"], "limit": 5}"""),
+
+        ("JOIN: Items + Products", """{"table": "Items", "joins": [{"table": "Products", "on": ["Products.Id", "Items.ProductId"], "type": "left"}], "columns": ["Items.Name", "Products.Name"], "limit": 5}"""),
+
+        // 3. Aggregates with GROUP BY
+        ("GROUP BY: Items by Shop", """{"table": "Items", "columns": ["Shop"], "aggregates": [{"function": "COUNT", "column": "*", "alias": "item_count"}], "group_by": ["Shop"], "order_by": [{"column": "item_count", "direction": "DESC"}], "limit": 10}"""),
+
+        ("GROUP BY: Receipts by Shop with SUM", """{"table": "Receipts", "columns": ["Shop"], "aggregates": [{"function": "COUNT", "column": "*", "alias": "receipt_count"}, {"function": "SUM", "column": "Total", "alias": "total_sum"}], "group_by": ["Shop"], "order_by": [{"column": "total_sum", "direction": "DESC"}], "limit": 10}"""),
+
+        // 4. Complex query: Top items by total amount
+        ("TOP 5 Items by Amount (JOIN + GROUP BY)", """{"table": "ReceiptItems", "joins": [{"table": "Items", "on": ["Items.Id", "ReceiptItems.ItemId"]}], "columns": ["Items.Name"], "aggregates": [{"function": "SUM", "column": "ReceiptItems.Amount", "alias": "total_amount"}, {"function": "COUNT", "column": "*", "alias": "purchase_count"}], "group_by": ["Items.Name"], "order_by": [{"column": "total_amount", "direction": "DESC"}], "limit": 5}"""),
+
+        // 5. WHERE with different operators
+        ("WHERE: Receipts with Total > 1000", """{"table": "Receipts", "columns": ["Id", "Shop", "Total", "ReceiptDate"], "where": [{"column": "Total", "op": ">", "value": 1000}], "limit": 5}"""),
+
+        ("WHERE: Date range (BETWEEN)", """{"table": "Receipts", "columns": ["Id", "Shop", "Total", "ReceiptDate"], "where": [{"column": "ReceiptDate", "op": "BETWEEN", "value": ["2024-01-01", "2024-12-31"]}], "limit": 5}"""),
+
+        ("WHERE: Date >= (timestamp cast)", """{"table": "Receipts", "columns": ["Id", "Shop", "ReceiptDate"], "where": [{"column": "ReceiptDate", "op": ">=", "value": "2024-06-01"}], "limit": 5}"""),
+
+        ("WHERE: Date = (timestamp cast)", """{"table": "Receipts", "columns": ["Id", "Shop", "ReceiptDate"], "where": [{"column": "ReceiptDate", "op": "=", "value": "2024-12-01"}], "limit": 5}"""),
+
+        // 6. snake_case input normalization test
+        ("snake_case: receipt_items", """{"table": "receipt_items", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}"""),
+        ("snake_case: item_labels", """{"table": "item_labels", "aggregates": [{"function": "COUNT", "column": "*", "alias": "total"}]}""")
+    };
+
+    var passed = 0;
+    var failed = 0;
+    var failedTests = new List<string>();
+
+    foreach (var (name, json) in testCases)
+    {
+        Console.Write($"  {name}... ");
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            var result = await queryHandler.ExecuteAsync(json);
+            sw.Stop();
+
+            if (result.Success)
+            {
+                var data = JsonSerializer.Deserialize<JsonElement>(result.JsonData);
+                var rowCount = data.TryGetProperty("row_count", out var rc) ? rc.GetInt32() : -1;
+                var sql = data.TryGetProperty("sql", out var s) ? s.GetString() : "";
+
+                Console.WriteLine($"OK ({sw.ElapsedMilliseconds}ms, {rowCount} rows)");
+                Console.WriteLine($"      SQL: {sql?.Substring(0, Math.Min(100, sql?.Length ?? 0))}...");
+                passed++;
+            }
+            else
+            {
+                Console.WriteLine($"FAILED: {result.ErrorMessage}");
+                failed++;
+                failedTests.Add($"{name}: {result.ErrorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            Console.WriteLine($"ERROR: {ex.Message}");
+            failed++;
+            failedTests.Add($"{name}: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("=== Summary ===");
+    Console.WriteLine($"Passed: {passed}/{testCases.Count}");
+    Console.WriteLine($"Failed: {failed}/{testCases.Count}");
+
+    if (failedTests.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Failed tests:");
+        foreach (var f in failedTests)
+        {
+            Console.WriteLine($"  - {f}");
+        }
+    }
+
+    return failed == 0 ? 0 : 1;
 }

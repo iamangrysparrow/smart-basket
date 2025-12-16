@@ -3,11 +3,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
+using SmartBasket.Services.Tools.Models;
 
 namespace SmartBasket.Services.Llm;
 
 /// <summary>
-/// LLM провайдер для YandexGPT (Yandex Cloud) с поддержкой стриминга
+/// LLM провайдер для YandexGPT (Yandex Cloud) с поддержкой стриминга и tools
 /// https://cloud.yandex.ru/docs/yandexgpt/api-ref/v1/TextGeneration/completion
 /// </summary>
 public class YandexGptLlmProvider : ILlmProvider
@@ -21,6 +22,10 @@ public class YandexGptLlmProvider : ILlmProvider
     public string Name => $"YandexGPT/{_config.Model}";
 
     public bool SupportsConversationReset => false;
+
+    // YandexGPT пока не поддерживает native tool calling публично
+    // Используем fallback через prompt injection и парсинг текстового ответа
+    public bool SupportsTools => false;
 
     public void ResetConversation()
     {
@@ -100,22 +105,16 @@ public class YandexGptLlmProvider : ILlmProvider
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            // Использовать настройки из конфига
             var actualMaxTokens = _config.MaxTokens ?? maxTokens;
             var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
 
-            // Формируем modelUri
-            // Для обычных моделей: gpt://{folder_id}/yandexgpt-lite/latest
-            // Для Alice и других general моделей: gpt://{folder_id}/general:alice (без /latest)
             string modelUri;
             if (_config.Model.StartsWith("general:"))
             {
-                // General модели (Alice и др.) - без /latest
                 modelUri = $"gpt://{_config.FolderId}/{_config.Model}";
             }
             else
             {
-                // Обычные YandexGPT модели - с /latest
                 modelUri = $"gpt://{_config.FolderId}/{_config.Model}/latest";
             }
 
@@ -124,7 +123,7 @@ public class YandexGptLlmProvider : ILlmProvider
                 ModelUri = modelUri,
                 CompletionOptions = new YandexCompletionOptions
                 {
-                    Stream = true, // Включаем стриминг
+                    Stream = true,
                     Temperature = actualTemperature,
                     MaxTokens = actualMaxTokens.ToString()
                 },
@@ -153,16 +152,12 @@ public class YandexGptLlmProvider : ILlmProvider
                     "application/json")
             };
 
-            // Добавляем авторизацию
-            // Поддерживаем оба формата: IAM token и API key
             if (_config.ApiKey.StartsWith("t1.") || _config.ApiKey.StartsWith("y"))
             {
-                // IAM token
                 httpRequest.Headers.Add("Authorization", $"Bearer {_config.ApiKey}");
             }
             else
             {
-                // API key
                 httpRequest.Headers.Add("Authorization", $"Api-Key {_config.ApiKey}");
             }
 
@@ -189,7 +184,6 @@ public class YandexGptLlmProvider : ILlmProvider
                 return result;
             }
 
-            // Читаем streaming ответ
             progress?.Report($"  [YandexGPT] === STREAMING RESPONSE ===");
             var fullResponse = new StringBuilder();
             var lineBuffer = new StringBuilder();
@@ -206,7 +200,6 @@ public class YandexGptLlmProvider : ILlmProvider
 
                 try
                 {
-                    // YandexGPT streaming возвращает JSON объекты построчно
                     var chunk = JsonSerializer.Deserialize<YandexStreamChunk>(line,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -215,8 +208,6 @@ public class YandexGptLlmProvider : ILlmProvider
                         var alternative = chunk.Result.Alternatives[0];
                         var text = alternative.Message?.Text ?? string.Empty;
 
-                        // YandexGPT отправляет полный текст в каждом чанке (накопленный)
-                        // Нужно вычислить дельту
                         var newText = text;
                         if (text.Length > fullResponse.Length)
                         {
@@ -224,13 +215,11 @@ public class YandexGptLlmProvider : ILlmProvider
                         }
                         else
                         {
-                            // Полный текст в финальном сообщении
                             newText = text.Length == fullResponse.Length ? "" : text;
                         }
 
                         if (!string.IsNullOrEmpty(newText))
                         {
-                            // Буферизация для построчного вывода
                             foreach (var ch in newText)
                             {
                                 if (ch == '\n')
@@ -245,18 +234,15 @@ public class YandexGptLlmProvider : ILlmProvider
                             }
                         }
 
-                        // Обновляем полный ответ
                         if (text.Length > fullResponse.Length)
                         {
                             fullResponse.Clear();
                             fullResponse.Append(text);
                         }
 
-                        // Проверяем статус завершения
                         if (alternative.Status == "ALTERNATIVE_STATUS_FINAL" ||
                             alternative.Status == "ALTERNATIVE_STATUS_COMPLETE")
                         {
-                            // Выводим остаток буфера
                             if (lineBuffer.Length > 0)
                             {
                                 progress?.Report($"  {lineBuffer}");
@@ -310,6 +296,7 @@ public class YandexGptLlmProvider : ILlmProvider
 
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
+        IEnumerable<ToolDefinition>? tools = null,
         int maxTokens = 2000,
         double temperature = 0.7,
         IProgress<string>? progress = null,
@@ -351,13 +338,12 @@ public class YandexGptLlmProvider : ILlmProvider
             }
 
             // Конвертируем сообщения в формат YandexGPT
-            var yandexMessages = messages.Select(m => new YandexMessage
-            {
-                Role = m.Role,
-                Text = m.Content
-            }).ToArray();
+            var yandexMessages = ConvertMessages(messages);
 
-            var request = new YandexGptRequest
+            // Конвертируем tools в формат YandexGPT (если поддерживаются)
+            var yandexTools = tools != null && SupportsTools ? ConvertTools(tools) : null;
+
+            var request = new YandexGptRequestWithTools
             {
                 ModelUri = modelUri,
                 CompletionOptions = new YandexCompletionOptions
@@ -366,16 +352,24 @@ public class YandexGptLlmProvider : ILlmProvider
                     Temperature = actualTemperature,
                     MaxTokens = actualMaxTokens.ToString()
                 },
-                Messages = yandexMessages
+                Messages = yandexMessages,
+                Tools = yandexTools
+            };
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
 
             _logger.LogInformation("[YandexGPT Chat] ========================================");
             _logger.LogInformation("[YandexGPT Chat] >>> ЗАПРОС К YandexGPT");
             _logger.LogInformation("[YandexGPT Chat] Model: {Model}", modelUri);
             _logger.LogInformation("[YandexGPT Chat] Messages count: {Count}", yandexMessages.Length);
+            _logger.LogInformation("[YandexGPT Chat] Tools count: {Count}", yandexTools?.Length ?? 0);
 
             progress?.Report($"[YandexGPT Chat] >>> ЗАПРОС");
-            progress?.Report($"[YandexGPT Chat] Model: {modelUri}, Messages: {yandexMessages.Length}");
+            progress?.Report($"[YandexGPT Chat] Model: {modelUri}, Messages: {yandexMessages.Length}, Tools: {yandexTools?.Length ?? 0}");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -385,7 +379,7 @@ public class YandexGptLlmProvider : ILlmProvider
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
             {
                 Content = new StringContent(
-                    JsonSerializer.Serialize(request),
+                    JsonSerializer.Serialize(request, jsonOptions),
                     Encoding.UTF8,
                     "application/json")
             };
@@ -424,6 +418,7 @@ public class YandexGptLlmProvider : ILlmProvider
 
             var fullResponse = new StringBuilder();
             var lineBuffer = new StringBuilder();
+            var collectedToolCalls = new List<LlmToolCall>();
 
             using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
             using var reader = new StreamReader(stream);
@@ -437,7 +432,7 @@ public class YandexGptLlmProvider : ILlmProvider
 
                 try
                 {
-                    var chunk = JsonSerializer.Deserialize<YandexStreamChunk>(line,
+                    var chunk = JsonSerializer.Deserialize<YandexStreamChunkWithTools>(line,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                     if (chunk?.Result?.Alternatives?.Length > 0)
@@ -477,6 +472,31 @@ public class YandexGptLlmProvider : ILlmProvider
                             fullResponse.Append(text);
                         }
 
+                        // Обработка tool calls
+                        if (alternative.Message?.ToolCalls != null)
+                        {
+                            foreach (var toolCall in alternative.Message.ToolCalls)
+                            {
+                                if (toolCall?.FunctionCall != null)
+                                {
+                                    var argsJson = toolCall.FunctionCall.Arguments != null
+                                        ? JsonSerializer.Serialize(toolCall.FunctionCall.Arguments)
+                                        : "{}";
+
+                                    collectedToolCalls.Add(new LlmToolCall
+                                    {
+                                        Id = Guid.NewGuid().ToString("N")[..8],
+                                        Name = toolCall.FunctionCall.Name ?? "",
+                                        Arguments = argsJson
+                                    });
+
+                                    _logger.LogInformation("[YandexGPT Chat] Tool call: {Name}({Args})",
+                                        toolCall.FunctionCall.Name, argsJson);
+                                    progress?.Report($"  [Tool Call] {toolCall.FunctionCall.Name}");
+                                }
+                            }
+                        }
+
                         if (alternative.Status == "ALTERNATIVE_STATUS_FINAL" ||
                             alternative.Status == "ALTERNATIVE_STATUS_COMPLETE")
                         {
@@ -497,11 +517,21 @@ public class YandexGptLlmProvider : ILlmProvider
 
             stopwatch.Stop();
 
-            if (fullResponse.Length > 0)
+            if (fullResponse.Length > 0 || collectedToolCalls.Count > 0)
             {
                 result.IsSuccess = true;
                 result.Response = fullResponse.ToString();
-                _logger.LogInformation("[YandexGPT Chat] <<< ОТВЕТ ПОЛУЧЕН ({Time}s)", stopwatch.Elapsed.TotalSeconds);
+
+                if (collectedToolCalls.Count > 0)
+                {
+                    result.ToolCalls = collectedToolCalls;
+                    _logger.LogInformation("[YandexGPT Chat] <<< TOOL CALLS: {Count}", collectedToolCalls.Count);
+                }
+                else
+                {
+                    _logger.LogInformation("[YandexGPT Chat] <<< ОТВЕТ ПОЛУЧЕН ({Time}s)", stopwatch.Elapsed.TotalSeconds);
+                }
+
                 _logger.LogInformation("[YandexGPT Chat] Response length: {Length} chars", result.Response.Length);
             }
             else
@@ -533,6 +563,67 @@ public class YandexGptLlmProvider : ILlmProvider
         return result;
     }
 
+    private YandexMessage[] ConvertMessages(IEnumerable<LlmChatMessage> messages)
+    {
+        var result = new List<YandexMessage>();
+
+        foreach (var m in messages)
+        {
+            // YandexGPT поддерживает только system, user, assistant
+            // Конвертируем tool результаты в user сообщения
+            if (m.Role == "tool")
+            {
+                // Формируем сообщение с результатом инструмента
+                var toolResult = $"[Результат инструмента {m.ToolCallId}]:\n{m.Content}";
+                result.Add(new YandexMessage
+                {
+                    Role = "user",
+                    Text = toolResult
+                });
+            }
+            else if (m.Role == "assistant" && m.ToolCalls != null && m.ToolCalls.Count > 0)
+            {
+                // Assistant сообщение с tool calls — показываем какой инструмент был вызван
+                var toolCallsInfo = string.Join("\n", m.ToolCalls.Select(tc =>
+                    $"[Вызов инструмента {tc.Name}]: {tc.Arguments}"));
+
+                var text = string.IsNullOrEmpty(m.Content)
+                    ? toolCallsInfo
+                    : $"{m.Content}\n{toolCallsInfo}";
+
+                result.Add(new YandexMessage
+                {
+                    Role = "assistant",
+                    Text = text
+                });
+            }
+            else
+            {
+                // Обычное сообщение
+                result.Add(new YandexMessage
+                {
+                    Role = m.Role,
+                    Text = m.Content ?? ""
+                });
+            }
+        }
+
+        return result.ToArray();
+    }
+
+    private YandexTool[] ConvertTools(IEnumerable<ToolDefinition> tools)
+    {
+        return tools.Select(t => new YandexTool
+        {
+            Function = new YandexToolFunction
+            {
+                Name = t.Name,
+                Description = t.Description,
+                Parameters = t.ParametersSchema
+            }
+        }).ToArray();
+    }
+
     // DTOs for YandexGPT API
     private class YandexGptRequest
     {
@@ -544,6 +635,21 @@ public class YandexGptLlmProvider : ILlmProvider
 
         [JsonPropertyName("messages")]
         public YandexMessage[] Messages { get; set; } = Array.Empty<YandexMessage>();
+    }
+
+    private class YandexGptRequestWithTools
+    {
+        [JsonPropertyName("modelUri")]
+        public string ModelUri { get; set; } = string.Empty;
+
+        [JsonPropertyName("completionOptions")]
+        public YandexCompletionOptions CompletionOptions { get; set; } = new();
+
+        [JsonPropertyName("messages")]
+        public YandexMessage[] Messages { get; set; } = Array.Empty<YandexMessage>();
+
+        [JsonPropertyName("tools")]
+        public YandexTool[]? Tools { get; set; }
     }
 
     private class YandexCompletionOptions
@@ -567,6 +673,25 @@ public class YandexGptLlmProvider : ILlmProvider
         public string Text { get; set; } = string.Empty;
     }
 
+    // Tool DTOs
+    private class YandexTool
+    {
+        [JsonPropertyName("function")]
+        public YandexToolFunction? Function { get; set; }
+    }
+
+    private class YandexToolFunction
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = string.Empty;
+
+        [JsonPropertyName("parameters")]
+        public object? Parameters { get; set; }
+    }
+
     // Streaming response chunk
     private class YandexStreamChunk
     {
@@ -574,10 +699,28 @@ public class YandexGptLlmProvider : ILlmProvider
         public YandexGptResult? Result { get; set; }
     }
 
+    private class YandexStreamChunkWithTools
+    {
+        [JsonPropertyName("result")]
+        public YandexGptResultWithTools? Result { get; set; }
+    }
+
     private class YandexGptResult
     {
         [JsonPropertyName("alternatives")]
         public YandexAlternative[]? Alternatives { get; set; }
+
+        [JsonPropertyName("usage")]
+        public YandexUsage? Usage { get; set; }
+
+        [JsonPropertyName("modelVersion")]
+        public string? ModelVersion { get; set; }
+    }
+
+    private class YandexGptResultWithTools
+    {
+        [JsonPropertyName("alternatives")]
+        public YandexAlternativeWithTools[]? Alternatives { get; set; }
 
         [JsonPropertyName("usage")]
         public YandexUsage? Usage { get; set; }
@@ -593,6 +736,42 @@ public class YandexGptLlmProvider : ILlmProvider
 
         [JsonPropertyName("status")]
         public string? Status { get; set; }
+    }
+
+    private class YandexAlternativeWithTools
+    {
+        [JsonPropertyName("message")]
+        public YandexMessageWithToolCalls? Message { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+    }
+
+    private class YandexMessageWithToolCalls
+    {
+        [JsonPropertyName("role")]
+        public string Role { get; set; } = "assistant";
+
+        [JsonPropertyName("text")]
+        public string Text { get; set; } = string.Empty;
+
+        [JsonPropertyName("toolCalls")]
+        public YandexToolCall[]? ToolCalls { get; set; }
+    }
+
+    private class YandexToolCall
+    {
+        [JsonPropertyName("functionCall")]
+        public YandexFunctionCall? FunctionCall { get; set; }
+    }
+
+    private class YandexFunctionCall
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("arguments")]
+        public object? Arguments { get; set; }
     }
 
     private class YandexUsage
