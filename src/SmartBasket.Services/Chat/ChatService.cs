@@ -21,6 +21,7 @@ public class ChatService : IChatService
     private const int MaxIterations = 20;
     private string? _systemPrompt;
     private string? _currentProviderKey;
+    private bool _isPrimed; // Флаг что контекст БД уже загружен
 
     public IReadOnlyList<LlmChatMessage> History => _history.AsReadOnly();
     public string? CurrentProviderKey => _currentProviderKey;
@@ -49,15 +50,85 @@ public class ChatService : IChatService
     {
         var count = _history.Count;
         _history.Clear();
-        _logger.LogInformation("[ChatService] History cleared ({Count} messages removed)", count);
+        _isPrimed = false; // Сбрасываем флаг priming при очистке истории
+        _logger.LogInformation("[ChatService] History cleared ({Count} messages removed), priming reset", count);
     }
 
     public void SetSystemPrompt(string systemPrompt)
     {
         _systemPrompt = systemPrompt;
-        _logger.LogInformation("[ChatService] System prompt set ({Length} chars)", systemPrompt.Length);
+        _isPrimed = false; // Сбрасываем priming при изменении промпта
+        _logger.LogInformation("[ChatService] System prompt set ({Length} chars), priming reset", systemPrompt.Length);
         _logger.LogDebug("[ChatService] System prompt:\n{Prompt}", systemPrompt);
     }
+
+    /// <summary>
+    /// Auto-priming: добавляет контекст БД в начало диалога для "тупых" моделей
+    /// </summary>
+    private async Task<string> GetPrimingContextAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("[ChatService] >>> AUTO-PRIMING: загружаю контекст БД...");
+
+        try
+        {
+            // Выполняем describe_data чтобы получить схему и примеры
+            var describeResult = await _tools.ExecuteAsync("describe_data", "{}", ct);
+
+            if (!describeResult.Success)
+            {
+                _logger.LogWarning("[ChatService] describe_data failed: {Error}", describeResult.ErrorMessage);
+                return "";
+            }
+
+            var now = DateTime.Now;
+            var primingContext = $@"
+=== КОНТЕКСТ БАЗЫ ДАННЫХ ===
+
+ТЕКУЩАЯ ДАТА И ВРЕМЯ: {now:yyyy-MM-dd HH:mm:ss} ({now:dddd}, {GetRussianMonth(now.Month)} {now.Year})
+
+СХЕМА И ДАННЫЕ:
+{describeResult.JsonData}
+
+=== ИНСТРУКЦИИ ПО ИСПОЛЬЗОВАНИЮ ИНСТРУМЕНТОВ ===
+
+У тебя есть 2 инструмента:
+1. describe_data - схема БД (УЖЕ ВЫЗВАН выше, НЕ вызывай повторно)
+2. query - универсальный SELECT запрос
+
+Для query используй JSON:
+{{
+  ""table"": ""Receipts"",
+  ""columns"": [""Shop"", ""Total""],
+  ""aggregates"": [{{""function"": ""SUM"", ""column"": ""Total"", ""alias"": ""total_sum""}}],
+  ""where"": [{{""column"": ""ReceiptDate"", ""op"": "">="", ""value"": ""2024-01-01""}}],
+  ""group_by"": [""Shop""],
+  ""order_by"": [{{""column"": ""total_sum"", ""direction"": ""DESC""}}],
+  ""limit"": 10
+}}
+
+Таблицы: Receipts, ReceiptItems, Items, Products, Labels, ItemLabels, ProductLabels
+Операторы WHERE: =, !=, >, <, >=, <=, ILIKE, IN, NOT IN, IS NULL, BETWEEN
+Функции: COUNT, SUM, AVG, MIN, MAX
+
+=== КОНЕЦ КОНТЕКСТА ===
+";
+            _logger.LogInformation("[ChatService] <<< AUTO-PRIMING: контекст загружен ({Length} chars)", primingContext.Length);
+            return primingContext;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ChatService] AUTO-PRIMING failed: {Error}", ex.Message);
+            return "";
+        }
+    }
+
+    private static string GetRussianMonth(int month) => month switch
+    {
+        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
+        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
+        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
+        _ => ""
+    };
 
     public async Task<ChatResponse> SendAsync(
         string userMessage,
@@ -70,6 +141,16 @@ public class ChatService : IChatService
         _logger.LogInformation("[ChatService] >>> NEW MESSAGE");
         _logger.LogInformation("[ChatService] User message ({Length} chars):\n{Message}",
             userMessage.Length, TruncateForLog(userMessage, 500));
+
+        // AUTO-PRIMING: при первом сообщении добавляем контекст БД
+        string primingContext = "";
+        if (!_isPrimed)
+        {
+            progress?.Report("Загружаю контекст базы данных...");
+            primingContext = await GetPrimingContextAsync(cancellationToken);
+            _isPrimed = true;
+            _logger.LogInformation("[ChatService] Priming context added ({Length} chars)", primingContext.Length);
+        }
 
         // Добавляем сообщение пользователя
         _history.Add(new LlmChatMessage { Role = "user", Content = userMessage });
@@ -113,6 +194,13 @@ public class ChatService : IChatService
         var effectiveSystemPrompt = _systemPrompt ?? "";
         IReadOnlyList<ToolDefinition>? effectiveTools = tools;
 
+        // Добавляем priming context (схема БД, примеры, текущее время)
+        if (!string.IsNullOrEmpty(primingContext))
+        {
+            effectiveSystemPrompt = effectiveSystemPrompt + "\n\n" + primingContext;
+            _logger.LogInformation("[ChatService] Priming context appended to system prompt");
+        }
+
         if (!provider.SupportsTools && tools.Count > 0)
         {
             _logger.LogInformation("[ChatService] Provider doesn't support native tools, using prompt injection");
@@ -151,10 +239,15 @@ public class ChatService : IChatService
                 var parsedToolCalls = TryParseToolCallsFromText(result.Response);
                 if (parsedToolCalls.Count > 0)
                 {
+                    // Помечаем что эти tool calls были parsed из текста (не native)
+                    foreach (var tc in parsedToolCalls)
+                    {
+                        tc.IsParsedFromText = true;
+                    }
                     result.ToolCalls = parsedToolCalls;
                     // Извлекаем текст до JSON (если был)
                     result.Response = ExtractTextBeforeToolCall(result.Response);
-                    _logger.LogInformation("[ChatService] Parsed {Count} tool calls from text response (fallback)", parsedToolCalls.Count);
+                    _logger.LogInformation("[ChatService] Parsed {Count} tool calls from text response (fallback, IsParsedFromText=true)", parsedToolCalls.Count);
                 }
             }
 
@@ -250,7 +343,8 @@ public class ChatService : IChatService
                 {
                     Role = "tool",
                     Content = toolResult.JsonData,
-                    ToolCallId = call.Id
+                    ToolCallId = call.Id,
+                    IsToolError = !toolResult.Success  // Помечаем ошибку для правильного форматирования
                 });
 
                 // Обновляем messages

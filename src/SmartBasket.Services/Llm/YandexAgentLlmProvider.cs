@@ -823,26 +823,76 @@ public class YandexAgentLlmProvider : ILlmProvider
                 // Если у assistant есть tool calls - добавляем пары [function_call, function_call_output]
                 if (msg.ToolCalls?.Count > 0)
                 {
-                    foreach (var tc in msg.ToolCalls)
-                    {
-                        // Сначала function_call
-                        result.Add(new
-                        {
-                            type = "function_call",
-                            call_id = tc.Id,
-                            name = tc.Name,
-                            arguments = tc.Arguments
-                        });
+                    // Проверяем были ли tool calls parsed из текста
+                    var isParsedFromText = msg.ToolCalls[0].IsParsedFromText;
 
-                        // Сразу за ним function_call_output
-                        if (toolResults.TryGetValue(tc.Id, out var output))
+                    if (isParsedFromText)
+                    {
+                        // Parsed tool calls - модель вывела JSON в тексте, не native API
+                        // Отправляем результат как user message
+                        foreach (var tc in msg.ToolCalls)
                         {
+                            if (toolResults.TryGetValue(tc.Id, out var output))
+                            {
+                                // Находим исходный вопрос пользователя
+                                var lastUserQuestion = FindLastUserQuestion(messages, i);
+
+                                // Проверяем успешность tool result
+                                var toolResultMsg = messages.FirstOrDefault(m => m.Role == "tool" && m.ToolCallId == tc.Id);
+                                var isError = toolResultMsg?.IsToolError ?? false;
+
+                                string content;
+                                if (isError)
+                                {
+                                    content = $@"Вызов инструмента {tc.Name} завершился с ОШИБКОЙ:
+
+{output}
+
+Проанализируй ошибку и исправь вызов инструмента.";
+                                }
+                                else
+                                {
+                                    content = $@"=== РЕЗУЛЬТАТ ИНСТРУМЕНТА {tc.Name} ===
+
+{output}
+
+=== ВОПРОС ПОЛЬЗОВАТЕЛЯ ===
+{lastUserQuestion}
+
+=== ТВОЯ ЗАДАЧА ===
+Используя данные выше, ответь на вопрос пользователя.
+Дай КОНКРЕТНЫЙ ОТВЕТ с числами. НЕ спрашивай уточнений.";
+                                }
+
+                                result.Add(new { type = "message", role = "user", content });
+                                _logger.LogDebug("[YandexAgent] Parsed tool result sent as user message (isError={IsError})", isError);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Native tool calls - используем function_call / function_call_output
+                        foreach (var tc in msg.ToolCalls)
+                        {
+                            // Сначала function_call
                             result.Add(new
                             {
-                                type = "function_call_output",
+                                type = "function_call",
                                 call_id = tc.Id,
-                                output = output
+                                name = tc.Name,
+                                arguments = tc.Arguments
                             });
+
+                            // Сразу за ним function_call_output
+                            if (toolResults.TryGetValue(tc.Id, out var output))
+                            {
+                                result.Add(new
+                                {
+                                    type = "function_call_output",
+                                    call_id = tc.Id,
+                                    output = output
+                                });
+                            }
                         }
                     }
                 }
@@ -868,6 +918,26 @@ public class YandexAgentLlmProvider : ILlmProvider
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Найти последний вопрос пользователя перед указанным индексом
+    /// </summary>
+    private string FindLastUserQuestion(List<LlmChatMessage> messages, int currentIndex)
+    {
+        for (int i = currentIndex - 1; i >= 0; i--)
+        {
+            if (messages[i].Role == "user" && !string.IsNullOrWhiteSpace(messages[i].Content))
+            {
+                var content = messages[i].Content;
+                // Пропускаем сообщения с результатами tool
+                if (!content.TrimStart().StartsWith("{") && !content.Contains("=== РЕЗУЛЬТАТ"))
+                {
+                    return content;
+                }
+            }
+        }
+        return "(вопрос не найден)";
     }
 
     /// <summary>
@@ -1132,6 +1202,92 @@ public class YandexAgentLlmProvider : ILlmProvider
         catch (Exception ex)
         {
             _logger.LogWarning("[YandexAgent] Error parsing text tool calls: {Error}", ex.Message);
+        }
+
+        // Если не нашли [TOOL_CALL_START] формат, пробуем markdown code block
+        if (result.Count == 0)
+        {
+            var codeBlockToolCalls = TryParseMarkdownCodeBlockToolCalls(text);
+            if (codeBlockToolCalls.Count > 0)
+            {
+                result.AddRange(codeBlockToolCalls);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Парсит tool calls из markdown code blocks: ```json {...} ``` или ``` {...} ```
+    /// Формат JSON: {"name": "tool_name", "arguments": {...}} или {"table": "...", ...}
+    /// </summary>
+    private List<LlmToolCall> TryParseMarkdownCodeBlockToolCalls(string text)
+    {
+        var result = new List<LlmToolCall>();
+
+        try
+        {
+            // Паттерн: ```json\n{...}\n``` или ```\n{...}\n```
+            var codeBlockPattern = new System.Text.RegularExpressions.Regex(
+                @"```(?:json)?\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            var matches = codeBlockPattern.Matches(text);
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                var jsonStr = match.Groups[1].Value.Trim();
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(jsonStr);
+                    var root = doc.RootElement;
+
+                    string? toolName = null;
+                    string? arguments = null;
+
+                    // Формат 1: {"name": "query", "arguments": {...}} или {"name": "query", "parameters": {...}}
+                    if (root.TryGetProperty("name", out var nameProp))
+                    {
+                        toolName = nameProp.GetString();
+
+                        if (root.TryGetProperty("arguments", out var argsProp))
+                        {
+                            arguments = argsProp.GetRawText();
+                        }
+                        else if (root.TryGetProperty("parameters", out var paramsProp))
+                        {
+                            arguments = paramsProp.GetRawText();
+                        }
+                    }
+                    // Формат 2: {"table": "Receipts", ...} - прямой вызов query
+                    else if (root.TryGetProperty("table", out _))
+                    {
+                        toolName = "query";
+                        arguments = jsonStr;
+                    }
+
+                    if (!string.IsNullOrEmpty(toolName) && !string.IsNullOrEmpty(arguments))
+                    {
+                        result.Add(new LlmToolCall
+                        {
+                            Id = Guid.NewGuid().ToString("N")[..8],
+                            Name = toolName,
+                            Arguments = arguments,
+                            IsParsedFromText = true
+                        });
+
+                        _logger.LogInformation("[YandexAgent] Parsed tool call from markdown code block: {Name}", toolName);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogDebug("[YandexAgent] Invalid JSON in markdown code block: {Error}", ex.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("[YandexAgent] Error parsing markdown code block tool calls: {Error}", ex.Message);
         }
 
         return result;

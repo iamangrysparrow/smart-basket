@@ -8,7 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Helpers;
+using SmartBasket.Data;
+using SmartBasket.Services.Chat;
 using SmartBasket.Services.Email;
+using SmartBasket.Services.Llm;
+using SmartBasket.Services.Tools;
 using SmartBasket.Services.Tools.Handlers;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -124,6 +128,11 @@ switch (mode)
     case "test-query":
         return await TestQueryHandlerAsync(settings);
 
+    case "test-chat":
+        var providerKey = args.Length > 1 ? args[1] : null;
+        var iterations = args.Length > 2 ? int.Parse(args[2]) : 1;
+        return await TestChatServiceAsync(settings, providerKey, iterations);
+
     default:
         Console.WriteLine("=== SmartBasket CLI ===");
         Console.WriteLine();
@@ -132,6 +141,7 @@ switch (mode)
         Console.WriteLine("  dotnet run -- test-agent-stream    - Test YandexAgent streaming API (raw HTTP)");
         Console.WriteLine("  dotnet run -- test-agent-provider  - Test YandexAgent via LlmProvider (streaming)");
         Console.WriteLine("  dotnet run -- test-query           - Test QueryHandler (SQL queries to all tables)");
+        Console.WriteLine("  dotnet run -- test-chat [provider] [iterations] - Test ChatService with tools");
         Console.WriteLine("  dotnet run -- email                - Fetch and save emails");
         Console.WriteLine("  dotnet run -- parse                - Fetch emails and parse with Ollama");
         Console.WriteLine("  dotnet run -- classify [model]     - Test classification pipeline");
@@ -1105,4 +1115,164 @@ async Task<int> TestQueryHandlerAsync(AppSettings appSettings)
     }
 
     return failed == 0 ? 0 : 1;
+}
+
+// ============= TEST CHAT SERVICE =============
+async Task<int> TestChatServiceAsync(AppSettings appSettings, string? providerKey, int iterations)
+{
+    Console.WriteLine("=== ChatService Test with Tools ===");
+    Console.WriteLine($"Provider key filter: {providerKey ?? "(all)"}");
+    Console.WriteLine($"Iterations per provider: {iterations}");
+    Console.WriteLine();
+
+    // Get available providers
+    var availableProviders = appSettings.AiProviders
+        .Where(p => providerKey == null || p.Key.Contains(providerKey, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    if (availableProviders.Count == 0)
+    {
+        Console.WriteLine("ERROR: No matching providers found!");
+        Console.WriteLine("Available providers:");
+        foreach (var p in appSettings.AiProviders)
+            Console.WriteLine($"  - {p.Key} ({p.Provider})");
+        return 1;
+    }
+
+    Console.WriteLine($"Testing {availableProviders.Count} provider(s):");
+    foreach (var p in availableProviders)
+        Console.WriteLine($"  - {p.Key} ({p.Provider}, Model: {p.Model})");
+    Console.WriteLine();
+
+    // Setup DI
+    var services = new ServiceCollection();
+    services.AddHttpClient();
+    services.AddLogging(builder =>
+    {
+        builder.AddConsole();
+        builder.SetMinimumLevel(LogLevel.Debug);
+        builder.AddFilter("Microsoft", LogLevel.Warning);
+        builder.AddFilter("System", LogLevel.Warning);
+    });
+    services.AddSingleton(appSettings);
+
+    // Register database context
+    var dbProvider = appSettings.Database.Provider.ToLowerInvariant() switch
+    {
+        "postgresql" or "postgres" => DatabaseProviderType.PostgreSQL,
+        "sqlite" => DatabaseProviderType.SQLite,
+        _ => DatabaseProviderType.PostgreSQL
+    };
+    services.AddSmartBasketDbContext(dbProvider, appSettings.Database.ConnectionString);
+
+    // Register tools using extension method
+    services.AddTools();
+
+    // Register provider factory
+    services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
+
+    // Register chat service
+    services.AddTransient<IChatService, ChatService>();
+
+    var serviceProvider = services.BuildServiceProvider();
+
+    var testPrompt = "Сколько у меня чеков? На какую сумму?";
+    var expectedAnswer = "6 чеков на сумму 34540,91"; // Примерно
+
+    Console.WriteLine($"Test prompt: {testPrompt}");
+    Console.WriteLine($"Expected answer (approx): {expectedAnswer}");
+    Console.WriteLine();
+
+    var results = new List<(string provider, int iteration, bool success, double time, string response)>();
+
+    foreach (var providerConfig in availableProviders)
+    {
+        Console.WriteLine($"========================================");
+        Console.WriteLine($"PROVIDER: {providerConfig.Key}");
+        Console.WriteLine($"========================================");
+
+        for (int i = 1; i <= iterations; i++)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"--- Iteration {i}/{iterations} ---");
+
+            // Create fresh chat service for each iteration
+            var chatService = serviceProvider.GetRequiredService<IChatService>();
+            chatService.SetProvider(providerConfig.Key);
+
+            // Set system prompt (simplified)
+            var systemPrompt = @"Ты - помощник по анализу чеков и покупок.
+У тебя есть доступ к базе данных через инструменты.
+Отвечай кратко и по существу на русском языке.
+Когда получишь результат инструмента - сразу отвечай пользователю на его вопрос.";
+
+            chatService.SetSystemPrompt(systemPrompt);
+
+            var progress = new Progress<string>(msg =>
+            {
+                Console.WriteLine($"  {msg}");
+            });
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var response = await chatService.SendAsync(testPrompt, progress, CancellationToken.None);
+                sw.Stop();
+
+                Console.WriteLine();
+                Console.WriteLine($"=== RESULT ({sw.Elapsed.TotalSeconds:F1}s) ===");
+                Console.WriteLine($"Success: {response.Success}");
+                Console.WriteLine($"Response: {response.Content}");
+
+                if (!response.Success)
+                {
+                    Console.WriteLine($"Error: {response.ErrorMessage}");
+                }
+
+                results.Add((providerConfig.Key, i, response.Success, sw.Elapsed.TotalSeconds, response.Content ?? response.ErrorMessage ?? ""));
+
+                // Check if answer looks correct
+                var isCorrect = response.Content?.Contains("6") == true &&
+                               (response.Content?.Contains("34540") == true ||
+                                response.Content?.Contains("31540") == true ||
+                                response.Content?.Contains("сумм") == true);
+
+                Console.WriteLine($"Answer looks correct: {isCorrect}");
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                Console.WriteLine($"EXCEPTION: {ex.Message}");
+                results.Add((providerConfig.Key, i, false, sw.Elapsed.TotalSeconds, ex.Message));
+            }
+
+            Console.WriteLine();
+        }
+    }
+
+    // Summary
+    Console.WriteLine();
+    Console.WriteLine("========================================");
+    Console.WriteLine("SUMMARY");
+    Console.WriteLine("========================================");
+
+    var grouped = results.GroupBy(r => r.provider);
+    foreach (var group in grouped)
+    {
+        var successCount = group.Count(r => r.success);
+        var avgTime = group.Where(r => r.success).Select(r => r.time).DefaultIfEmpty(0).Average();
+
+        Console.WriteLine($"{group.Key}:");
+        Console.WriteLine($"  Success: {successCount}/{group.Count()}");
+        Console.WriteLine($"  Avg time: {avgTime:F1}s");
+
+        foreach (var r in group)
+        {
+            var preview = r.response.Length > 100 ? r.response[..100] + "..." : r.response;
+            Console.WriteLine($"  [{r.iteration}] {(r.success ? "OK" : "FAIL")} ({r.time:F1}s): {preview}");
+        }
+        Console.WriteLine();
+    }
+
+    return results.All(r => r.success) ? 0 : 1;
 }

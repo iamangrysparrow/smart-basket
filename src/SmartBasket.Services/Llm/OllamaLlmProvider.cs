@@ -269,7 +269,8 @@ public class OllamaLlmProvider : ILlmProvider
             var jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
             var requestJson = JsonSerializer.Serialize(request, jsonOptions);
             var requestUrl = $"{baseUrl}/api/chat";
@@ -280,9 +281,14 @@ public class OllamaLlmProvider : ILlmProvider
             _logger.LogInformation("[Ollama Chat] Messages count: {Count}", ollamaMessages.Length);
             _logger.LogInformation("[Ollama Chat] Tools count: {Count}", ollamaTools?.Length ?? 0);
             _logger.LogInformation("[Ollama Chat] URL: {Url}", requestUrl);
+            _logger.LogInformation("[Ollama Chat] Timeout: {Timeout}s", timeoutSeconds);
 
-            progress?.Report($"[Ollama Chat] >>> ЗАПРОС К /api/chat");
-            progress?.Report($"[Ollama Chat] Model: {_config.Model}, Messages: {ollamaMessages.Length}, Tools: {ollamaTools?.Length ?? 0}");
+            // Детальное логирование запроса (только в файл, не в UI)
+            _logger.LogDebug("[Ollama Chat] ===== REQUEST JSON START =====");
+            _logger.LogDebug("[Ollama Chat] {Json}", requestJson);
+            _logger.LogDebug("[Ollama Chat] ===== REQUEST JSON END =====");
+
+            progress?.Report($"Запрос к {_config.Model} ({ollamaMessages.Length} сообщений, {ollamaTools?.Length ?? 0} инструментов)");
 
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -317,6 +323,9 @@ public class OllamaLlmProvider : ILlmProvider
             var fullResponse = new StringBuilder();
             var lineBuffer = new StringBuilder();
             var collectedToolCalls = new List<LlmToolCall>();
+            var rawChunks = new StringBuilder(); // Для логирования сырых чанков
+
+            _logger.LogDebug("[Ollama Chat] ===== STREAMING RESPONSE START =====");
 
             using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
             using var reader = new StreamReader(stream);
@@ -327,6 +336,10 @@ public class OllamaLlmProvider : ILlmProvider
 
                 var line = await reader.ReadLineAsync(linkedCts.Token);
                 if (string.IsNullOrEmpty(line)) continue;
+
+                // Собираем сырые chunks для логирования (только в файл, не в UI)
+                rawChunks.AppendLine(line);
+                _logger.LogDebug("[Ollama Chat] RAW CHUNK: {Line}", line);
 
                 try
                 {
@@ -401,33 +414,50 @@ public class OllamaLlmProvider : ILlmProvider
             result.IsSuccess = true;
             result.Response = fullResponse.ToString();
 
+            _logger.LogDebug("[Ollama Chat] ===== STREAMING RESPONSE END =====");
+            _logger.LogDebug("[Ollama Chat] ===== ALL RAW CHUNKS =====\n{Chunks}", rawChunks.ToString());
+
             if (collectedToolCalls.Count > 0)
             {
                 result.ToolCalls = collectedToolCalls;
                 _logger.LogInformation("[Ollama Chat] <<< TOOL CALLS (native): {Count}", collectedToolCalls.Count);
+                foreach (var tc in collectedToolCalls)
+                {
+                    _logger.LogInformation("[Ollama Chat]   - {Name} (id={Id}): {Args}", tc.Name, tc.Id, tc.Arguments);
+                }
+                progress?.Report($"🔧 Tool call (native): {string.Join(", ", collectedToolCalls.Select(tc => tc.Name))}");
             }
             else
             {
                 // Fallback: попробуем распарсить tool call из текста (для моделей без native tool calling)
+                _logger.LogDebug("[Ollama Chat] No native tool calls, trying to parse from text...");
+                _logger.LogDebug("[Ollama Chat] Full response text:\n{Text}", result.Response);
+
                 var parsedToolCalls = TryParseToolCallsFromText(result.Response);
                 if (parsedToolCalls.Count > 0)
                 {
+                    // Помечаем что эти tool calls были parsed из текста (не native)
+                    foreach (var tc in parsedToolCalls)
+                    {
+                        tc.IsParsedFromText = true;
+                    }
                     result.ToolCalls = parsedToolCalls;
                     result.Response = ""; // Очищаем текст, т.к. это был tool call
-                    _logger.LogInformation("[Ollama Chat] <<< TOOL CALLS (parsed from text): {Count}", parsedToolCalls.Count);
+                    _logger.LogInformation("[Ollama Chat] <<< TOOL CALLS (parsed from text, IsParsedFromText=true): {Count}", parsedToolCalls.Count);
                     foreach (var tc in parsedToolCalls)
                     {
                         _logger.LogInformation("[Ollama Chat]   - {Name}: {Args}", tc.Name, tc.Arguments);
-                        progress?.Report($"  [Tool Call parsed] {tc.Name}");
                     }
+                    progress?.Report($"🔧 Tool call (parsed): {string.Join(", ", parsedToolCalls.Select(tc => tc.Name))}");
                 }
                 else
                 {
-                    _logger.LogInformation("[Ollama Chat] <<< ОТВЕТ ПОЛУЧЕН");
+                    _logger.LogInformation("[Ollama Chat] <<< ОТВЕТ ПОЛУЧЕН (no tool calls)");
                 }
             }
 
             _logger.LogInformation("[Ollama Chat] Response length: {Length} chars", result.Response?.Length ?? 0);
+            _logger.LogDebug("[Ollama Chat] Final response:\n{Response}", result.Response);
             _logger.LogInformation("[Ollama Chat] ========================================");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -454,9 +484,14 @@ public class OllamaLlmProvider : ILlmProvider
     private OllamaChatMessage[] ConvertMessages(IEnumerable<LlmChatMessage> messages)
     {
         var result = new List<OllamaChatMessage>();
+        var messagesList = messages.ToList();
 
-        foreach (var msg in messages)
+        // Отслеживаем был ли последний assistant tool call parsed из текста
+        bool lastToolCallsWereParsed = false;
+
+        for (int i = 0; i < messagesList.Count; i++)
         {
+            var msg = messagesList[i];
             var ollamaMsg = new OllamaChatMessage
             {
                 Role = msg.Role,
@@ -466,28 +501,111 @@ public class OllamaLlmProvider : ILlmProvider
             // Если это assistant сообщение с tool calls
             if (msg.Role == "assistant" && msg.ToolCalls != null && msg.ToolCalls.Count > 0)
             {
-                // Assistant message с tool calls должен иметь content = null или пустую строку
-                ollamaMsg.Content = string.IsNullOrEmpty(msg.Content) ? null : msg.Content;
-                ollamaMsg.ToolCalls = msg.ToolCalls.Select(tc => new OllamaToolCall
+                // Проверяем флаг IsParsedFromText на первом tool call
+                lastToolCallsWereParsed = msg.ToolCalls[0].IsParsedFromText;
+
+                if (!lastToolCallsWereParsed)
                 {
-                    Id = tc.Id, // Передаём ID для связи с tool result
-                    Function = new OllamaFunctionCall
+                    // Native tool calls - передаём как есть
+                    ollamaMsg.Content = string.IsNullOrEmpty(msg.Content) ? null : msg.Content;
+                    ollamaMsg.ToolCalls = msg.ToolCalls.Select(tc => new OllamaToolCall
                     {
-                        Name = tc.Name,
-                        Arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(tc.Arguments)
-                    }
-                }).ToArray();
+                        Id = tc.Id,
+                        Function = new OllamaFunctionCall
+                        {
+                            Name = tc.Name,
+                            Arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(tc.Arguments)
+                        }
+                    }).ToArray();
+                    _logger.LogDebug("[Ollama ConvertMessages] Assistant with NATIVE tool calls");
+                }
+                else
+                {
+                    // Parsed tool calls - НЕ передаём tool_calls в Ollama API
+                    // Модель ответила текстом с JSON, поэтому tool_calls ей не понятны
+                    // Создаём assistant сообщение с описанием что модель сделала
+                    var toolName = msg.ToolCalls[0].Name;
+                    var toolArgs = msg.ToolCalls[0].Arguments;
+                    ollamaMsg.Content = $"Я вызвал инструмент {toolName} с параметрами: {toolArgs}";
+                    ollamaMsg.ToolCalls = null;
+                    _logger.LogDebug("[Ollama ConvertMessages] Assistant with PARSED tool calls (text-based), converted to text");
+                }
             }
-            // Если это tool результат - передаём tool_call_id для связи
+            // Если это tool результат
             else if (msg.Role == "tool")
             {
-                ollamaMsg.ToolCallId = msg.ToolCallId;
+                if (!lastToolCallsWereParsed)
+                {
+                    // Native tool calls - используем role="tool" с tool_call_id
+                    ollamaMsg.ToolCallId = msg.ToolCallId;
+                    _logger.LogDebug("[Ollama ConvertMessages] Tool result as role=tool (native), isError={IsError}", msg.IsToolError);
+                }
+                else
+                {
+                    // Parsed tool calls - преобразуем в user сообщение
+                    // Модель ответила текстом, значит и результат даём как текст
+                    // ВАЖНО: даём разную инструкцию в зависимости от успеха/ошибки
+                    ollamaMsg.Role = "user";
+
+                    if (msg.IsToolError)
+                    {
+                        // Ошибка - просим модель исправить вызов
+                        ollamaMsg.Content = $@"Вызов инструмента завершился с ОШИБКОЙ:
+
+{msg.Content}
+
+Проанализируй ошибку и исправь вызов инструмента. Обрати внимание на сообщение об ошибке и скорректируй параметры запроса.";
+                        _logger.LogDebug("[Ollama ConvertMessages] Tool ERROR result as role=user (text-based fallback, asking to fix)");
+                    }
+                    else
+                    {
+                        // Успех - просим модель ответить пользователю
+                        // ВАЖНО: находим исходный вопрос пользователя и включаем его в инструкцию
+                        var lastUserQuestion = FindLastUserQuestion(messagesList, i);
+
+                        ollamaMsg.Content = $@"=== РЕЗУЛЬТАТ ИНСТРУМЕНТА ===
+
+{msg.Content}
+
+=== ВОПРОС ПОЛЬЗОВАТЕЛЯ ===
+{lastUserQuestion}
+
+=== ТВОЯ ЗАДАЧА ===
+Используя данные выше, ответь на вопрос пользователя.
+Если данные содержат несколько записей, ПОСЧИТАЙ нужные значения (количество, сумму и т.д.)
+Дай КОНКРЕТНЫЙ ОТВЕТ с числами. НЕ спрашивай уточнений.";
+                        _logger.LogDebug("[Ollama ConvertMessages] Tool SUCCESS result as role=user (text-based fallback), user question: {Q}", lastUserQuestion);
+                    }
+
+                    ollamaMsg.ToolCallId = null;
+                }
             }
 
             result.Add(ollamaMsg);
         }
 
         return result.ToArray();
+    }
+
+    /// <summary>
+    /// Найти последний вопрос пользователя перед указанным индексом (tool result)
+    /// </summary>
+    private string FindLastUserQuestion(List<LlmChatMessage> messages, int currentIndex)
+    {
+        // Ищем назад от текущей позиции
+        for (int i = currentIndex - 1; i >= 0; i--)
+        {
+            if (messages[i].Role == "user" && !string.IsNullOrWhiteSpace(messages[i].Content))
+            {
+                // Пропускаем сообщения, которые выглядят как tool results (содержат JSON с результатом)
+                var content = messages[i].Content;
+                if (!content.TrimStart().StartsWith("{") && !content.Contains("=== РЕЗУЛЬТАТ"))
+                {
+                    return content;
+                }
+            }
+        }
+        return "(вопрос не найден)";
     }
 
     private OllamaTool[] ConvertTools(IEnumerable<ToolDefinition> tools)

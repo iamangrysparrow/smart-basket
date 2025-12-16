@@ -10,6 +10,12 @@ public class LlmToolCall
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Arguments { get; set; } = "{}";  // JSON
+
+    /// <summary>
+    /// True если tool call был распарсен из текста модели (не native tool calling).
+    /// Это важно для форматирования ответа - модели без native tools ожидают ответ как user message.
+    /// </summary>
+    public bool IsParsedFromText { get; set; }
 }
 
 /// <summary>
@@ -36,6 +42,14 @@ public class LlmChatMessage
     /// ID вызова инструмента (для role="tool")
     /// </summary>
     public string? ToolCallId { get; set; }
+
+    /// <summary>
+    /// True если tool result содержит ошибку (для role="tool").
+    /// Используется для формирования правильной инструкции модели:
+    /// - При ошибке: "Исправь вызов инструмента"
+    /// - При успехе: "Ответь на вопрос пользователя"
+    /// </summary>
+    public bool IsToolError { get; set; }
 }
 
 /// <summary>
