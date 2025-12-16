@@ -421,7 +421,51 @@ public class YandexAgentLlmProvider : ILlmProvider
             _logger.LogInformation("[YandexAgent Chat] PreviousResponseId: {Id}", _lastResponseId ?? "(null - new conversation)");
             _logger.LogInformation("[YandexAgent Chat] Input items: {Count} (total history: {TotalCount}), Tools: {ToolsCount}",
                 inputItemsCount, messageList.Count, yandexTools?.Count ?? 0);
-            _logger.LogDebug("[YandexAgent Chat] Request JSON: {Json}", requestJson);
+            _logger.LogInformation("[YandexAgent Chat] Timeout: {Timeout}s", timeoutSeconds);
+
+            // Полное логирование запроса
+            _logger.LogDebug("[YandexAgent Chat] ===== FULL REQUEST JSON START =====");
+            _logger.LogDebug("[YandexAgent Chat] Request ({Length} chars):\n{Json}", requestJson.Length, requestJson);
+            _logger.LogDebug("[YandexAgent Chat] ===== FULL REQUEST JSON END =====");
+
+            // Полное логирование всех сообщений из истории
+            _logger.LogDebug("[YandexAgent Chat] ===== MESSAGE HISTORY START =====");
+            for (var i = 0; i < messageList.Count; i++)
+            {
+                var msg = messageList[i];
+                _logger.LogDebug("[YandexAgent Chat] [{Index}] Role={Role}, Content ({ContentLength} chars), ToolCalls={ToolCallsCount}, ToolCallId={ToolCallId}",
+                    i, msg.Role, msg.Content?.Length ?? 0, msg.ToolCalls?.Count ?? 0, msg.ToolCallId ?? "(null)");
+                if (!string.IsNullOrEmpty(msg.Content))
+                {
+                    _logger.LogDebug("[YandexAgent Chat] [{Index}] Content:\n{Content}", i, msg.Content);
+                }
+                if (msg.ToolCalls?.Count > 0)
+                {
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        _logger.LogDebug("[YandexAgent Chat] [{Index}] ToolCall: {Name} (id={Id}), Args:\n{Args}",
+                            i, tc.Name, tc.Id, tc.Arguments);
+                    }
+                }
+            }
+            _logger.LogDebug("[YandexAgent Chat] ===== MESSAGE HISTORY END =====");
+
+            // Полное логирование tools
+            if (yandexTools != null && yandexTools.Count > 0)
+            {
+                _logger.LogDebug("[YandexAgent Chat] ===== TOOLS DETAIL START =====");
+                foreach (var tool in yandexTools)
+                {
+                    _logger.LogDebug("[YandexAgent Chat] Tool: {Name}", tool.Name);
+                    _logger.LogDebug("[YandexAgent Chat]   Description: {Description}", tool.Description);
+                    if (tool.Parameters != null)
+                    {
+                        var paramsJson = JsonSerializer.Serialize(tool.Parameters, new JsonSerializerOptions { WriteIndented = true });
+                        _logger.LogDebug("[YandexAgent Chat]   Parameters:\n{Params}", paramsJson);
+                    }
+                }
+                _logger.LogDebug("[YandexAgent Chat] ===== TOOLS DETAIL END =====");
+            }
 
             progress?.Report($"[YandexAgent Chat] >>> ЗАПРОС К /v1/responses");
             progress?.Report($"[YandexAgent Chat] Agent: {_config.AgentId}");
@@ -687,6 +731,22 @@ public class YandexAgentLlmProvider : ILlmProvider
                 }
             }
 
+            // Полное логирование ответа
+            _logger.LogDebug("[YandexAgent Chat] ===== FULL RESPONSE START =====");
+            _logger.LogDebug("[YandexAgent Chat] ResponseId: {ResponseId}", responseId ?? "(null)");
+            _logger.LogDebug("[YandexAgent Chat] ToolCalls count: {Count}", toolCalls.Count);
+            if (toolCalls.Count > 0)
+            {
+                foreach (var tc in toolCalls)
+                {
+                    _logger.LogDebug("[YandexAgent Chat] ToolCall: {Name} (id={Id}), Args:\n{Args}",
+                        tc.Name, tc.Id, tc.Arguments);
+                }
+            }
+            _logger.LogDebug("[YandexAgent Chat] Response text ({Length} chars):\n{Response}",
+                fullResponse.Length, fullResponse.ToString());
+            _logger.LogDebug("[YandexAgent Chat] ===== FULL RESPONSE END =====");
+
             // Если есть tool calls - возвращаем их
             if (toolCalls.Count > 0)
             {
@@ -697,6 +757,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                 result.Response = responseText;
                 result.ResponseId = responseId;
                 result.ToolCalls = toolCalls;
+                _logger.LogInformation("[YandexAgent Chat] <<< TOOL CALLS: {Count}", toolCalls.Count);
                 progress?.Report($"[YandexAgent Chat] {toolCalls.Count} tool call(s) received");
             }
             else if (fullResponse.Length > 0)
@@ -704,14 +765,18 @@ public class YandexAgentLlmProvider : ILlmProvider
                 result.IsSuccess = true;
                 result.Response = fullResponse.ToString();
                 result.ResponseId = responseId;
+                _logger.LogInformation("[YandexAgent Chat] <<< ОТВЕТ ПОЛУЧЕН");
                 progress?.Report($"[YandexAgent Chat] Total response: {fullResponse.Length} chars");
             }
             else
             {
                 result.IsSuccess = false;
                 result.ErrorMessage = "YandexAgent returned empty response";
+                _logger.LogWarning("[YandexAgent Chat] <<< ПУСТОЙ ОТВЕТ");
                 progress?.Report($"[YandexAgent Chat] ERROR: Empty response");
             }
+
+            _logger.LogInformation("[YandexAgent Chat] ========================================");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

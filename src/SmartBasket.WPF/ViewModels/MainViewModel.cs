@@ -6,6 +6,7 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Core.Entities;
 using SmartBasket.Data;
@@ -14,6 +15,7 @@ using SmartBasket.Services;
 using SmartBasket.Services.Export;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Products;
+using SmartBasket.WPF.Logging;
 using SmartBasket.WPF.Models;
 using SmartBasket.WPF.Services;
 
@@ -46,6 +48,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IReceiptExportService _receiptExportService;
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
+    private readonly ILogger<MainViewModel> _logger;
     private CancellationTokenSource? _cts;
 
     public MainViewModel(
@@ -54,7 +57,8 @@ public partial class MainViewModel : ObservableObject
         IProductCleanupService productCleanupService,
         IReceiptExportService receiptExportService,
         AppSettings settings,
-        SettingsService settingsService)
+        SettingsService settingsService,
+        ILogger<MainViewModel> logger)
     {
         _dbContext = dbContext;
         _receiptCollectionService = receiptCollectionService;
@@ -62,6 +66,7 @@ public partial class MainViewModel : ObservableObject
         _receiptExportService = receiptExportService;
         _settings = settings;
         _settingsService = settingsService;
+        _logger = logger;
     }
 
     // State
@@ -73,13 +78,10 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private string _statusText = "Ready";
 
-    // Log - thread-safe via BindingOperations.EnableCollectionSynchronization
-    public ObservableCollection<LogEntry> LogEntries { get; } = new();
-    private readonly object _logEntriesLock = new();
-
-    // Full log for saving (not truncated)
-    private readonly List<LogEntry> _fullLog = new();
-    private readonly object _fullLogLock = new();
+    /// <summary>
+    /// Записи лога из Serilog LogViewerSink
+    /// </summary>
+    public ObservableCollection<LogEntry> LogEntries => LogViewerSink.Instance.LogEntries;
 
     // Log filtering by level
     [ObservableProperty] private bool _showDebug = true;
@@ -164,9 +166,10 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     public void EnableCollectionSynchronization()
     {
+        // LogViewerSink manages its own collection synchronization
+        LogViewerSink.Instance.EnableCollectionSynchronization();
+
         // This WPF method allows ObservableCollection to be modified from any thread
-        // It uses the provided lock object to synchronize access
-        BindingOperations.EnableCollectionSynchronization(LogEntries, _logEntriesLock);
         BindingOperations.EnableCollectionSynchronization(Receipts, _receiptsLock);
         BindingOperations.EnableCollectionSynchronization(ShopFilters, _shopFiltersLock);
 
@@ -182,46 +185,17 @@ public partial class MainViewModel : ObservableObject
 
         return entry.Level switch
         {
-            LogLevel.Debug => ShowDebug,
-            LogLevel.Info => ShowInfo,
-            LogLevel.Warning => ShowWarning,
-            LogLevel.Error => ShowError,
+            Models.LogLevel.Debug => ShowDebug,
+            Models.LogLevel.Info => ShowInfo,
+            Models.LogLevel.Warning => ShowWarning,
+            Models.LogLevel.Error => ShowError,
             _ => true
         };
     }
 
-    private void Log(string message, LogLevel level = LogLevel.Debug)
-    {
-        var entry = new LogEntry
-        {
-            Timestamp = DateTime.Now,
-            Level = level,
-            Message = message
-        };
-
-        // Save to full log (never truncated) for file export
-        lock (_fullLogLock)
-        {
-            _fullLog.Add(entry);
-        }
-
-        // With EnableCollectionSynchronization, we can safely modify from any thread
-        // The lock is handled internally by WPF's binding system
-        lock (_logEntriesLock)
-        {
-            LogEntries.Add(entry);
-            // Keep only last 500 entries in UI for performance
-            while (LogEntries.Count > 500)
-            {
-                LogEntries.RemoveAt(0);
-            }
-        }
-    }
-
     /// <summary>
-    /// Публичный метод для добавления записей в лог из других компонентов.
-    /// Автоматически определяет уровень по содержимому сообщения.
-    /// Многострочные сообщения разбиваются на отдельные записи.
+    /// Публичный метод для добавления записей в лог из других компонентов (legacy).
+    /// Использует ILogger через Serilog.
     /// </summary>
     public void AddLogEntry(string message)
     {
@@ -234,40 +208,20 @@ public partial class MainViewModel : ObservableObject
         foreach (var line in lines)
         {
             var entry = LogEntry.FromMessage(line);
-            Log(entry.Message, entry.Level);
-        }
-    }
-
-    /// <summary>
-    /// Логирует исключение с полной информацией: Message, InnerException, StackTrace
-    /// </summary>
-    private void LogException(Exception ex, string context = "")
-    {
-        var prefix = string.IsNullOrEmpty(context) ? "ERROR" : $"ERROR [{context}]";
-        Log($"{prefix}: {ex.GetType().Name}: {ex.Message}", LogLevel.Error);
-
-        // Логируем всю цепочку InnerException
-        var inner = ex.InnerException;
-        var depth = 1;
-        while (inner != null)
-        {
-            var indent = new string(' ', depth * 2);
-            Log($"{indent}-> InnerException[{depth}]: {inner.GetType().Name}: {inner.Message}", LogLevel.Error);
-            inner = inner.InnerException;
-            depth++;
-        }
-
-        // StackTrace
-        if (!string.IsNullOrEmpty(ex.StackTrace))
-        {
-            Log("--- StackTrace ---");
-            foreach (var line in ex.StackTrace.Split('\n').Take(15)) // Первые 15 строк
+            switch (entry.Level)
             {
-                Log($"  {line.Trim()}");
-            }
-            if (ex.StackTrace.Split('\n').Length > 15)
-            {
-                Log("  ... (truncated)");
+                case Models.LogLevel.Error:
+                    _logger.LogError("{Message}", line);
+                    break;
+                case Models.LogLevel.Warning:
+                    _logger.LogWarning("{Message}", line);
+                    break;
+                case Models.LogLevel.Info:
+                    _logger.LogInformation("{Message}", line);
+                    break;
+                default:
+                    _logger.LogDebug("{Message}", line);
+                    break;
             }
         }
     }
@@ -281,14 +235,14 @@ public partial class MainViewModel : ObservableObject
     {
         if (IsProcessing)
         {
-            Log("Operation already in progress, please wait...");
+            _logger.LogDebug("Operation already in progress, please wait...");
             return;
         }
 
         // Проверить наличие настроенных источников
         if (_settings.ReceiptSources == null || _settings.ReceiptSources.Count == 0)
         {
-            Log("No receipt sources configured. Please configure sources in Settings.");
+            _logger.LogDebug("No receipt sources configured. Please configure sources in Settings.");
             StatusText = "No sources configured";
             return;
         }
@@ -296,7 +250,7 @@ public partial class MainViewModel : ObservableObject
         var enabledSources = _settings.ReceiptSources.Where(s => s.IsEnabled).ToList();
         if (enabledSources.Count == 0)
         {
-            Log("No enabled receipt sources. Please enable at least one source in Settings.");
+            _logger.LogDebug("No enabled receipt sources. Please enable at least one source in Settings.");
             StatusText = "No enabled sources";
             return;
         }
@@ -304,12 +258,12 @@ public partial class MainViewModel : ObservableObject
         IsProcessing = true;
         _cts = new CancellationTokenSource();
         StatusText = "Collecting receipts...";
-        Log("=== Starting receipt collection (Phase 4) ===");
-        Log($"Enabled sources: {string.Join(", ", enabledSources.Select(s => s.Name))}");
+        _logger.LogDebug("=== Starting receipt collection (Phase 4) ===");
+        _logger.LogDebug("Enabled sources: {Sources}", string.Join(", ", enabledSources.Select(s => s.Name)));
 
         try
         {
-            var progress = new ThreadSafeProgress<string>(msg => Log(msg));
+            var progress = new ThreadSafeProgress<string>(msg => _logger.LogDebug("{Message}", msg));
 
             var result = await Task.Run(async () =>
                 await _receiptCollectionService.CollectAsync(
@@ -320,13 +274,13 @@ public partial class MainViewModel : ObservableObject
             // Очистка осиротевших Products после обработки
             if (result.ReceiptsSaved > 0)
             {
-                Log("");
-                Log("=== Cleaning up orphaned products ===");
+                _logger.LogDebug("");
+                _logger.LogDebug("=== Cleaning up orphaned products ===");
                 var cleanedUp = await Task.Run(async () =>
                     await _productCleanupService.CleanupOrphanedProductsAsync(_cts.Token));
                 if (cleanedUp > 0)
                 {
-                    Log($"Removed {cleanedUp} orphaned products");
+                    _logger.LogDebug("Removed {Count} orphaned products", cleanedUp);
                 }
             }
 
@@ -335,20 +289,20 @@ public partial class MainViewModel : ObservableObject
             // Обновить UI
             if (result.ReceiptsSaved > 0 && !_cts.Token.IsCancellationRequested)
             {
-                Log("");
-                Log("Reloading receipts...");
+                _logger.LogDebug("");
+                _logger.LogDebug("Reloading receipts...");
                 await LoadReceiptsAsync();
                 await LoadCategoryTreeAsync();
             }
         }
         catch (OperationCanceledException)
         {
-            Log("Cancelled by user");
+            _logger.LogDebug("Cancelled by user");
             StatusText = "Cancelled";
         }
         catch (Exception ex)
         {
-            LogException(ex, "CollectReceipts");
+            _logger.LogError(ex, "CollectReceipts error");
             StatusText = "Error occurred - see log";
         }
         finally
@@ -367,13 +321,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (IsProcessing)
         {
-            Log("Operation already in progress, please wait...");
+            _logger.LogDebug("Operation already in progress, please wait...");
             return;
         }
 
         IsProcessing = true;
         StatusText = "Cleaning up orphaned products...";
-        Log("=== Cleanup Orphaned Products ===");
+        _logger.LogDebug("=== Cleanup Orphaned Products ===");
 
         try
         {
@@ -383,19 +337,19 @@ public partial class MainViewModel : ObservableObject
 
             if (orphaned.Count == 0)
             {
-                Log("No orphaned products found");
+                _logger.LogDebug("No orphaned products found");
                 StatusText = "No orphaned products";
                 return;
             }
 
-            Log($"Found {orphaned.Count} orphaned products:");
+            _logger.LogDebug("Found {Count} orphaned products:", orphaned.Count);
             foreach (var p in orphaned.Take(20))
             {
-                Log($"  - {p.Name}" + (p.ParentName != null ? $" (parent: {p.ParentName})" : ""));
+                _logger.LogDebug("  - {Name}{Parent}", p.Name, p.ParentName != null ? $" (parent: {p.ParentName})" : "");
             }
             if (orphaned.Count > 20)
             {
-                Log($"  ... and {orphaned.Count - 20} more");
+                _logger.LogDebug("  ... and {Count} more", orphaned.Count - 20);
             }
 
             var result = MessageBox.Show(
@@ -406,7 +360,7 @@ public partial class MainViewModel : ObservableObject
 
             if (result != MessageBoxResult.Yes)
             {
-                Log("Cleanup cancelled by user");
+                _logger.LogDebug("Cleanup cancelled by user");
                 StatusText = "Cleanup cancelled";
                 return;
             }
@@ -414,14 +368,14 @@ public partial class MainViewModel : ObservableObject
             var deleted = await Task.Run(async () =>
                 await _productCleanupService.CleanupOrphanedProductsAsync());
 
-            Log($"Deleted {deleted} orphaned products");
+            _logger.LogDebug("Deleted {Count} orphaned products", deleted);
             StatusText = $"Deleted {deleted} products";
 
             await LoadCategoryTreeAsync();
         }
         catch (Exception ex)
         {
-            LogException(ex, "CleanupOrphanedProducts");
+            _logger.LogError(ex, "CleanupOrphanedProducts error");
             StatusText = "Cleanup failed - see log";
         }
         finally
@@ -434,7 +388,7 @@ public partial class MainViewModel : ObservableObject
     private void CancelOperation()
     {
         _cts?.Cancel();
-        Log("Cancellation requested...");
+        _logger.LogDebug("Cancellation requested...");
         StatusText = "Cancelling...";
     }
 
@@ -443,12 +397,12 @@ public partial class MainViewModel : ObservableObject
     {
         if (IsProcessing)
         {
-            Log("Operation already in progress, please wait...");
+            _logger.LogDebug("Operation already in progress, please wait...");
             return;
         }
 
         IsProcessing = true;
-        Log("Loading receipts from database...");
+        _logger.LogDebug("Loading receipts from database...");
 
         try
         {
@@ -529,7 +483,7 @@ public partial class MainViewModel : ObservableObject
             TotalReceiptsCount = receipts.Count;
             TotalSum = receipts.Sum(r => r.Total ?? 0);
 
-            Log($"Loaded {receipts.Count} receipts, total: {TotalSum:N2}\u20BD");
+            _logger.LogDebug("Loaded {Count} receipts, total: {Total:N2}\u20BD", receipts.Count, TotalSum);
             StatusText = $"Loaded {receipts.Count} receipts";
 
             // Select first receipt if none selected
@@ -542,7 +496,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogException(ex, "LoadReceipts");
+            _logger.LogError(ex, "LoadReceipts error");
             StatusText = "Load failed - see log";
         }
         finally
@@ -563,7 +517,7 @@ public partial class MainViewModel : ObservableObject
         FilterDateTo = null;
 
         _receiptsLoaded = wasLoaded;
-        Log("Фильтры сброшены", LogLevel.Info);
+        _logger.LogInformation("Фильтры сброшены");
 
         // Reload once after all filters cleared
         if (_receiptsLoaded)
@@ -582,7 +536,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedReceipt == null)
         {
-            Log("Не выбран чек для экспорта", LogLevel.Warning);
+            _logger.LogWarning("Не выбран чек для экспорта");
             return;
         }
 
@@ -602,7 +556,7 @@ public partial class MainViewModel : ObservableObject
 
             if (receipt == null)
             {
-                Log($"Чек не найден: {SelectedReceipt.Id}", LogLevel.Error);
+                _logger.LogError("Чек не найден: {Id}", SelectedReceipt.Id);
                 return;
             }
 
@@ -617,13 +571,13 @@ public partial class MainViewModel : ObservableObject
             if (dialog.ShowDialog() == true)
             {
                 await _receiptExportService.SaveToFileFullAsync(receipt, dialog.FileName);
-                Log($"Чек экспортирован: {dialog.FileName}", LogLevel.Info);
+                _logger.LogInformation("Чек экспортирован: {FileName}", dialog.FileName);
                 StatusText = $"Экспортировано: {System.IO.Path.GetFileName(dialog.FileName)}";
             }
         }
         catch (Exception ex)
         {
-            LogException(ex, "ExportReceiptFull");
+            _logger.LogError(ex, "ExportReceiptFull error");
             StatusText = "Ошибка экспорта";
         }
     }
@@ -636,7 +590,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedReceipt == null)
         {
-            Log("Не выбран чек для экспорта", LogLevel.Warning);
+            _logger.LogWarning("Не выбран чек для экспорта");
             return;
         }
 
@@ -650,7 +604,7 @@ public partial class MainViewModel : ObservableObject
 
             if (receipt == null)
             {
-                Log($"Чек не найден: {SelectedReceipt.Id}", LogLevel.Error);
+                _logger.LogError("Чек не найден: {Id}", SelectedReceipt.Id);
                 return;
             }
 
@@ -665,13 +619,13 @@ public partial class MainViewModel : ObservableObject
             if (dialog.ShowDialog() == true)
             {
                 await _receiptExportService.SaveToFileMinimalAsync(receipt, dialog.FileName);
-                Log($"Чек экспортирован: {dialog.FileName}", LogLevel.Info);
+                _logger.LogInformation("Чек экспортирован: {FileName}", dialog.FileName);
                 StatusText = $"Экспортировано: {System.IO.Path.GetFileName(dialog.FileName)}";
             }
         }
         catch (Exception ex)
         {
-            LogException(ex, "ExportReceiptMinimal");
+            _logger.LogError(ex, "ExportReceiptMinimal error");
             StatusText = "Ошибка экспорта";
         }
     }
@@ -683,26 +637,26 @@ public partial class MainViewModel : ObservableObject
     {
         if (IsProcessing)
         {
-            Log("Operation already in progress, please wait...");
+            _logger.LogDebug("Operation already in progress, please wait...");
             return;
         }
 
         IsProcessing = true;
         StatusText = "Initializing database...";
-        Log("=== Initializing Database ===");
-        Log($"Connection: {_settings.Database.ConnectionString}");
+        _logger.LogDebug("=== Initializing Database ===");
+        _logger.LogDebug("Connection: {ConnectionString}", _settings.Database.ConnectionString);
 
         try
         {
             // Run on background thread to completely free UI thread
             await Task.Run(async () =>
                 await _dbContext.Database.EnsureCreatedAsync());
-            Log("Database initialized successfully");
+            _logger.LogDebug("Database initialized successfully");
             StatusText = "Database: OK";
         }
         catch (Exception ex)
         {
-            LogException(ex, "InitializeDatabase");
+            _logger.LogError(ex, "InitializeDatabase error");
             StatusText = "Database: FAILED";
         }
         finally
@@ -716,7 +670,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (IsProcessing)
         {
-            Log("Operation already in progress, please wait...");
+            _logger.LogDebug("Operation already in progress, please wait...");
             return;
         }
 
@@ -738,7 +692,7 @@ public partial class MainViewModel : ObservableObject
 
         IsProcessing = true;
         StatusText = "Resetting database...";
-        Log("=== Resetting Database ===");
+        _logger.LogDebug("=== Resetting Database ===");
 
         try
         {
@@ -748,7 +702,7 @@ public partial class MainViewModel : ObservableObject
                 await _dbContext.Database.EnsureDeletedAsync();
                 await _dbContext.Database.EnsureCreatedAsync();
             });
-            Log("Database deleted and recreated");
+            _logger.LogDebug("Database deleted and recreated");
 
             // Clear collection (thread-safe via EnableCollectionSynchronization)
             lock (_receiptsLock)
@@ -756,12 +710,12 @@ public partial class MainViewModel : ObservableObject
                 Receipts.Clear();
             }
 
-            Log("Reset complete");
+            _logger.LogDebug("Reset complete");
             StatusText = "Database: Reset OK";
         }
         catch (Exception ex)
         {
-            LogException(ex, "ResetDatabase");
+            _logger.LogError(ex, "ResetDatabase error");
             StatusText = "Database: Reset FAILED";
         }
         finally
@@ -773,15 +727,8 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ClearLog()
     {
-        lock (_fullLogLock)
-        {
-            _fullLog.Clear();
-        }
-        lock (_logEntriesLock)
-        {
-            LogEntries.Clear();
-        }
-        Log("Log cleared", LogLevel.Info);
+        LogViewerSink.Instance.Clear();
+        _logger.LogInformation("Log cleared");
     }
 
     [RelayCommand]
@@ -795,20 +742,15 @@ public partial class MainViewModel : ObservableObject
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
             var logPath = Path.Combine(logsDir, $"smartbasket_{timestamp}.log");
 
-            string[] entries;
-            lock (_fullLogLock)
-            {
-                // Save full log (not truncated UI version) with full format
-                entries = _fullLog.Select(e => e.FullMessage).ToArray();
-            }
-
+            var entries = LogViewerSink.Instance.GetFullLogLines();
             File.WriteAllLines(logPath, entries);
-            Log($"Log saved to: {logPath} ({entries.Length} entries)", LogLevel.Info);
+
+            _logger.LogInformation("Log saved to: {LogPath} ({Count} entries)", logPath, entries.Length);
             StatusText = $"Log saved: {Path.GetFileName(logPath)} ({entries.Length} entries)";
         }
         catch (Exception ex)
         {
-            LogException(ex, "SaveLog");
+            _logger.LogError(ex, "SaveLog error");
             StatusText = "Log save FAILED";
         }
     }
@@ -821,14 +763,7 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            string[] entries;
-            lock (_logEntriesLock)
-            {
-                entries = LogEntries
-                    .Where(e => LogEntryFilter(e))
-                    .Select(e => e.FormattedMessage)
-                    .ToArray();
-            }
+            var entries = LogViewerSink.Instance.GetVisibleLogLines(e => LogEntryFilter(e));
 
             if (entries.Length > 0)
             {
@@ -838,14 +773,14 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogException(ex, "CopyLog");
+            _logger.LogError(ex, "CopyLog error");
         }
     }
 
     [RelayCommand]
     private void SaveSettings()
     {
-        Log("=== Saving Settings ===");
+        _logger.LogDebug("=== Saving Settings ===");
         try
         {
             // TODO: Legacy UI settings removed - need to implement new settings UI
@@ -853,12 +788,12 @@ public partial class MainViewModel : ObservableObject
             // For now, just save current settings as-is
             _settingsService.Save(_settings);
 
-            Log($"Settings saved to: {_settingsService.SettingsPath}");
+            _logger.LogDebug("Settings saved to: {Path}", _settingsService.SettingsPath);
             StatusText = "Settings saved";
         }
         catch (Exception ex)
         {
-            LogException(ex, "SaveSettings");
+            _logger.LogError(ex, "SaveSettings error");
             StatusText = "Settings save FAILED";
         }
     }
@@ -963,7 +898,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogException(ex, "LoadCategoryItems");
+            _logger.LogError(ex, "LoadCategoryItems error");
         }
     }
 
@@ -972,7 +907,7 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            Log("Loading category tree...");
+            _logger.LogDebug("Loading category tree...");
 
             var products = await Task.Run(async () =>
             {
@@ -1016,11 +951,11 @@ public partial class MainViewModel : ObservableObject
             TotalItemsCount = products.Sum(p => p.Items.Count);
             UncategorizedCount = 0; // TODO: Calculate based on new schema
 
-            Log($"Loaded {products.Count} categories");
+            _logger.LogDebug("Loaded {Count} categories", products.Count);
         }
         catch (Exception ex)
         {
-            LogException(ex, "LoadCategoryTree");
+            _logger.LogError(ex, "LoadCategoryTree error");
         }
     }
 
@@ -1047,7 +982,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogException(ex, "OpenCategoriesDialog");
+            _logger.LogError(ex, "OpenCategoriesDialog error");
         }
     }
 
@@ -1055,7 +990,7 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            Log($"Saving {categories.Length} categories...");
+            _logger.LogDebug("Saving {Count} categories...", categories.Length);
 
             await Task.Run(async () =>
             {
@@ -1072,19 +1007,19 @@ public partial class MainViewModel : ObservableObject
                         {
                             Name = category
                         });
-                        Log($"  + Added: {category}");
+                        _logger.LogDebug("  + Added: {Category}", category);
                     }
                 }
 
                 await _dbContext.SaveChangesAsync().ConfigureAwait(false);
             });
 
-            Log("Categories saved");
+            _logger.LogDebug("Categories saved");
             await LoadCategoryTreeAsync();
         }
         catch (Exception ex)
         {
-            LogException(ex, "SaveCategories");
+            _logger.LogError(ex, "SaveCategories error");
         }
     }
 
@@ -1110,7 +1045,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogException(ex, "ChangeCategory");
+            _logger.LogError(ex, "ChangeCategory error");
         }
     }
 
@@ -1130,12 +1065,12 @@ public partial class MainViewModel : ObservableObject
                     product = new Product { Name = categoryName };
                     _dbContext.Products.Add(product);
                     await _dbContext.SaveChangesAsync().ConfigureAwait(false);
-                    Log($"Created new category: {categoryName}");
+                    _logger.LogDebug("Created new category: {Category}", categoryName);
                 }
 
                 if (product == null)
                 {
-                    Log($"ERROR: Category not found: {categoryName}");
+                    _logger.LogError("Category not found: {Category}", categoryName);
                     return;
                 }
 
@@ -1148,7 +1083,7 @@ public partial class MainViewModel : ObservableObject
                 {
                     existingItem.ProductId = product.Id;
                     await _dbContext.SaveChangesAsync().ConfigureAwait(false);
-                    Log($"Moved '{existingItem.Name}' to category '{categoryName}'");
+                    _logger.LogDebug("Moved '{ItemName}' to category '{Category}'", existingItem.Name, categoryName);
                 }
             });
 
@@ -1156,7 +1091,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogException(ex, "ApplyCategoryChange");
+            _logger.LogError(ex, "ApplyCategoryChange error");
         }
     }
 
@@ -1166,7 +1101,7 @@ public partial class MainViewModel : ObservableObject
         // TODO: Refactor categorization for new schema
         // Old logic used RawReceiptItem with CategorizationStatus
         // New schema should work directly with Items
-        Log("Categorization not yet implemented for new schema");
+        _logger.LogDebug("Categorization not yet implemented for new schema");
         CategorizationProgress = "TODO: Refactor for new schema";
         await Task.CompletedTask;
     }

@@ -199,6 +199,10 @@ public class QueryHandler : IToolHandler
 
     public async Task<ToolResult> ExecuteAsync(string argumentsJson, CancellationToken cancellationToken = default)
     {
+        _logger.LogDebug("[QueryHandler] ===== TOOL ARGUMENTS START =====");
+        _logger.LogDebug("[QueryHandler] Arguments ({Length} chars):\n{Args}", argumentsJson.Length, argumentsJson);
+        _logger.LogDebug("[QueryHandler] ===== TOOL ARGUMENTS END =====");
+
         try
         {
             var args = JsonSerializer.Deserialize<QueryArgs>(argumentsJson, new JsonSerializerOptions
@@ -253,10 +257,13 @@ public class QueryHandler : IToolHandler
         // Строим запрос
         var query = BuildQuery(args, tableName);
 
-        // Логируем SQL для отладки
+        // Полное логирование SQL для отладки
         var compiled = compiler.Compile(query);
-        _logger.LogDebug("[QueryHandler] SQL: {Sql}", compiled.Sql);
-        _logger.LogDebug("[QueryHandler] Bindings: {Bindings}", string.Join(", ", compiled.Bindings));
+        _logger.LogDebug("[QueryHandler] ===== SQL QUERY START =====");
+        _logger.LogDebug("[QueryHandler] SQL ({Length} chars):\n{Sql}", compiled.Sql.Length, compiled.Sql);
+        _logger.LogDebug("[QueryHandler] Bindings ({Count}): {Bindings}",
+            compiled.Bindings.Count, string.Join(", ", compiled.Bindings.Select((b, i) => $"${i}={b}")));
+        _logger.LogDebug("[QueryHandler] ===== SQL QUERY END =====");
 
         // Выполняем
         var rows = (await db.FromQuery(query).GetAsync(cancellationToken: ct)).ToList();
@@ -270,7 +277,7 @@ public class QueryHandler : IToolHandler
                 columns = first.Keys.ToList();
         }
 
-        return ToolResult.Ok(new
+        var result = ToolResult.Ok(new
         {
             table = tableName,
             sql = compiled.Sql,
@@ -279,6 +286,15 @@ public class QueryHandler : IToolHandler
             row_count = rows.Count,
             truncated = rows.Count >= args.Limit
         });
+
+        _logger.LogDebug("[QueryHandler] ===== QUERY RESULT START =====");
+        _logger.LogDebug("[QueryHandler] Result table={Table}, rows={RowCount}, truncated={Truncated}",
+            tableName, rows.Count, rows.Count >= args.Limit);
+        _logger.LogDebug("[QueryHandler] Result JSON ({Length} chars):\n{Json}",
+            result.JsonData.Length, result.JsonData);
+        _logger.LogDebug("[QueryHandler] ===== QUERY RESULT END =====");
+
+        return result;
     }
 
     private Query BuildQuery(QueryArgs args, string tableName)

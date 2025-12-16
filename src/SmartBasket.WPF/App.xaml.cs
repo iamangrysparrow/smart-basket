@@ -5,6 +5,8 @@ using System.Windows.Media;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Serilog;
+using Serilog.Events;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Data;
 using SmartBasket.Services;
@@ -16,6 +18,7 @@ using SmartBasket.Services.Products;
 using SmartBasket.Services.Sources;
 using SmartBasket.Services.Tools;
 using SmartBasket.Services.Chat;
+using SmartBasket.WPF.Logging;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
@@ -78,10 +81,31 @@ public partial class App : Application
     {
         services.AddSingleton(_appSettings!);
 
-        // Logging
+        // Configure UI log limit from settings (default: 10000)
+        LogViewerSink.Instance.SetMaxUiEntries(_appSettings!.MaxUiLogEntries);
+
+        // Serilog configuration - separate log file per app launch + daily rotation if running > 24h
+        var logsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        var sessionTimestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        var logsPath = Path.Combine(logsDir, $"smartbasket_{sessionTimestamp}.log");
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .MinimumLevel.Override("System", LogEventLevel.Warning)
+            .WriteTo.Debug(outputTemplate: "[{Timestamp:HH:mm:ss}] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+            .WriteTo.File(logsPath,
+                rollingInterval: RollingInterval.Day,
+                outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}",
+                retainedFileCountLimit: 30)
+            .WriteTo.LogViewer(LogEventLevel.Debug)
+            .CreateLogger();
+
+        // Logging via Serilog
         services.AddLogging(builder =>
         {
-            builder.AddDebug();
+            builder.ClearProviders();
+            builder.AddSerilog(Log.Logger, dispose: true);
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
@@ -148,6 +172,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Log.CloseAndFlush();
         _serviceProvider?.Dispose();
         base.OnExit(e);
     }

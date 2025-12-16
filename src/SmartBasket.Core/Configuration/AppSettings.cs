@@ -27,4 +27,12 @@ public class AppSettings
     /// </summary>
     public AiOperationsConfig AiOperations { get; set; } = new();
 
+    /// <summary>
+    /// Максимальное количество записей лога в UI.
+    /// Ограничивает ObservableCollection для производительности ListBox.
+    /// Полный лог (без лимита) всегда доступен для экспорта в файл.
+    /// Default: 10000. Настраивается в appsettings.json: "MaxUiLogEntries": 10000
+    /// </summary>
+    public int MaxUiLogEntries { get; set; } = 10000;
+
 }

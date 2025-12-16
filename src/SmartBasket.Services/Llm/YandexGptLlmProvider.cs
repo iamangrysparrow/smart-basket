@@ -367,6 +367,42 @@ public class YandexGptLlmProvider : ILlmProvider
             _logger.LogInformation("[YandexGPT Chat] Model: {Model}", modelUri);
             _logger.LogInformation("[YandexGPT Chat] Messages count: {Count}", yandexMessages.Length);
             _logger.LogInformation("[YandexGPT Chat] Tools count: {Count}", yandexTools?.Length ?? 0);
+            _logger.LogInformation("[YandexGPT Chat] Temperature: {Temp}, MaxTokens: {MaxTokens}",
+                actualTemperature, actualMaxTokens);
+
+            // Полное логирование запроса
+            var fullRequestJson = JsonSerializer.Serialize(request, jsonOptions);
+            _logger.LogDebug("[YandexGPT Chat] ===== FULL REQUEST JSON START =====");
+            _logger.LogDebug("[YandexGPT Chat] Request ({Length} chars):\n{Json}", fullRequestJson.Length, fullRequestJson);
+            _logger.LogDebug("[YandexGPT Chat] ===== FULL REQUEST JSON END =====");
+
+            // Полное логирование каждого сообщения
+            _logger.LogDebug("[YandexGPT Chat] ===== MESSAGES DETAIL START =====");
+            for (var i = 0; i < yandexMessages.Length; i++)
+            {
+                var msg = yandexMessages[i];
+                _logger.LogDebug("[YandexGPT Chat] [{Index}] Role={Role}, Text ({Length} chars)",
+                    i, msg.Role, msg.Text.Length);
+                _logger.LogDebug("[YandexGPT Chat] [{Index}] Text:\n{Text}", i, msg.Text);
+            }
+            _logger.LogDebug("[YandexGPT Chat] ===== MESSAGES DETAIL END =====");
+
+            // Полное логирование tools
+            if (yandexTools != null && yandexTools.Length > 0)
+            {
+                _logger.LogDebug("[YandexGPT Chat] ===== TOOLS DETAIL START =====");
+                foreach (var tool in yandexTools)
+                {
+                    _logger.LogDebug("[YandexGPT Chat] Tool: {Name}", tool.Function?.Name);
+                    _logger.LogDebug("[YandexGPT Chat]   Description: {Description}", tool.Function?.Description);
+                    if (tool.Function?.Parameters != null)
+                    {
+                        var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, jsonOptions);
+                        _logger.LogDebug("[YandexGPT Chat]   Parameters:\n{Params}", paramsJson);
+                    }
+                }
+                _logger.LogDebug("[YandexGPT Chat] ===== TOOLS DETAIL END =====");
+            }
 
             progress?.Report($"[YandexGPT Chat] >>> ЗАПРОС");
             progress?.Report($"[YandexGPT Chat] Model: {modelUri}, Messages: {yandexMessages.Length}, Tools: {yandexTools?.Length ?? 0}");
@@ -533,6 +569,9 @@ public class YandexGptLlmProvider : ILlmProvider
                 }
 
                 _logger.LogInformation("[YandexGPT Chat] Response length: {Length} chars", result.Response.Length);
+                _logger.LogDebug("[YandexGPT Chat] ===== FINAL RESPONSE START =====");
+                _logger.LogDebug("[YandexGPT Chat] Response:\n{Response}", result.Response);
+                _logger.LogDebug("[YandexGPT Chat] ===== FINAL RESPONSE END =====");
             }
             else
             {

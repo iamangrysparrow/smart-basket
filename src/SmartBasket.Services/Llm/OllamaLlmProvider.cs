@@ -198,10 +198,9 @@ public class OllamaLlmProvider : ILlmProvider
 
             _logger.LogInformation("[Ollama] <<< ОТВЕТ ПОЛУЧЕН");
             _logger.LogInformation("[Ollama] Response length: {Length} chars", result.Response?.Length ?? 0);
-            var responsePreview = result.Response?.Length > 500
-                ? result.Response.Substring(0, 500) + "..."
-                : result.Response;
-            _logger.LogInformation("[Ollama] Response preview:\n{Preview}", responsePreview);
+            _logger.LogDebug("[Ollama] ===== FULL RESPONSE START =====");
+            _logger.LogDebug("[Ollama] Response:\n{Response}", result.Response);
+            _logger.LogDebug("[Ollama] ===== FULL RESPONSE END =====");
             _logger.LogInformation("[Ollama] ========================================");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -282,11 +281,55 @@ public class OllamaLlmProvider : ILlmProvider
             _logger.LogInformation("[Ollama Chat] Tools count: {Count}", ollamaTools?.Length ?? 0);
             _logger.LogInformation("[Ollama Chat] URL: {Url}", requestUrl);
             _logger.LogInformation("[Ollama Chat] Timeout: {Timeout}s", timeoutSeconds);
+            _logger.LogInformation("[Ollama Chat] Temperature: {Temp}, MaxTokens: {MaxTokens}",
+                actualTemperature, actualMaxTokens);
 
-            // Детальное логирование запроса (только в файл, не в UI)
-            _logger.LogDebug("[Ollama Chat] ===== REQUEST JSON START =====");
-            _logger.LogDebug("[Ollama Chat] {Json}", requestJson);
-            _logger.LogDebug("[Ollama Chat] ===== REQUEST JSON END =====");
+            // Полное логирование запроса
+            _logger.LogDebug("[Ollama Chat] ===== FULL REQUEST JSON START =====");
+            _logger.LogDebug("[Ollama Chat] Request ({Length} chars):\n{Json}", requestJson.Length, requestJson);
+            _logger.LogDebug("[Ollama Chat] ===== FULL REQUEST JSON END =====");
+
+            // Полное логирование каждого сообщения
+            _logger.LogDebug("[Ollama Chat] ===== MESSAGES DETAIL START =====");
+            for (var i = 0; i < ollamaMessages.Length; i++)
+            {
+                var msg = ollamaMessages[i];
+                _logger.LogDebug("[Ollama Chat] [{Index}] Role={Role}, Content ({ContentLength} chars), ToolCalls={ToolCallsCount}",
+                    i, msg.Role, msg.Content?.Length ?? 0, msg.ToolCalls?.Length ?? 0);
+                if (!string.IsNullOrEmpty(msg.Content))
+                {
+                    _logger.LogDebug("[Ollama Chat] [{Index}] Content:\n{Content}", i, msg.Content);
+                }
+                if (msg.ToolCalls != null)
+                {
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        var argsJson = tc.Function?.Arguments != null
+                            ? JsonSerializer.Serialize(tc.Function.Arguments)
+                            : "{}";
+                        _logger.LogDebug("[Ollama Chat] [{Index}] ToolCall: {Name}, Args:\n{Args}",
+                            i, tc.Function?.Name, argsJson);
+                    }
+                }
+            }
+            _logger.LogDebug("[Ollama Chat] ===== MESSAGES DETAIL END =====");
+
+            // Полное логирование tools
+            if (ollamaTools != null && ollamaTools.Length > 0)
+            {
+                _logger.LogDebug("[Ollama Chat] ===== TOOLS DETAIL START =====");
+                foreach (var tool in ollamaTools)
+                {
+                    _logger.LogDebug("[Ollama Chat] Tool: {Name}", tool.Function?.Name);
+                    _logger.LogDebug("[Ollama Chat]   Description: {Description}", tool.Function?.Description);
+                    if (tool.Function?.Parameters != null)
+                    {
+                        var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, jsonOptions);
+                        _logger.LogDebug("[Ollama Chat]   Parameters:\n{Params}", paramsJson);
+                    }
+                }
+                _logger.LogDebug("[Ollama Chat] ===== TOOLS DETAIL END =====");
+            }
 
             progress?.Report($"Запрос к {_config.Model} ({ollamaMessages.Length} сообщений, {ollamaTools?.Length ?? 0} инструментов)");
 
@@ -457,7 +500,9 @@ public class OllamaLlmProvider : ILlmProvider
             }
 
             _logger.LogInformation("[Ollama Chat] Response length: {Length} chars", result.Response?.Length ?? 0);
-            _logger.LogDebug("[Ollama Chat] Final response:\n{Response}", result.Response);
+            _logger.LogDebug("[Ollama Chat] ===== FINAL RESPONSE START =====");
+            _logger.LogDebug("[Ollama Chat] Response:\n{Response}", result.Response);
+            _logger.LogDebug("[Ollama Chat] ===== FINAL RESPONSE END =====");
             _logger.LogInformation("[Ollama Chat] ========================================");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

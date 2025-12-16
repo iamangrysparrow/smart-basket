@@ -1,5 +1,13 @@
 # SmartBasket Architecture
 
+---
+
+## 🔥🔥🔥 ЗОЛОТОЕ ПРАВИЛО: ВОПРОС = ОБСУЖДЕНИЕ, НЕ КОД 🔥🔥🔥
+
+**Если сообщение пользователя заканчивается знаком вопроса (`?`) — ЗАПРЕЩЕНО менять код. ОБЯЗАТЕЛЬНО: обсудить, предложить, объяснить. Это правило БЕЗ ИСКЛЮЧЕНИЙ.**
+
+---
+
 > **AI Integration:** См. [ARCHITECTURE-AI.md](ARCHITECTURE-AI.md) для документации по интеграции с LLM провайдерами и Tool Calling.
 
 ## Overview
@@ -264,6 +272,84 @@ AiProviderConfig
 
 ---
 
+## Logging Architecture
+
+Логирование построено на **Serilog** с интеграцией в UI через custom sink.
+
+```
+ILogger<T>.LogXxx(...)
+        │
+        ▼
+    Serilog
+        ├─→ Debug Sink ────────→ Visual Studio Output
+        ├─→ File Sink ─────────→ logs/smartbasket-YYYY-MM-DD.log
+        └─→ LogViewerSink ─────→ SmartBasket Logs UI (ObservableCollection)
+```
+
+### Компоненты
+
+| Component | Description |
+|-----------|-------------|
+| **LogViewerSink** | Custom Serilog sink → `ObservableCollection<LogEntry>` для UI |
+| **LogEntry** | Модель записи лога: Timestamp, Level, Message |
+| **FilteredLogEntries** | `ICollectionView` с фильтрацией по уровню (Debug/Info/Warning/Error) |
+
+### Конфигурация (App.xaml.cs)
+
+```csharp
+// Отдельный файл на каждый запуск + ротация при работе > 24ч
+var sessionTimestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+var logsPath = Path.Combine(logsDir, $"smartbasket_{sessionTimestamp}.log");
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .WriteTo.Debug(outputTemplate: "[{Timestamp:HH:mm:ss}] [{Level:u3}] {Message:lj}")
+    .WriteTo.File(logsPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30)
+    .WriteTo.LogViewer(LogEventLevel.Debug)
+    .CreateLogger();
+```
+
+### Использование
+
+```csharp
+// В любом сервисе через DI
+public class MyService
+{
+    private readonly ILogger<MyService> _logger;
+
+    public MyService(ILogger<MyService> logger) => _logger = logger;
+
+    public void DoWork()
+    {
+        _logger.LogDebug("Starting work...");
+        _logger.LogInformation("Processed {Count} items", 42);
+        _logger.LogError(ex, "Failed to process");
+    }
+}
+```
+
+### Особенности
+
+- **Thread-safe**: `LogViewerSink` использует `BindingOperations.EnableCollectionSynchronization`
+- **UI limit**: 10000 записей в UI (настраивается), полный лог хранится отдельно для экспорта
+- **Per-session files**: Отдельный лог-файл на каждый запуск (`smartbasket_2025-12-16_14-30-45.log`)
+- **Daily rotation**: Ротация при работе > 24ч, 30 файлов хранения
+- **Structured logging**: Параметры через `{Placeholder}`, не string interpolation
+- **Full AI logging**: Все LLM запросы/ответы логируются на уровне Debug
+
+### Настройка лимита UI лога
+
+```json
+// appsettings.json
+{
+  "MaxUiLogEntries": 10000  // Default. Уменьшить если UI тормозит
+}
+```
+
+---
+
 ## Projects
 
 ### SmartBasket.Core
@@ -309,6 +395,13 @@ EF Core DbContext. PostgreSQL / SQLite.
 
 ### SmartBasket.WPF
 MVVM приложение (CommunityToolkit.Mvvm).
+
+**Logging:**
+- `Logging/LogViewerSink.cs` — custom Serilog sink для UI
+- `Models/LogEntry.cs` — модель записи лога с уровнем
+
+**Themes:**
+- `ThemeManager.cs` — переключение Light/Dark тем
 
 ### SmartBasket.CLI
 Консольные утилиты для тестирования.

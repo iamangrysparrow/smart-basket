@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -140,7 +141,7 @@ public class ChatService : IChatService
         _logger.LogInformation("[ChatService] ========================================");
         _logger.LogInformation("[ChatService] >>> NEW MESSAGE");
         _logger.LogInformation("[ChatService] User message ({Length} chars):\n{Message}",
-            userMessage.Length, TruncateForLog(userMessage, 500));
+            userMessage.Length, FormatForLog(userMessage, "user-message"));
 
         // AUTO-PRIMING: при первом сообщении добавляем контекст БД
         string primingContext = "";
@@ -184,11 +185,19 @@ public class ChatService : IChatService
         // Получаем определения инструментов
         var tools = _tools.GetToolDefinitions();
         _logger.LogInformation("[ChatService] Tools available: {Count}", tools.Count);
+        // Полное логирование tool definitions
+        _logger.LogDebug("[ChatService] ===== TOOL DEFINITIONS START =====");
         foreach (var tool in tools)
         {
-            _logger.LogDebug("[ChatService]   - {Name}: {Description}",
-                tool.Name, TruncateForLog(tool.Description, 80));
+            _logger.LogDebug("[ChatService] Tool: {Name}", tool.Name);
+            _logger.LogDebug("[ChatService]   Description: {Description}", tool.Description);
+            if (tool.ParametersSchema != null)
+            {
+                var schemaJson = JsonSerializer.Serialize(tool.ParametersSchema, JsonLogOptions);
+                _logger.LogDebug("[ChatService]   Parameters Schema:\n{Schema}", schemaJson);
+            }
         }
+        _logger.LogDebug("[ChatService] ===== TOOL DEFINITIONS END =====");
 
         // Если провайдер не поддерживает native tools, добавляем описание в системный промпт
         var effectiveSystemPrompt = _systemPrompt ?? "";
@@ -211,6 +220,33 @@ public class ChatService : IChatService
         // Подготавливаем сообщения с системным промптом
         var messages = BuildMessagesWithSystem(effectiveSystemPrompt);
         _logger.LogDebug("[ChatService] Total messages to send: {Count}", messages.Count);
+
+        // Полное логирование системного промпта и всех сообщений
+        _logger.LogDebug("[ChatService] ===== SYSTEM PROMPT START =====");
+        _logger.LogDebug("[ChatService] System prompt ({Length} chars):\n{Prompt}",
+            effectiveSystemPrompt?.Length ?? 0, FormatForLog(effectiveSystemPrompt ?? "", "system-prompt"));
+        _logger.LogDebug("[ChatService] ===== SYSTEM PROMPT END =====");
+
+        _logger.LogDebug("[ChatService] ===== MESSAGE HISTORY START =====");
+        for (var i = 0; i < messages.Count; i++)
+        {
+            var msg = messages[i];
+            _logger.LogDebug("[ChatService] [{Index}] Role={Role}, Content ({ContentLength} chars), ToolCalls={ToolCallsCount}",
+                i, msg.Role, msg.Content?.Length ?? 0, msg.ToolCalls?.Count ?? 0);
+            if (!string.IsNullOrEmpty(msg.Content))
+            {
+                _logger.LogDebug("[ChatService] [{Index}] Content:\n{Content}", i, FormatForLog(msg.Content, $"msg-{i}-{msg.Role}"));
+            }
+            if (msg.ToolCalls?.Count > 0)
+            {
+                foreach (var tc in msg.ToolCalls)
+                {
+                    _logger.LogDebug("[ChatService] [{Index}] ToolCall: {Name} (id={Id}), Args:\n{Args}",
+                        i, tc.Name, tc.Id, tc.Arguments);
+                }
+            }
+        }
+        _logger.LogDebug("[ChatService] ===== MESSAGE HISTORY END =====");
 
         // Tool-use loop
         for (int iteration = 0; iteration < MaxIterations; iteration++)
@@ -261,12 +297,13 @@ public class ChatService : IChatService
                 return new ChatResponse("", false, result.ErrorMessage);
             }
 
-            // Логируем ответ LLM
-            if (!string.IsNullOrEmpty(result.Response))
-            {
-                _logger.LogDebug("[ChatService] LLM response text ({Length} chars):\n{Response}",
-                    result.Response.Length, TruncateForLog(result.Response, 500));
-            }
+            // Полное логирование ответа LLM
+            _logger.LogDebug("[ChatService] ===== LLM RAW RESPONSE START =====");
+            _logger.LogDebug("[ChatService] LLM response text ({Length} chars):\n{Response}",
+                result.Response?.Length ?? 0, FormatForLog(result.Response ?? "", "llm-response"));
+            _logger.LogDebug("[ChatService] HasToolCalls: {HasToolCalls}, ToolCalls count: {Count}",
+                result.HasToolCalls, result.ToolCalls?.Count ?? 0);
+            _logger.LogDebug("[ChatService] ===== LLM RAW RESPONSE END =====");
 
             // Если нет tool calls — это финальный ответ
             if (!result.HasToolCalls)
@@ -282,7 +319,9 @@ public class ChatService : IChatService
                 _logger.LogInformation("[ChatService] <<< FINAL RESPONSE");
                 _logger.LogInformation("[ChatService] Response ({Length} chars) in {Time:F2}s total, {Iterations} iteration(s)",
                     response.Length, totalStopwatch.Elapsed.TotalSeconds, iteration + 1);
-                _logger.LogDebug("[ChatService] Response:\n{Response}", TruncateForLog(response, 1000));
+                _logger.LogDebug("[ChatService] ===== FINAL RESPONSE TEXT START =====");
+                _logger.LogDebug("[ChatService] Response:\n{Response}", FormatForLog(response, "final-response"));
+                _logger.LogDebug("[ChatService] ===== FINAL RESPONSE TEXT END =====");
                 _logger.LogInformation("[ChatService] ========================================");
 
                 return new ChatResponse(response, true);
@@ -310,12 +349,15 @@ public class ChatService : IChatService
             foreach (var call in result.ToolCalls)
             {
                 _logger.LogInformation("[ChatService] >>> Executing tool: {Name}", call.Name);
-                _logger.LogDebug("[ChatService] Tool arguments:\n{Args}",
-                    FormatJson(call.Arguments));
+                _logger.LogDebug("[ChatService] ===== TOOL CALL ARGUMENTS START =====");
+                _logger.LogDebug("[ChatService] Tool: {Name}, ID: {Id}", call.Name, call.Id);
+                _logger.LogDebug("[ChatService] Arguments ({Length} chars):\n{Args}",
+                    call.Arguments.Length, FormatForLog(FormatJson(call.Arguments), $"tool-args-{call.Name}"));
+                _logger.LogDebug("[ChatService] ===== TOOL CALL ARGUMENTS END =====");
 
-                // Логируем аргументы в UI для отладки
-                progress?.Report($"[DEBUG] >>> Tool: {call.Name}");
-                progress?.Report($"[DEBUG] Args: {TruncateForLog(FormatJson(call.Arguments), 300)}");
+                // Логируем аргументы в UI для отладки (полностью)
+                progress?.Report($"[DEBUG] >>> Tool: {call.Name} (id={call.Id})");
+                progress?.Report($"[DEBUG] Args ({call.Arguments.Length} chars):\n{FormatJson(call.Arguments)}");
 
                 progress?.Report($"Выполняю {call.Name}...");
 
@@ -331,12 +373,14 @@ public class ChatService : IChatService
                     _logger.LogWarning("[ChatService] Tool error: {Error}", toolResult.ErrorMessage);
                 }
 
+                _logger.LogDebug("[ChatService] ===== TOOL RESULT START =====");
                 _logger.LogDebug("[ChatService] Tool result ({Length} chars):\n{Result}",
-                    toolResult.JsonData.Length, TruncateForLog(toolResult.JsonData, 500));
+                    toolResult.JsonData.Length, FormatForLog(toolResult.JsonData, $"tool-result-{call.Name}"));
+                _logger.LogDebug("[ChatService] ===== TOOL RESULT END =====");
 
-                // Логируем результат в UI для отладки
+                // Логируем результат в UI для отладки (полностью)
                 progress?.Report($"[DEBUG] <<< Tool: {call.Name} ({toolStopwatch.Elapsed.TotalSeconds:F2}s, success={toolResult.Success})");
-                progress?.Report($"[DEBUG] Result ({toolResult.JsonData.Length} chars): {TruncateForLog(toolResult.JsonData, 500)}");
+                progress?.Report($"[DEBUG] Result ({toolResult.JsonData.Length} chars):\n{toolResult.JsonData}");
 
                 // Добавляем результат tool в историю
                 _history.Add(new LlmChatMessage
@@ -775,11 +819,31 @@ public class ChatService : IChatService
         return null;
     }
 
-    private static string TruncateForLog(string text, int maxLength)
+    private const int MaxLogSize = 100 * 1024; // 100KB limit
+
+    /// <summary>
+    /// Форматирует текст для логирования. Не обрезает, но ограничивает 100KB.
+    /// Если превышено - сохраняет в файл и возвращает ссылку.
+    /// </summary>
+    private string FormatForLog(string text, string context = "content")
     {
         if (string.IsNullOrEmpty(text)) return "(empty)";
-        if (text.Length <= maxLength) return text;
-        return text[..maxLength] + $"... ({text.Length - maxLength} more chars)";
+        if (text.Length <= MaxLogSize) return text;
+
+        // Сохраняем в файл если превышает 100KB
+        try
+        {
+            var logsDir = Path.Combine(AppContext.BaseDirectory, "logs", "ai-debug");
+            Directory.CreateDirectory(logsDir);
+            var fileName = $"{DateTime.Now:yyyyMMdd-HHmmss}-{context}-{Guid.NewGuid():N}.txt";
+            var filePath = Path.Combine(logsDir, fileName);
+            File.WriteAllText(filePath, text);
+            return $"[{text.Length} chars saved to: {filePath}]";
+        }
+        catch
+        {
+            return $"[{text.Length} chars, first 50KB:]\n{text[..(50 * 1024)]}";
+        }
     }
 
     private static readonly JsonSerializerOptions JsonLogOptions = new()
