@@ -1,9 +1,10 @@
-using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using SmartBasket.WPF.Models;
 using SmartBasket.WPF.ViewModels;
 
 namespace SmartBasket.WPF.Views;
@@ -13,25 +14,40 @@ namespace SmartBasket.WPF.Views;
 /// </summary>
 public partial class LogWindow : Window
 {
-    private readonly MainViewModel _viewModel;
+    private readonly LogWindowViewModel _viewModel;
+    private readonly MainViewModel _mainViewModel;
     private bool _isClosingToMainWindow;
     private bool _userScrolledUp;
     private ScrollViewer? _scrollViewer;
 
-    public LogWindow(MainViewModel viewModel)
+    public LogWindow(MainViewModel mainViewModel)
     {
         InitializeComponent();
-        _viewModel = viewModel;
-        DataContext = viewModel;
+        _mainViewModel = mainViewModel;
+        _viewModel = new LogWindowViewModel(mainViewModel);
+        DataContext = _viewModel;
 
         // Auto-scroll on new entries
-        if (viewModel.LogEntries is INotifyCollectionChanged collection)
+        if (_viewModel.LogEntries is INotifyCollectionChanged collection)
         {
             collection.CollectionChanged += LogEntries_CollectionChanged;
         }
 
         // Subscribe to filtered view changes for auto-scroll
-        viewModel.FilteredLogEntries.CollectionChanged += FilteredLogEntries_CollectionChanged;
+        _viewModel.FilteredLogEntries.CollectionChanged += FilteredLogEntries_CollectionChanged;
+
+        // Subscribe to search navigation
+        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LogWindowViewModel.CurrentSearchMatch) && _viewModel.CurrentSearchMatch != null)
+        {
+            // Scroll to the current search match
+            LogListBox.ScrollIntoView(_viewModel.CurrentSearchMatch);
+            LogListBox.SelectedItem = _viewModel.CurrentSearchMatch;
+        }
     }
 
     private void LogEntries_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -115,9 +131,31 @@ public partial class LogWindow : Window
             collection.CollectionChanged -= LogEntries_CollectionChanged;
         }
         _viewModel.FilteredLogEntries.CollectionChanged -= FilteredLogEntries_CollectionChanged;
+        _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _viewModel.Cleanup();
 
         // Notify main window to show docked panel if docking back
         LogWindowClosed?.Invoke(this, _isClosingToMainWindow);
+    }
+
+    private void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        // Handle Ctrl+C for copying selected items
+        if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (LogListBox.SelectedItems.Count > 0)
+            {
+                _viewModel.CopySelectedLogCommand.Execute(LogListBox.SelectedItems);
+                e.Handled = true;
+            }
+        }
+        // Handle Ctrl+F for focusing search box
+        else if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            SearchTextBox.Focus();
+            SearchTextBox.SelectAll();
+            e.Handled = true;
+        }
     }
 
     /// <summary>

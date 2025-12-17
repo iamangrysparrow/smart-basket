@@ -58,6 +58,9 @@
             <converters:IntToVisibilityConverter x:Key="IntToVis"/>
             <converters:StringToColorConverter x:Key="StringToColor"/>
             <converters:DoubleToStringConverter x:Key="DoubleToString"/>
+            <converters:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVis"/>
+            <converters:StringNotEqualsToVisibilityConverter x:Key="StringNotEqualsToVis"/>
+            <converters:BoolToFontWeightConverter x:Key="BoolToFontWeight"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

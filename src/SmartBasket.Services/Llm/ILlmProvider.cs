@@ -96,14 +96,10 @@ public interface ILlmProvider
     /// Сгенерировать текст по prompt
     /// </summary>
     /// <param name="prompt">Prompt для генерации</param>
-    /// <param name="maxTokens">Максимальное количество токенов в ответе</param>
-    /// <param name="temperature">Температура генерации (0.0 - 1.0)</param>
     /// <param name="progress">Отчёт о прогрессе (для streaming)</param>
     /// <param name="cancellationToken">Токен отмены</param>
     Task<LlmGenerationResult> GenerateAsync(
         string prompt,
-        int maxTokens = 2000,
-        double temperature = 0.1,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 
@@ -117,15 +113,11 @@ public interface ILlmProvider
     /// </summary>
     /// <param name="messages">История сообщений (user, assistant, system, tool)</param>
     /// <param name="tools">Доступные инструменты (опционально)</param>
-    /// <param name="maxTokens">Максимальное количество токенов в ответе</param>
-    /// <param name="temperature">Температура генерации (0.0 - 1.0)</param>
     /// <param name="progress">Отчёт о прогрессе (для streaming)</param>
     /// <param name="cancellationToken">Токен отмены</param>
     Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
-        int maxTokens = 2000,
-        double temperature = 0.7,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 

@@ -89,6 +89,13 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showWarning = true;
     [ObservableProperty] private bool _showError = true;
 
+    // Log filtering by source
+    public ObservableCollection<string> AvailableSources { get; } = new() { "Все" };
+    private readonly object _availableSourcesLock = new();
+    [ObservableProperty] private string _selectedSourceFilter = "Все";
+
+    partial void OnSelectedSourceFilterChanged(string value) => FilteredLogEntries?.Refresh();
+
     // Auto-scroll state
     [ObservableProperty] private bool _autoScrollEnabled = true;
 
@@ -172,10 +179,32 @@ public partial class MainViewModel : ObservableObject
         // This WPF method allows ObservableCollection to be modified from any thread
         BindingOperations.EnableCollectionSynchronization(Receipts, _receiptsLock);
         BindingOperations.EnableCollectionSynchronization(ShopFilters, _shopFiltersLock);
+        BindingOperations.EnableCollectionSynchronization(AvailableSources, _availableSourcesLock);
 
-        // Create filtered view for log entries with level filtering
+        // Subscribe to new sources
+        LogViewerSink.Instance.SourcesChanged += OnSourcesChanged;
+
+        // Create filtered view for log entries with level and source filtering
         FilteredLogEntries = CollectionViewSource.GetDefaultView(LogEntries);
         FilteredLogEntries.Filter = LogEntryFilter;
+    }
+
+    private void OnSourcesChanged(object? sender, EventArgs e)
+    {
+        // Update available sources from LogViewerSink
+        Application.Current?.Dispatcher?.BeginInvoke(() =>
+        {
+            lock (_availableSourcesLock)
+            {
+                foreach (var source in LogViewerSink.Instance.KnownSources)
+                {
+                    if (!AvailableSources.Contains(source))
+                    {
+                        AvailableSources.Add(source);
+                    }
+                }
+            }
+        });
     }
 
     private bool LogEntryFilter(object item)
@@ -183,7 +212,8 @@ public partial class MainViewModel : ObservableObject
         if (item is not LogEntry entry)
             return true;
 
-        return entry.Level switch
+        // Filter by level
+        var levelMatch = entry.Level switch
         {
             Models.LogLevel.Debug => ShowDebug,
             Models.LogLevel.Info => ShowInfo,
@@ -191,6 +221,18 @@ public partial class MainViewModel : ObservableObject
             Models.LogLevel.Error => ShowError,
             _ => true
         };
+
+        if (!levelMatch)
+            return false;
+
+        // Filter by source
+        if (!string.IsNullOrEmpty(SelectedSourceFilter) && SelectedSourceFilter != "Все")
+        {
+            if (entry.Source != SelectedSourceFilter)
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -756,7 +798,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Copy all visible log entries to clipboard
+    /// Copy all visible log entries to clipboard (toolbar button)
     /// </summary>
     [RelayCommand]
     private void CopyLog()
@@ -774,6 +816,41 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "CopyLog error");
+        }
+    }
+
+    /// <summary>
+    /// Copy only selected log entries to clipboard (context menu)
+    /// </summary>
+    [RelayCommand]
+    private void CopySelectedLog(object? parameter)
+    {
+        try
+        {
+            if (parameter is not System.Collections.IList selectedItems || selectedItems.Count == 0)
+            {
+                StatusText = "No log entries selected";
+                return;
+            }
+
+            var lines = new List<string>();
+            foreach (var item in selectedItems)
+            {
+                if (item is LogEntry entry)
+                {
+                    lines.Add(entry.FormattedMessage);
+                }
+            }
+
+            if (lines.Count > 0)
+            {
+                Clipboard.SetText(string.Join(Environment.NewLine, lines));
+                StatusText = $"Copied {lines.Count} selected log entries to clipboard";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CopySelectedLog error");
         }
     }
 

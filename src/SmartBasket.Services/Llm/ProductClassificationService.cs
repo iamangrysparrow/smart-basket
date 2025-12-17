@@ -81,8 +81,6 @@ public class ProductClassificationService : IProductClassificationService
 
             var llmResult = await provider.GenerateAsync(
                 prompt,
-                maxTokens: 4000,
-                temperature: 0.1,
                 progress: progress,
                 cancellationToken: cancellationToken);
 

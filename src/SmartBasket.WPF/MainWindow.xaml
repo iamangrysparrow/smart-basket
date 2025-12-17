@@ -305,6 +305,12 @@
                             <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="I" IsChecked="{Binding ShowInfo}" ToolTip="Info"/>
                             <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="W" IsChecked="{Binding ShowWarning}" ToolTip="Warning"/>
                             <ToggleButton Style="{StaticResource MiniFilterToggle}" Content="E" IsChecked="{Binding ShowError}" ToolTip="Error"/>
+                            <!-- Source filter -->
+                            <ComboBox ItemsSource="{Binding AvailableSources}"
+                                      SelectedItem="{Binding SelectedSourceFilter}"
+                                      MinWidth="80" FontSize="9" Margin="8,0,0,0"
+                                      VerticalAlignment="Center"
+                                      ToolTip="Filter by source"/>
                         </StackPanel>
 
                         <TextBlock Grid.Column="2" Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}"
@@ -317,9 +323,6 @@
                             </Button>
                             <Button Style="{StaticResource ToolbarButton}" Command="{Binding ClearLogCommand}" ToolTip="Clear">
                                 <Path Data="{StaticResource IconClear}" Fill="{DynamicResource LogTextBrush}" Width="10" Height="10" Stretch="Uniform"/>
-                            </Button>
-                            <Button Style="{StaticResource ToolbarButton}" Command="{Binding SaveLogCommand}" ToolTip="Save">
-                                <Path Data="{StaticResource IconSave}" Fill="{DynamicResource LogTextBrush}" Width="10" Height="10" Stretch="Uniform"/>
                             </Button>
                             <Button Style="{StaticResource ToolbarButton}" Click="PopOutLog_Click" ToolTip="Pop out">
                                 <Path Data="{StaticResource IconPopOut}" Fill="{DynamicResource LogTextBrush}" Width="10" Height="10" Stretch="Uniform"/>
@@ -377,7 +380,10 @@
                     </ListBox.ItemTemplate>
                     <ListBox.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="Copy Selected" Command="{Binding CopyLogCommand}" InputGestureText="Ctrl+C">
+                            <MenuItem Header="Copy Selected"
+                                      Command="{Binding CopySelectedLogCommand}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      InputGestureText="Ctrl+C">
                                 <MenuItem.Icon>
                                     <Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
                                           Fill="{DynamicResource TextPrimaryBrush}" Width="12" Height="12" Stretch="Uniform"/>

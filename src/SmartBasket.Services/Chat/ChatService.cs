@@ -81,38 +81,17 @@ public class ChatService : IChatService
                 return "";
             }
 
+            // Загружаем шаблон промпта из файла
+            var template = LoadPromptTemplate("prompt_chat_priming.txt");
+
+            // Подставляем плейсхолдеры
             var now = DateTime.Now;
-            var primingContext = $@"
-=== КОНТЕКСТ БАЗЫ ДАННЫХ ===
+            var nowFormatted = $"{now:yyyy-MM-dd HH:mm:ss} ({now:dddd}, {GetRussianMonth(now.Month)} {now.Year})";
 
-ТЕКУЩАЯ ДАТА И ВРЕМЯ: {now:yyyy-MM-dd HH:mm:ss} ({now:dddd}, {GetRussianMonth(now.Month)} {now.Year})
+            var primingContext = template
+                .Replace("{{NOW}}", nowFormatted)
+                .Replace("{{DB_SCHEMA}}", describeResult.JsonData);
 
-СХЕМА И ДАННЫЕ:
-{describeResult.JsonData}
-
-=== ИНСТРУКЦИИ ПО ИСПОЛЬЗОВАНИЮ ИНСТРУМЕНТОВ ===
-
-У тебя есть 2 инструмента:
-1. describe_data - схема БД (УЖЕ ВЫЗВАН выше, НЕ вызывай повторно)
-2. query - универсальный SELECT запрос
-
-Для query используй JSON:
-{{
-  ""table"": ""Receipts"",
-  ""columns"": [""Shop"", ""Total""],
-  ""aggregates"": [{{""function"": ""SUM"", ""column"": ""Total"", ""alias"": ""total_sum""}}],
-  ""where"": [{{""column"": ""ReceiptDate"", ""op"": "">="", ""value"": ""2024-01-01""}}],
-  ""group_by"": [""Shop""],
-  ""order_by"": [{{""column"": ""total_sum"", ""direction"": ""DESC""}}],
-  ""limit"": 10
-}}
-
-Таблицы: Receipts, ReceiptItems, Items, Products, Labels, ItemLabels, ProductLabels
-Операторы WHERE: =, !=, >, <, >=, <=, ILIKE, IN, NOT IN, IS NULL, BETWEEN
-Функции: COUNT, SUM, AVG, MIN, MAX
-
-=== КОНЕЦ КОНТЕКСТА ===
-";
             _logger.LogInformation("[ChatService] <<< AUTO-PRIMING: контекст загружен ({Length} chars)", primingContext.Length);
             return primingContext;
         }
@@ -121,6 +100,42 @@ public class ChatService : IChatService
             _logger.LogError(ex, "[ChatService] AUTO-PRIMING failed: {Error}", ex.Message);
             return "";
         }
+    }
+
+    /// <summary>
+    /// Загружает шаблон промпта из файла. Ищет в текущей директории и в директории сборки.
+    /// </summary>
+    private string LoadPromptTemplate(string fileName)
+    {
+        // Пути для поиска файла
+        var searchPaths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, fileName),
+            Path.Combine(Directory.GetCurrentDirectory(), fileName),
+            Path.Combine(AppContext.BaseDirectory, "..", fileName),
+        };
+
+        foreach (var path in searchPaths)
+        {
+            if (File.Exists(path))
+            {
+                _logger.LogDebug("[ChatService] Loading prompt template from: {Path}", path);
+                return File.ReadAllText(path);
+            }
+        }
+
+        _logger.LogWarning("[ChatService] Prompt template not found: {FileName}, searched in: {Paths}",
+            fileName, string.Join(", ", searchPaths));
+
+        // Fallback - возвращаем минимальный шаблон
+        return @"=== КОНТЕКСТ БАЗЫ ДАННЫХ ===
+
+ТЕКУЩАЯ ДАТА И ВРЕМЯ: {{NOW}}
+
+СХЕМА И ДАННЫЕ:
+{{DB_SCHEMA}}
+
+=== КОНЕЦ КОНТЕКСТА ===";
     }
 
     private static string GetRussianMonth(int month) => month switch
@@ -184,20 +199,7 @@ public class ChatService : IChatService
 
         // Получаем определения инструментов
         var tools = _tools.GetToolDefinitions();
-        _logger.LogInformation("[ChatService] Tools available: {Count}", tools.Count);
-        // Полное логирование tool definitions
-        _logger.LogDebug("[ChatService] ===== TOOL DEFINITIONS START =====");
-        foreach (var tool in tools)
-        {
-            _logger.LogDebug("[ChatService] Tool: {Name}", tool.Name);
-            _logger.LogDebug("[ChatService]   Description: {Description}", tool.Description);
-            if (tool.ParametersSchema != null)
-            {
-                var schemaJson = JsonSerializer.Serialize(tool.ParametersSchema, JsonLogOptions);
-                _logger.LogDebug("[ChatService]   Parameters Schema:\n{Schema}", schemaJson);
-            }
-        }
-        _logger.LogDebug("[ChatService] ===== TOOL DEFINITIONS END =====");
+        _logger.LogDebug("[ChatService] Tools available: {Count}", tools.Count);
 
         // Если провайдер не поддерживает native tools, добавляем описание в системный промпт
         var effectiveSystemPrompt = _systemPrompt ?? "";
@@ -221,33 +223,6 @@ public class ChatService : IChatService
         var messages = BuildMessagesWithSystem(effectiveSystemPrompt);
         _logger.LogDebug("[ChatService] Total messages to send: {Count}", messages.Count);
 
-        // Полное логирование системного промпта и всех сообщений
-        _logger.LogDebug("[ChatService] ===== SYSTEM PROMPT START =====");
-        _logger.LogDebug("[ChatService] System prompt ({Length} chars):\n{Prompt}",
-            effectiveSystemPrompt?.Length ?? 0, FormatForLog(effectiveSystemPrompt ?? "", "system-prompt"));
-        _logger.LogDebug("[ChatService] ===== SYSTEM PROMPT END =====");
-
-        _logger.LogDebug("[ChatService] ===== MESSAGE HISTORY START =====");
-        for (var i = 0; i < messages.Count; i++)
-        {
-            var msg = messages[i];
-            _logger.LogDebug("[ChatService] [{Index}] Role={Role}, Content ({ContentLength} chars), ToolCalls={ToolCallsCount}",
-                i, msg.Role, msg.Content?.Length ?? 0, msg.ToolCalls?.Count ?? 0);
-            if (!string.IsNullOrEmpty(msg.Content))
-            {
-                _logger.LogDebug("[ChatService] [{Index}] Content:\n{Content}", i, FormatForLog(msg.Content, $"msg-{i}-{msg.Role}"));
-            }
-            if (msg.ToolCalls?.Count > 0)
-            {
-                foreach (var tc in msg.ToolCalls)
-                {
-                    _logger.LogDebug("[ChatService] [{Index}] ToolCall: {Name} (id={Id}), Args:\n{Args}",
-                        i, tc.Name, tc.Id, tc.Arguments);
-                }
-            }
-        }
-        _logger.LogDebug("[ChatService] ===== MESSAGE HISTORY END =====");
-
         // Tool-use loop
         for (int iteration = 0; iteration < MaxIterations; iteration++)
         {
@@ -262,8 +237,6 @@ public class ChatService : IChatService
             var result = await provider.ChatAsync(
                 messages,
                 effectiveTools,
-                maxTokens: 2000,
-                temperature: 0.7,
                 progress: progress,
                 cancellationToken: cancellationToken);
             llmStopwatch.Stop();
@@ -297,14 +270,6 @@ public class ChatService : IChatService
                 return new ChatResponse("", false, result.ErrorMessage);
             }
 
-            // Полное логирование ответа LLM
-            _logger.LogDebug("[ChatService] ===== LLM RAW RESPONSE START =====");
-            _logger.LogDebug("[ChatService] LLM response text ({Length} chars):\n{Response}",
-                result.Response?.Length ?? 0, FormatForLog(result.Response ?? "", "llm-response"));
-            _logger.LogDebug("[ChatService] HasToolCalls: {HasToolCalls}, ToolCalls count: {Count}",
-                result.HasToolCalls, result.ToolCalls?.Count ?? 0);
-            _logger.LogDebug("[ChatService] ===== LLM RAW RESPONSE END =====");
-
             // Если нет tool calls — это финальный ответ
             if (!result.HasToolCalls)
             {
@@ -316,23 +281,15 @@ public class ChatService : IChatService
                 });
 
                 totalStopwatch.Stop();
-                _logger.LogInformation("[ChatService] <<< FINAL RESPONSE");
-                _logger.LogInformation("[ChatService] Response ({Length} chars) in {Time:F2}s total, {Iterations} iteration(s)",
+                _logger.LogInformation("[ChatService] <<< FINAL RESPONSE ({Length} chars) in {Time:F2}s total, {Iterations} iteration(s)",
                     response.Length, totalStopwatch.Elapsed.TotalSeconds, iteration + 1);
-                _logger.LogDebug("[ChatService] ===== FINAL RESPONSE TEXT START =====");
-                _logger.LogDebug("[ChatService] Response:\n{Response}", FormatForLog(response, "final-response"));
-                _logger.LogDebug("[ChatService] ===== FINAL RESPONSE TEXT END =====");
                 _logger.LogInformation("[ChatService] ========================================");
 
                 return new ChatResponse(response, true);
             }
 
-            // Обрабатываем tool calls
-            _logger.LogInformation("[ChatService] Tool calls requested: {Count}", result.ToolCalls!.Count);
-            foreach (var tc in result.ToolCalls)
-            {
-                _logger.LogInformation("[ChatService]   - {Name}(id={Id})", tc.Name, tc.Id);
-            }
+            // Обрабатываем tool calls (детали логируются в провайдере)
+            _logger.LogDebug("[ChatService] Processing {Count} tool call(s)", result.ToolCalls!.Count);
 
             // Добавляем assistant сообщение с tool calls
             _history.Add(new LlmChatMessage
@@ -348,39 +305,19 @@ public class ChatService : IChatService
             // Выполняем каждый tool call
             foreach (var call in result.ToolCalls)
             {
-                _logger.LogInformation("[ChatService] >>> Executing tool: {Name}", call.Name);
-                _logger.LogDebug("[ChatService] ===== TOOL CALL ARGUMENTS START =====");
-                _logger.LogDebug("[ChatService] Tool: {Name}, ID: {Id}", call.Name, call.Id);
-                _logger.LogDebug("[ChatService] Arguments ({Length} chars):\n{Args}",
-                    call.Arguments.Length, FormatForLog(FormatJson(call.Arguments), $"tool-args-{call.Name}"));
-                _logger.LogDebug("[ChatService] ===== TOOL CALL ARGUMENTS END =====");
-
-                // Логируем аргументы в UI для отладки (полностью)
-                progress?.Report($"[DEBUG] >>> Tool: {call.Name} (id={call.Id})");
-                progress?.Report($"[DEBUG] Args ({call.Arguments.Length} chars):\n{FormatJson(call.Arguments)}");
-
                 progress?.Report($"Выполняю {call.Name}...");
 
                 var toolStopwatch = Stopwatch.StartNew();
                 var toolResult = await _tools.ExecuteAsync(call.Name, call.Arguments, cancellationToken);
                 toolStopwatch.Stop();
 
-                _logger.LogInformation("[ChatService] <<< Tool {Name} completed in {Time:F2}s, success={Success}",
-                    call.Name, toolStopwatch.Elapsed.TotalSeconds, toolResult.Success);
+                _logger.LogInformation("[ChatService] Tool {Name} completed in {Time:F2}s, success={Success}, result={ResultLength} chars",
+                    call.Name, toolStopwatch.Elapsed.TotalSeconds, toolResult.Success, toolResult.JsonData.Length);
 
                 if (!toolResult.Success)
                 {
                     _logger.LogWarning("[ChatService] Tool error: {Error}", toolResult.ErrorMessage);
                 }
-
-                _logger.LogDebug("[ChatService] ===== TOOL RESULT START =====");
-                _logger.LogDebug("[ChatService] Tool result ({Length} chars):\n{Result}",
-                    toolResult.JsonData.Length, FormatForLog(toolResult.JsonData, $"tool-result-{call.Name}"));
-                _logger.LogDebug("[ChatService] ===== TOOL RESULT END =====");
-
-                // Логируем результат в UI для отладки (полностью)
-                progress?.Report($"[DEBUG] <<< Tool: {call.Name} ({toolStopwatch.Elapsed.TotalSeconds:F2}s, success={toolResult.Success})");
-                progress?.Report($"[DEBUG] Result ({toolResult.JsonData.Length} chars):\n{toolResult.JsonData}");
 
                 // Добавляем результат tool в историю
                 _history.Add(new LlmChatMessage
@@ -444,32 +381,27 @@ public class ChatService : IChatService
             sb.AppendLine();
         }
 
-        sb.AppendLine("У тебя есть доступ к следующим инструментам:");
-        sb.AppendLine();
-
+        // Формируем описание инструментов
+        var toolsSb = new StringBuilder();
         foreach (var tool in tools)
         {
-            sb.AppendLine($"### {tool.Name}");
-            sb.AppendLine(tool.Description);
+            toolsSb.AppendLine($"### {tool.Name}");
+            toolsSb.AppendLine(tool.Description);
             if (tool.ParametersSchema != null)
             {
-                sb.AppendLine("Параметры (JSON Schema):");
-                sb.AppendLine($"```json");
-                sb.AppendLine(JsonSerializer.Serialize(tool.ParametersSchema, new JsonSerializerOptions { WriteIndented = true }));
-                sb.AppendLine("```");
+                toolsSb.AppendLine("Параметры (JSON Schema):");
+                toolsSb.AppendLine($"```json");
+                toolsSb.AppendLine(JsonSerializer.Serialize(tool.ParametersSchema, new JsonSerializerOptions { WriteIndented = true }));
+                toolsSb.AppendLine("```");
             }
-            sb.AppendLine();
+            toolsSb.AppendLine();
         }
 
-        sb.AppendLine("ВАЖНО: Когда тебе нужно использовать инструмент, отвечай ТОЛЬКО JSON в следующем формате:");
-        sb.AppendLine("```json");
-        sb.AppendLine("{");
-        sb.AppendLine("  \"name\": \"имя_инструмента\",");
-        sb.AppendLine("  \"arguments\": { ... параметры ... }");
-        sb.AppendLine("}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-        sb.AppendLine("Не добавляй никакого текста до или после JSON блока. Если инструмент не нужен, отвечай обычным текстом.");
+        // Загружаем шаблон и подставляем инструменты
+        var template = LoadPromptTemplate("prompt_chat_tools.txt");
+        var toolsPrompt = template.Replace("{{TOOLS}}", toolsSb.ToString().TrimEnd());
+
+        sb.Append(toolsPrompt);
 
         return sb.ToString();
     }
@@ -846,22 +778,4 @@ public class ChatService : IChatService
         }
     }
 
-    private static readonly JsonSerializerOptions JsonLogOptions = new()
-    {
-        WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
-
-    private static string FormatJson(string json)
-    {
-        try
-        {
-            var obj = JsonSerializer.Deserialize<object>(json);
-            return JsonSerializer.Serialize(obj, JsonLogOptions);
-        }
-        catch
-        {
-            return json;
-        }
-    }
 }

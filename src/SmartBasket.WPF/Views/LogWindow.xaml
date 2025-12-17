@@ -7,7 +7,16 @@
         MinHeight="300" MinWidth="600"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource LogBackgroundBrush}"
-        Closing="Window_Closing">
+        Closing="Window_Closing"
+        KeyDown="Window_KeyDown">
+
+    <Window.InputBindings>
+        <KeyBinding Key="C" Modifiers="Ctrl" Command="{Binding CopySelectedLogCommand}"
+                    CommandParameter="{Binding SelectedItems, ElementName=LogListBox}"/>
+        <KeyBinding Key="F3" Command="{Binding SearchNextCommand}"/>
+        <KeyBinding Key="F3" Modifiers="Shift" Command="{Binding SearchPreviousCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding ClearSearchCommand}"/>
+    </Window.InputBindings>
 
     <Window.Resources>
         <!-- Log level to color converter -->
@@ -65,10 +74,40 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Small toolbar button -->
+        <Style x:Key="SmallToolbarButton" TargetType="Button">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -102,7 +141,7 @@
 
                 <!-- Level filters -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="Filter:" Foreground="{DynamicResource TextSecondaryBrush}"
+                    <TextBlock Text="Level:" Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ToggleButton Style="{StaticResource FilterToggle}" Content="DEBUG"
                                   IsChecked="{Binding ShowDebug}" ToolTip="Show debug messages"/>
@@ -112,6 +151,69 @@
                                   IsChecked="{Binding ShowWarning}" ToolTip="Show warnings"/>
                     <ToggleButton Style="{StaticResource FilterToggle}" Content="ERROR"
                                   IsChecked="{Binding ShowError}" ToolTip="Show errors"/>
+
+                    <!-- Source filter (multi-select popup) -->
+                    <TextBlock Text="Source:" Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="11" VerticalAlignment="Center" Margin="16,0,8,0"/>
+
+                    <Border BorderBrush="{DynamicResource BorderLightBrush}"
+                            BorderThickness="1" CornerRadius="3"
+                            Background="{DynamicResource BackgroundLayer1Brush}">
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton x:Name="SourceFilterToggle"
+                                          Background="Transparent" BorderThickness="0"
+                                          Padding="8,4" MinWidth="100"
+                                          ToolTip="Click to select sources">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding SelectedSourcesText}"
+                                               FontSize="11" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource LogTextBrush}"/>
+                                    <Path Data="M7,10L12,15L17,10H7Z"
+                                          Fill="{DynamicResource TextSecondaryBrush}"
+                                          Width="10" Height="10" Stretch="Uniform"
+                                          Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </ToggleButton>
+                            <Button Style="{StaticResource SmallToolbarButton}"
+                                    Command="{Binding ResetSourceFilterCommand}"
+                                    ToolTip="Reset to All"
+                                    Visibility="{Binding SelectedSourcesText, Converter={StaticResource StringNotEqualsToVis}, ConverterParameter=Все}">
+                                <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                      Fill="{DynamicResource TextSecondaryBrush}"
+                                      Width="10" Height="10" Stretch="Uniform"/>
+                            </Button>
+
+                            <!-- Popup with checkboxes -->
+                            <Popup IsOpen="{Binding IsChecked, ElementName=SourceFilterToggle}"
+                                   PlacementTarget="{Binding ElementName=SourceFilterToggle}"
+                                   Placement="Bottom"
+                                   StaysOpen="False"
+                                   AllowsTransparency="True">
+                                <Border Background="{DynamicResource BackgroundLayer1Brush}"
+                                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="4"
+                                        Padding="4" Margin="0,2,0,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.2"/>
+                                    </Border.Effect>
+                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding SourceFilters}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected}"
+                                                              Content="{Binding Name}"
+                                                              Margin="4,2"
+                                                              FontSize="11"
+                                                              FontWeight="{Binding IsSpecial, Converter={StaticResource BoolToFontWeight}}"
+                                                              Foreground="{DynamicResource LogTextBrush}"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- Status -->
@@ -128,7 +230,7 @@
                     <!-- Copy -->
                     <Button Style="{StaticResource ToolbarButton}"
                             Command="{Binding CopyLogCommand}"
-                            ToolTip="Copy to clipboard (Ctrl+C)"
+                            ToolTip="Copy all to clipboard"
                             Padding="8,4" Margin="0,0,4,0">
                         <Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
                               Fill="{DynamicResource LogTextBrush}"
@@ -141,16 +243,6 @@
                             ToolTip="Clear logs"
                             Padding="8,4" Margin="0,0,4,0">
                         <Path Data="{StaticResource IconClear}"
-                              Fill="{DynamicResource LogTextBrush}"
-                              Width="14" Height="14" Stretch="Uniform"/>
-                    </Button>
-
-                    <!-- Save -->
-                    <Button Style="{StaticResource ToolbarButton}"
-                            Command="{Binding SaveLogCommand}"
-                            ToolTip="Save to file"
-                            Padding="8,4" Margin="0,0,4,0">
-                        <Path Data="{StaticResource IconSave}"
                               Fill="{DynamicResource LogTextBrush}"
                               Width="14" Height="14" Stretch="Uniform"/>
                     </Button>
@@ -168,8 +260,97 @@
             </Grid>
         </Border>
 
+        <!-- Search panel -->
+        <Border Grid.Row="1" Background="{DynamicResource BackgroundLayer1Brush}"
+                Padding="12,6" BorderBrush="{DynamicResource BorderLightBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MaxWidth="400"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Search:"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                <!-- Search input -->
+                <Border Grid.Column="1" BorderBrush="{DynamicResource BorderLightBrush}"
+                        BorderThickness="1" CornerRadius="3"
+                        Background="{DynamicResource BackgroundBaseBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="SearchTextBox"
+                                 Grid.Column="0"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 BorderThickness="0" Background="Transparent"
+                                 Padding="8,4" FontSize="11"
+                                 Foreground="{DynamicResource LogTextBrush}"
+                                 VerticalContentAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource SmallToolbarButton}"
+                                Command="{Binding ClearSearchCommand}"
+                                Visibility="{Binding SearchText, Converter={StaticResource StringNotEmptyToVis}}"
+                                ToolTip="Clear search (Esc)">
+                            <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                  Fill="{DynamicResource TextSecondaryBrush}"
+                                  Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Navigation buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                    <Button Style="{StaticResource SmallToolbarButton}"
+                            Command="{Binding SearchFirstCommand}"
+                            IsEnabled="{Binding SearchMatchCount}"
+                            ToolTip="First match">
+                        <Path Data="M18.41,16.59L13.82,12L18.41,7.41L17,6L11,12L17,18L18.41,16.59M6,6H8V18H6V6Z"
+                              Fill="{DynamicResource LogTextBrush}"
+                              Width="12" Height="12" Stretch="Uniform"/>
+                    </Button>
+                    <Button Style="{StaticResource SmallToolbarButton}"
+                            Command="{Binding SearchPreviousCommand}"
+                            IsEnabled="{Binding SearchMatchCount}"
+                            ToolTip="Previous match (Shift+F3)">
+                        <Path Data="M15.41,16.59L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.59Z"
+                              Fill="{DynamicResource LogTextBrush}"
+                              Width="12" Height="12" Stretch="Uniform"/>
+                    </Button>
+                    <Button Style="{StaticResource SmallToolbarButton}"
+                            Command="{Binding SearchNextCommand}"
+                            IsEnabled="{Binding SearchMatchCount}"
+                            ToolTip="Next match (F3)">
+                        <Path Data="M8.59,16.59L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.59Z"
+                              Fill="{DynamicResource LogTextBrush}"
+                              Width="12" Height="12" Stretch="Uniform"/>
+                    </Button>
+                    <Button Style="{StaticResource SmallToolbarButton}"
+                            Command="{Binding SearchLastCommand}"
+                            IsEnabled="{Binding SearchMatchCount}"
+                            ToolTip="Last match">
+                        <Path Data="M5.59,7.41L10.18,12L5.59,16.59L7,18L13,12L7,6L5.59,7.41M16,6H18V18H16V6Z"
+                              Fill="{DynamicResource LogTextBrush}"
+                              Width="12" Height="12" Stretch="Uniform"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Search status -->
+                <TextBlock Grid.Column="3"
+                           Text="{Binding SearchStatus}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="11" VerticalAlignment="Center"
+                           Margin="8,0,0,0" MinWidth="60"/>
+            </Grid>
+        </Border>
+
         <!-- Log Content with selectable text -->
-        <ListBox Grid.Row="1" x:Name="LogListBox"
+        <ListBox Grid.Row="2" x:Name="LogListBox"
                  ItemsSource="{Binding FilteredLogEntries}"
                  Background="{DynamicResource LogBackgroundBrush}"
                  Foreground="{DynamicResource LogTextBrush}"
@@ -221,7 +402,10 @@
             </ListBox.ItemTemplate>
             <ListBox.ContextMenu>
                 <ContextMenu>
-                    <MenuItem Header="Copy Selected" Command="{Binding CopyLogCommand}" InputGestureText="Ctrl+C">
+                    <MenuItem Header="Copy Selected"
+                              Command="{Binding CopySelectedLogCommand}"
+                              CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              InputGestureText="Ctrl+C">
                         <MenuItem.Icon>
                             <Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
                                   Fill="{DynamicResource TextPrimaryBrush}" Width="14" Height="14" Stretch="Uniform"/>
@@ -239,7 +423,7 @@
         </ListBox>
 
         <!-- Footer / Status -->
-        <Border Grid.Row="2" Background="{DynamicResource LogHeaderBrush}" Padding="12,6">
+        <Border Grid.Row="3" Background="{DynamicResource LogHeaderBrush}" Padding="12,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

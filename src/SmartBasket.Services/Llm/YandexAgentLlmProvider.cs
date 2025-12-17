@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -67,8 +68,6 @@ public class YandexAgentLlmProvider : ILlmProvider
             // Делаем тестовый запрос
             var result = await GenerateAsync(
                 "Привет! Ответь одним словом: Работает",
-                maxTokens: 50,
-                temperature: 0.1,
                 cancellationToken: cancellationToken);
 
             if (result.IsSuccess)
@@ -86,8 +85,6 @@ public class YandexAgentLlmProvider : ILlmProvider
 
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
-        int maxTokens = 2000,
-        double temperature = 0.1,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -292,8 +289,6 @@ public class YandexAgentLlmProvider : ILlmProvider
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
-        int maxTokens = 2000,
-        double temperature = 0.7,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -303,7 +298,7 @@ public class YandexAgentLlmProvider : ILlmProvider
 
         for (var attempt = 0; attempt <= maxRetries; attempt++)
         {
-            var result = await ChatAsyncInternal(messageList, tools, maxTokens, temperature, progress, cancellationToken);
+            var result = await ChatAsyncInternal(messageList, tools, progress, cancellationToken);
 
             // Успех или отмена пользователем - возвращаем сразу
             if (result.IsSuccess || cancellationToken.IsCancellationRequested)
@@ -336,8 +331,6 @@ public class YandexAgentLlmProvider : ILlmProvider
     private async Task<LlmGenerationResult> ChatAsyncInternal(
         List<LlmChatMessage> messageList,
         IEnumerable<ToolDefinition>? tools,
-        int maxTokens,
-        double temperature,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -909,24 +902,16 @@ public class YandexAgentLlmProvider : ILlmProvider
                                 string content;
                                 if (isError)
                                 {
-                                    content = $@"Вызов инструмента {tc.Name} завершился с ОШИБКОЙ:
-
-{output}
-
-Проанализируй ошибку и исправь вызов инструмента.";
+                                    content = LoadPromptTemplate("prompt_tool_error.txt")
+                                        .Replace("{{TOOL_NAME}}", tc.Name)
+                                        .Replace("{{TOOL_OUTPUT}}", output);
                                 }
                                 else
                                 {
-                                    content = $@"=== РЕЗУЛЬТАТ ИНСТРУМЕНТА {tc.Name} ===
-
-{output}
-
-=== ВОПРОС ПОЛЬЗОВАТЕЛЯ ===
-{lastUserQuestion}
-
-=== ТВОЯ ЗАДАЧА ===
-Используя данные выше, ответь на вопрос пользователя.
-Дай КОНКРЕТНЫЙ ОТВЕТ с числами. НЕ спрашивай уточнений.";
+                                    content = LoadPromptTemplate("prompt_tool_result.txt")
+                                        .Replace("{{TOOL_NAME}}", tc.Name)
+                                        .Replace("{{TOOL_OUTPUT}}", output)
+                                        .Replace("{{USER_QUESTION}}", lastUserQuestion);
                                 }
 
                                 result.Add(new { type = "message", role = "user", content });
@@ -1422,5 +1407,51 @@ public class YandexAgentLlmProvider : ILlmProvider
         }
 
         return index == 0 ? "" : text;
+    }
+
+    /// <summary>
+    /// Загружает шаблон промпта из файла. Ищет в текущей директории и в директории сборки.
+    /// </summary>
+    private string LoadPromptTemplate(string fileName)
+    {
+        // Пути для поиска файла
+        var searchPaths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, fileName),
+            Path.Combine(Directory.GetCurrentDirectory(), fileName),
+            Path.Combine(AppContext.BaseDirectory, "..", fileName),
+        };
+
+        foreach (var path in searchPaths)
+        {
+            if (File.Exists(path))
+            {
+                _logger.LogDebug("[YandexAgent] Loading prompt template from: {Path}", path);
+                return File.ReadAllText(path);
+            }
+        }
+
+        _logger.LogWarning("[YandexAgent] Prompt template not found: {FileName}, searched in: {Paths}",
+            fileName, string.Join(", ", searchPaths));
+
+        // Fallback для каждого шаблона
+        return fileName switch
+        {
+            "prompt_tool_result.txt" => @"=== РЕЗУЛЬТАТ ИНСТРУМЕНТА {{TOOL_NAME}} ===
+
+{{TOOL_OUTPUT}}
+
+=== ВОПРОС ПОЛЬЗОВАТЕЛЯ ===
+{{USER_QUESTION}}
+
+=== ТВОЯ ЗАДАЧА ===
+Используя данные выше, ответь на вопрос пользователя.",
+            "prompt_tool_error.txt" => @"Вызов инструмента {{TOOL_NAME}} завершился с ОШИБКОЙ:
+
+{{TOOL_OUTPUT}}
+
+Проанализируй ошибку и исправь вызов инструмента.",
+            _ => $"Template {fileName} not found"
+        };
     }
 }

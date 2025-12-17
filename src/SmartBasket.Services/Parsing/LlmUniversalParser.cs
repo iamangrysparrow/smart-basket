@@ -140,8 +140,6 @@ public class LlmUniversalParser : IReceiptTextParser
 
             var llmResult = await provider.GenerateAsync(
                 prompt,
-                maxTokens: 4000,
-                temperature: 0.1, // Low temperature for structured output
                 progress: progress,
                 cancellationToken: cancellationToken);
 

@@ -81,8 +81,6 @@ public class LabelAssignmentService : ILabelAssignmentService
 
             var llmResult = await provider.GenerateAsync(
                 prompt,
-                maxTokens: 256, // Labels are short
-                temperature: 0.1,
                 progress: progress,
                 cancellationToken: cancellationToken);
 
@@ -189,8 +187,6 @@ public class LabelAssignmentService : ILabelAssignmentService
 
             var llmResult = await provider.GenerateAsync(
                 prompt,
-                maxTokens: 1024, // Больше токенов для batch
-                temperature: 0.1,
                 progress: progress,
                 cancellationToken: cancellationToken);
 

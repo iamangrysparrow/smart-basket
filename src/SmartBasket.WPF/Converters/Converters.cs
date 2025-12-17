@@ -191,6 +191,61 @@ public class BoolToStringConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts non-empty string to Visibility (non-empty = Visible, empty = Collapsed)
+/// </summary>
+public class StringNotEmptyToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return !string.IsNullOrEmpty(value as string) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts string to Visibility based on inequality with parameter
+/// If string != parameter, returns Visible; otherwise Collapsed
+/// </summary>
+public class StringNotEqualsToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var str = value as string ?? string.Empty;
+        var compareWith = parameter as string ?? string.Empty;
+        return str != compareWith ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts boolean to FontWeight (true = Bold, false = Normal)
+/// </summary>
+public class BoolToFontWeightConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool boolValue && boolValue)
+        {
+            return FontWeights.SemiBold;
+        }
+        return FontWeights.Normal;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Attached behavior for highlighting search text in TextBlock
 /// </summary>
 public static class TextBlockHighlight

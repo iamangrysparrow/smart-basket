@@ -62,8 +62,6 @@ public class OllamaLlmProvider : ILlmProvider
 
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
-        int maxTokens = 2000,
-        double temperature = 0.1,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -75,8 +73,8 @@ public class OllamaLlmProvider : ILlmProvider
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
-            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
+            var maxTokens = _config.MaxTokens ?? 2000;
+            var temperature = _config.Temperature;
             var baseUrl = _config.BaseUrl ?? "http://localhost:11434";
 
             var request = new OllamaRequest
@@ -86,8 +84,8 @@ public class OllamaLlmProvider : ILlmProvider
                 Stream = true,
                 Options = new OllamaOptions
                 {
-                    Temperature = actualTemperature,
-                    NumPredict = actualMaxTokens
+                    Temperature = temperature,
+                    NumPredict = maxTokens
                 }
             };
 
@@ -229,8 +227,6 @@ public class OllamaLlmProvider : ILlmProvider
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
-        int maxTokens = 2000,
-        double temperature = 0.7,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -242,8 +238,8 @@ public class OllamaLlmProvider : ILlmProvider
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
-            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
+            var maxTokens = _config.MaxTokens ?? 2000;
+            var temperature = _config.Temperature;
             var baseUrl = _config.BaseUrl ?? "http://localhost:11434";
 
             // Конвертируем сообщения в формат Ollama
@@ -260,8 +256,8 @@ public class OllamaLlmProvider : ILlmProvider
                 Stream = true,
                 Options = new OllamaOptions
                 {
-                    Temperature = actualTemperature,
-                    NumPredict = actualMaxTokens
+                    Temperature = temperature,
+                    NumPredict = maxTokens
                 }
             };
 
@@ -282,7 +278,7 @@ public class OllamaLlmProvider : ILlmProvider
             _logger.LogInformation("[Ollama Chat] URL: {Url}", requestUrl);
             _logger.LogInformation("[Ollama Chat] Timeout: {Timeout}s", timeoutSeconds);
             _logger.LogInformation("[Ollama Chat] Temperature: {Temp}, MaxTokens: {MaxTokens}",
-                actualTemperature, actualMaxTokens);
+                temperature, maxTokens);
 
             // Полное логирование запроса
             _logger.LogDebug("[Ollama Chat] ===== FULL REQUEST JSON START =====");
@@ -458,7 +454,6 @@ public class OllamaLlmProvider : ILlmProvider
             result.Response = fullResponse.ToString();
 
             _logger.LogDebug("[Ollama Chat] ===== STREAMING RESPONSE END =====");
-            _logger.LogDebug("[Ollama Chat] ===== ALL RAW CHUNKS =====\n{Chunks}", rawChunks.ToString());
 
             if (collectedToolCalls.Count > 0)
             {

@@ -59,8 +59,6 @@ public class YandexGptLlmProvider : ILlmProvider
             // Делаем тестовый запрос
             var result = await GenerateAsync(
                 "Привет! Ответь одним словом: Работает",
-                maxTokens: 10,
-                temperature: 0.1,
                 cancellationToken: cancellationToken);
 
             if (result.IsSuccess)
@@ -78,8 +76,6 @@ public class YandexGptLlmProvider : ILlmProvider
 
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
-        int maxTokens = 2000,
-        double temperature = 0.1,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -105,8 +101,8 @@ public class YandexGptLlmProvider : ILlmProvider
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
-            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
+            var maxTokens = _config.MaxTokens ?? 2000;
+            var temperature = _config.Temperature;
 
             string modelUri;
             if (_config.Model.StartsWith("general:"))
@@ -124,8 +120,8 @@ public class YandexGptLlmProvider : ILlmProvider
                 CompletionOptions = new YandexCompletionOptions
                 {
                     Stream = true,
-                    Temperature = actualTemperature,
-                    MaxTokens = actualMaxTokens.ToString()
+                    Temperature = temperature,
+                    MaxTokens = maxTokens.ToString()
                 },
                 Messages = new[]
                 {
@@ -297,8 +293,6 @@ public class YandexGptLlmProvider : ILlmProvider
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
-        int maxTokens = 2000,
-        double temperature = 0.7,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -324,8 +318,8 @@ public class YandexGptLlmProvider : ILlmProvider
             var timeoutSeconds = Math.Max(_config.TimeoutSeconds, 60);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-            var actualMaxTokens = _config.MaxTokens ?? maxTokens;
-            var actualTemperature = _config.Temperature > 0 ? _config.Temperature : temperature;
+            var maxTokens = _config.MaxTokens ?? 2000;
+            var temperature = _config.Temperature;
 
             string modelUri;
             if (_config.Model.StartsWith("general:"))
@@ -349,8 +343,8 @@ public class YandexGptLlmProvider : ILlmProvider
                 CompletionOptions = new YandexCompletionOptions
                 {
                     Stream = true,
-                    Temperature = actualTemperature,
-                    MaxTokens = actualMaxTokens.ToString()
+                    Temperature = temperature,
+                    MaxTokens = maxTokens.ToString()
                 },
                 Messages = yandexMessages,
                 Tools = yandexTools
@@ -368,7 +362,7 @@ public class YandexGptLlmProvider : ILlmProvider
             _logger.LogInformation("[YandexGPT Chat] Messages count: {Count}", yandexMessages.Length);
             _logger.LogInformation("[YandexGPT Chat] Tools count: {Count}", yandexTools?.Length ?? 0);
             _logger.LogInformation("[YandexGPT Chat] Temperature: {Temp}, MaxTokens: {MaxTokens}",
-                actualTemperature, actualMaxTokens);
+                temperature, maxTokens);
 
             // Полное логирование запроса
             var fullRequestJson = JsonSerializer.Serialize(request, jsonOptions);
