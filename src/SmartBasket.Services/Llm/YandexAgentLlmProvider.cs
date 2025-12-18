@@ -125,7 +125,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                 Stream = true  // Включаем streaming
             };
 
-            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true });
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
 
             // Логирование в формате ARCHITECTURE-AI.md
             progress?.Report($"[YandexAgent] === PROMPT START ===");
@@ -200,8 +200,7 @@ public class YandexAgentLlmProvider : ILlmProvider
 
                     try
                     {
-                        var eventObj = JsonSerializer.Deserialize<StreamEvent>(currentData,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        var eventObj = JsonSerializer.Deserialize<StreamEvent>(currentData, LlmJsonOptions.ForParsing);
 
                         if (eventType == "response.output_text.delta" && eventObj?.Delta != null)
                         {
@@ -397,11 +396,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                 Tools = yandexTools
             };
 
-            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            });
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
 
             // Подсчёт размера контекста для диагностики
             var contextChars = messageList.Sum(m => m.Content?.Length ?? 0);
@@ -453,7 +448,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                     _logger.LogDebug("[YandexAgent Chat]   Description: {Description}", tool.Description);
                     if (tool.Parameters != null)
                     {
-                        var paramsJson = JsonSerializer.Serialize(tool.Parameters, new JsonSerializerOptions { WriteIndented = true });
+                        var paramsJson = JsonSerializer.Serialize(tool.Parameters, LlmJsonOptions.ForLogging);
                         _logger.LogDebug("[YandexAgent Chat]   Parameters:\n{Params}", paramsJson);
                     }
                 }
@@ -539,8 +534,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                     {
                         if (eventType == "response.output_text.delta")
                         {
-                            var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData,
-                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData, LlmJsonOptions.ForParsing);
 
                             if (eventObj?.Delta != null)
                             {
@@ -554,8 +548,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                         else if (eventType == "response.output_item.done")
                         {
                             // Проверяем на function_call
-                            var itemEvent = JsonSerializer.Deserialize<OutputItemDoneEvent>(currentData,
-                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            var itemEvent = JsonSerializer.Deserialize<OutputItemDoneEvent>(currentData, LlmJsonOptions.ForParsing);
 
                             if (itemEvent?.Item?.Type == "function_call")
                             {
@@ -575,8 +568,7 @@ public class YandexAgentLlmProvider : ILlmProvider
                         }
                         else if (eventType == "response.completed")
                         {
-                            var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData,
-                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            var eventObj = JsonSerializer.Deserialize<StreamEventWithId>(currentData, LlmJsonOptions.ForParsing);
 
                             var status = eventObj?.Response?.Status;
                             var id = eventObj?.Response?.Id;

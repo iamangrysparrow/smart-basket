@@ -89,7 +89,7 @@ public class OllamaLlmProvider : ILlmProvider
                 }
             };
 
-            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true });
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
             var requestUrl = $"{baseUrl}/api/generate";
 
             _logger.LogInformation("[Ollama] ========================================");
@@ -155,7 +155,7 @@ public class OllamaLlmProvider : ILlmProvider
                 try
                 {
                     var chunk = JsonSerializer.Deserialize<OllamaStreamChunk>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        LlmJsonOptions.ForParsing);
 
                     if (chunk?.Response != null)
                     {
@@ -261,13 +261,7 @@ public class OllamaLlmProvider : ILlmProvider
                 }
             };
 
-            var jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            };
-            var requestJson = JsonSerializer.Serialize(request, jsonOptions);
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
             var requestUrl = $"{baseUrl}/api/chat";
 
             _logger.LogInformation("[Ollama Chat] ========================================");
@@ -320,7 +314,7 @@ public class OllamaLlmProvider : ILlmProvider
                     _logger.LogDebug("[Ollama Chat]   Description: {Description}", tool.Function?.Description);
                     if (tool.Function?.Parameters != null)
                     {
-                        var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, jsonOptions);
+                        var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, LlmJsonOptions.ForLogging);
                         _logger.LogDebug("[Ollama Chat]   Parameters:\n{Params}", paramsJson);
                     }
                 }
@@ -383,7 +377,7 @@ public class OllamaLlmProvider : ILlmProvider
                 try
                 {
                     var chunk = JsonSerializer.Deserialize<OllamaChatStreamChunk>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        LlmJsonOptions.ForParsing);
 
                     // Обработка текстового контента
                     if (chunk?.Message?.Content != null)

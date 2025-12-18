@@ -391,7 +391,7 @@ public class ChatService : IChatService
             {
                 toolsSb.AppendLine("Параметры (JSON Schema):");
                 toolsSb.AppendLine($"```json");
-                toolsSb.AppendLine(JsonSerializer.Serialize(tool.ParametersSchema, new JsonSerializerOptions { WriteIndented = true }));
+                toolsSb.AppendLine(JsonSerializer.Serialize(tool.ParametersSchema, LlmJsonOptions.ForLogging));
                 toolsSb.AppendLine("```");
             }
             toolsSb.AppendLine();

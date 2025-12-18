@@ -973,7 +973,7 @@ async Task<int> TestYandexAgentProviderAsync(AiProviderConfig provider)
     var progress = new Progress<string>(msg => Console.WriteLine(msg));
 
     var sw = Stopwatch.StartNew();
-    var result = await agentProvider.GenerateAsync(testPrompt, maxTokens: 500, temperature: 0.3, progress: progress);
+    var result = await agentProvider.GenerateAsync(testPrompt, progress: progress);
     sw.Stop();
 
     Console.WriteLine();

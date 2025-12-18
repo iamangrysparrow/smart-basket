@@ -143,7 +143,7 @@ public class YandexGptLlmProvider : ILlmProvider
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
             {
                 Content = new StringContent(
-                    JsonSerializer.Serialize(request),
+                    JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging),
                     Encoding.UTF8,
                     "application/json")
             };
@@ -197,7 +197,7 @@ public class YandexGptLlmProvider : ILlmProvider
                 try
                 {
                     var chunk = JsonSerializer.Deserialize<YandexStreamChunk>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        LlmJsonOptions.ForParsing);
 
                     if (chunk?.Result?.Alternatives?.Length > 0)
                     {
@@ -350,12 +350,6 @@ public class YandexGptLlmProvider : ILlmProvider
                 Tools = yandexTools
             };
 
-            var jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
-
             _logger.LogInformation("[YandexGPT Chat] ========================================");
             _logger.LogInformation("[YandexGPT Chat] >>> ЗАПРОС К YandexGPT");
             _logger.LogInformation("[YandexGPT Chat] Model: {Model}", modelUri);
@@ -365,7 +359,7 @@ public class YandexGptLlmProvider : ILlmProvider
                 temperature, maxTokens);
 
             // Полное логирование запроса
-            var fullRequestJson = JsonSerializer.Serialize(request, jsonOptions);
+            var fullRequestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
             _logger.LogDebug("[YandexGPT Chat] ===== FULL REQUEST JSON START =====");
             _logger.LogDebug("[YandexGPT Chat] Request ({Length} chars):\n{Json}", fullRequestJson.Length, fullRequestJson);
             _logger.LogDebug("[YandexGPT Chat] ===== FULL REQUEST JSON END =====");
@@ -391,7 +385,7 @@ public class YandexGptLlmProvider : ILlmProvider
                     _logger.LogDebug("[YandexGPT Chat]   Description: {Description}", tool.Function?.Description);
                     if (tool.Function?.Parameters != null)
                     {
-                        var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, jsonOptions);
+                        var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, LlmJsonOptions.ForLogging);
                         _logger.LogDebug("[YandexGPT Chat]   Parameters:\n{Params}", paramsJson);
                     }
                 }
@@ -408,10 +402,7 @@ public class YandexGptLlmProvider : ILlmProvider
 
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
             {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(request, jsonOptions),
-                    Encoding.UTF8,
-                    "application/json")
+                Content = new StringContent(fullRequestJson, Encoding.UTF8, "application/json")
             };
 
             if (_config.ApiKey.StartsWith("t1.") || _config.ApiKey.StartsWith("y"))
@@ -463,7 +454,7 @@ public class YandexGptLlmProvider : ILlmProvider
                 try
                 {
                     var chunk = JsonSerializer.Deserialize<YandexStreamChunkWithTools>(line,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        LlmJsonOptions.ForParsing);
 
                     if (chunk?.Result?.Alternatives?.Length > 0)
                     {
