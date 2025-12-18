@@ -11,7 +11,7 @@ namespace SmartBasket.Services.Llm;
 /// LLM провайдер для YandexGPT (Yandex Cloud) с поддержкой стриминга и tools
 /// Использует OpenAI-совместимый API: https://yandex.cloud/ru/docs/ai-studio/concepts/openai-compatibility
 /// </summary>
-public class YandexGptLlmProvider : ILlmProvider
+public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
 {
     // OpenAI-совместимый endpoint для Completions API
     private const string YandexGptApiUrl = "https://llm.api.cloud.yandex.net/v1/chat/completions";
@@ -20,6 +20,10 @@ public class YandexGptLlmProvider : ILlmProvider
     private readonly ILogger<YandexGptLlmProvider> _logger;
     private readonly AiProviderConfig _config;
 
+    // Runtime override для reasoning параметров (устанавливаются из UI)
+    private Core.Configuration.ReasoningMode? _runtimeReasoningMode;
+    private Core.Configuration.ReasoningEffort? _runtimeReasoningEffort;
+
     public string Name => $"YandexGPT/{_config.Model}";
 
     public bool SupportsConversationReset => false;
@@ -27,10 +31,51 @@ public class YandexGptLlmProvider : ILlmProvider
     // YandexGPT поддерживает tool calling через OpenAI-совместимый API
     public bool SupportsTools => true;
 
+    // YandexGPT поддерживает режим рассуждений через параметр reasoning_effort
+    public bool SupportsReasoning => true;
+
     public void ResetConversation()
     {
         // YandexGPT не хранит состояние — ничего не делаем
     }
+
+    /// <summary>
+    /// Устанавливает параметры режима рассуждений для текущей сессии.
+    /// Переопределяет значения из конфигурации провайдера.
+    /// </summary>
+    /// <param name="mode">Режим рассуждений (null = использовать из конфигурации)</param>
+    /// <param name="effort">Уровень рассуждений (null = использовать из конфигурации)</param>
+    public void SetReasoningParameters(
+        Core.Configuration.ReasoningMode? mode,
+        Core.Configuration.ReasoningEffort? effort)
+    {
+        _runtimeReasoningMode = mode;
+        _runtimeReasoningEffort = effort;
+        _logger.LogInformation("[YandexGPT] Reasoning parameters set: Mode={Mode}, Effort={Effort}",
+            mode?.ToString() ?? "(default)", effort?.ToString() ?? "(default)");
+    }
+
+    /// <summary>
+    /// Сбрасывает runtime override для reasoning параметров
+    /// </summary>
+    public void ResetReasoningParameters()
+    {
+        _runtimeReasoningMode = null;
+        _runtimeReasoningEffort = null;
+        _logger.LogInformation("[YandexGPT] Reasoning parameters reset to config defaults");
+    }
+
+    /// <summary>
+    /// Текущий режим рассуждений (runtime override или из конфигурации)
+    /// </summary>
+    public Core.Configuration.ReasoningMode CurrentReasoningMode =>
+        _runtimeReasoningMode ?? _config.ReasoningMode;
+
+    /// <summary>
+    /// Текущий уровень рассуждений (runtime override или из конфигурации)
+    /// </summary>
+    public Core.Configuration.ReasoningEffort CurrentReasoningEffort =>
+        _runtimeReasoningEffort ?? _config.ReasoningEffort;
 
     public YandexGptLlmProvider(
         IHttpClientFactory httpClientFactory,
@@ -229,6 +274,25 @@ public class YandexGptLlmProvider : ILlmProvider
             // Конвертируем tools в OpenAI формат
             var openAiTools = tools != null ? ConvertToolsToOpenAi(tools).ToArray() : null;
 
+            // Определяем параметры режима рассуждений если включен
+            string? reasoningEffort = null;
+            ReasoningOptionsDto? reasoningOptions = null;
+
+            if (CurrentReasoningMode == Core.Configuration.ReasoningMode.EnabledHidden)
+            {
+                // reasoning_effort для моделей gpt-oss-*
+                reasoningEffort = CurrentReasoningEffort switch
+                {
+                    Core.Configuration.ReasoningEffort.Low => "low",
+                    Core.Configuration.ReasoningEffort.Medium => "medium",
+                    Core.Configuration.ReasoningEffort.High => "high",
+                    _ => "low"
+                };
+
+                // reasoning_options для YandexGPT Pro (нативный Yandex формат)
+                reasoningOptions = new ReasoningOptionsDto { Mode = "ENABLED_HIDDEN" };
+            }
+
             var request = new OpenAiChatRequest
             {
                 Model = modelUri,
@@ -237,7 +301,9 @@ public class YandexGptLlmProvider : ILlmProvider
                 MaxTokens = maxTokens,
                 Stream = true,
                 Tools = openAiTools?.Length > 0 ? openAiTools : null,
-                ToolChoice = openAiTools?.Length > 0 ? "auto" : null
+                ToolChoice = openAiTools?.Length > 0 ? "auto" : null,
+                ReasoningEffort = reasoningEffort,
+                ReasoningOptions = reasoningOptions
             };
 
             _logger.LogInformation("[YandexGPT Chat] ========================================");
@@ -247,6 +313,11 @@ public class YandexGptLlmProvider : ILlmProvider
             _logger.LogInformation("[YandexGPT Chat] Tools count: {Count}", openAiTools?.Length ?? 0);
             _logger.LogInformation("[YandexGPT Chat] Temperature: {Temp}, MaxTokens: {MaxTokens}",
                 temperature, maxTokens);
+            if (!string.IsNullOrEmpty(reasoningEffort) || reasoningOptions != null)
+            {
+                _logger.LogInformation("[YandexGPT Chat] Reasoning: effort={Effort}, options.mode={Mode}",
+                    reasoningEffort ?? "(null)", reasoningOptions?.Mode ?? "(null)");
+            }
 
             // Полное логирование запроса
             var fullRequestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
@@ -625,6 +696,31 @@ public class YandexGptLlmProvider : ILlmProvider
         [JsonPropertyName("tool_choice")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? ToolChoice { get; set; }
+
+        /// <summary>
+        /// Уровень рассуждений: "low", "medium", "high"
+        /// Для моделей gpt-oss-* (OpenAI-совместимый параметр)
+        /// </summary>
+        [JsonPropertyName("reasoning_effort")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ReasoningEffort { get; set; }
+
+        /// <summary>
+        /// Режим рассуждений для YandexGPT Pro
+        /// Нативный Yandex Cloud параметр
+        /// </summary>
+        [JsonPropertyName("reasoning_options")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ReasoningOptionsDto? ReasoningOptions { get; set; }
+    }
+
+    /// <summary>
+    /// DTO для reasoning_options (нативный Yandex формат)
+    /// </summary>
+    private class ReasoningOptionsDto
+    {
+        [JsonPropertyName("mode")]
+        public string Mode { get; set; } = "DISABLED";
     }
 
     // Сообщение OpenAI формата

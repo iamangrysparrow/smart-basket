@@ -188,9 +188,8 @@ public class QueryHandler : IToolHandler
                     limit = new
                     {
                         type = "integer",
-                        @default = 20,
-                        maximum = 100,
-                        description = "Максимум строк в результате"
+                        @default = 1000,
+                        description = "Максимум строк в результате (по умолчанию 1000)"
                     }
                 },
                 required = new[] { "table" }
@@ -248,6 +247,15 @@ public class QueryHandler : IToolHandler
     {
         var connectionString = _settings.Database.ConnectionString;
 
+        // Вычисляем эффективный лимит
+        var maxRows = _settings.QueryMaxRows > 0 ? _settings.QueryMaxRows : 1000;
+        var requestedLimit = args.Limit; // лимит запрошенный моделью (20 по умолчанию)
+        var effectiveLimit = Math.Min(requestedLimit, maxRows);
+
+        // Логируем лимиты на уровне Information (важно для отладки!)
+        _logger.LogInformation("[QueryHandler] LIMIT: запрошен={RequestedLimit}, максимум={MaxRows}, применён={EffectiveLimit}",
+            requestedLimit, maxRows, effectiveLimit);
+
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(ct);
 
@@ -277,6 +285,9 @@ public class QueryHandler : IToolHandler
                 columns = first.Keys.ToList();
         }
 
+        // truncated = true если вернулось >= effectiveLimit строк
+        var truncated = rows.Count >= effectiveLimit;
+
         var result = ToolResult.Ok(new
         {
             table = tableName,
@@ -284,12 +295,15 @@ public class QueryHandler : IToolHandler
             columns,
             rows,
             row_count = rows.Count,
-            truncated = rows.Count >= args.Limit
+            truncated,
+            limit_applied = effectiveLimit
         });
 
+        // Логируем результат на уровне Information
+        _logger.LogInformation("[QueryHandler] Result table={Table}, rows={RowCount}, truncated={Truncated}",
+            tableName, rows.Count, truncated);
+
         _logger.LogDebug("[QueryHandler] ===== QUERY RESULT START =====");
-        _logger.LogDebug("[QueryHandler] Result table={Table}, rows={RowCount}, truncated={Truncated}",
-            tableName, rows.Count, rows.Count >= args.Limit);
         _logger.LogDebug("[QueryHandler] Result JSON ({Length} chars):\n{Json}",
             result.JsonData.Length, result.JsonData);
         _logger.LogDebug("[QueryHandler] ===== QUERY RESULT END =====");
@@ -483,8 +497,9 @@ public class QueryHandler : IToolHandler
             }
         }
 
-        // LIMIT
-        var limit = Math.Min(args.Limit, 100);
+        // LIMIT - ограничиваем максимумом из настроек
+        var maxRows = _settings.QueryMaxRows > 0 ? _settings.QueryMaxRows : 1000;
+        var limit = Math.Min(args.Limit, maxRows);
         query = query.Limit(limit);
 
         return query;

@@ -57,4 +57,53 @@ public class AiProviderConfig
     /// Agent ID (для YandexAgent)
     /// </summary>
     public string? AgentId { get; set; }
+
+    // --- Reasoning mode (для YandexGPT) ---
+
+    /// <summary>
+    /// Режим рассуждений: Disabled, EnabledHidden
+    /// </summary>
+    public ReasoningMode ReasoningMode { get; set; } = ReasoningMode.Disabled;
+
+    /// <summary>
+    /// Уровень рассуждений: Low, Medium, High
+    /// </summary>
+    public ReasoningEffort ReasoningEffort { get; set; } = ReasoningEffort.Low;
+}
+
+/// <summary>
+/// Режим рассуждений для YandexGPT
+/// </summary>
+public enum ReasoningMode
+{
+    /// <summary>
+    /// Режим рассуждений выключен (по умолчанию)
+    /// </summary>
+    Disabled,
+
+    /// <summary>
+    /// Режим рассуждений включен, но цепочка рассуждений не возвращается
+    /// </summary>
+    EnabledHidden
+}
+
+/// <summary>
+/// Уровень рассуждений для YandexGPT
+/// </summary>
+public enum ReasoningEffort
+{
+    /// <summary>
+    /// Приоритет по скорости и экономии токенов
+    /// </summary>
+    Low,
+
+    /// <summary>
+    /// Баланс между скоростью и точностью рассуждений
+    /// </summary>
+    Medium,
+
+    /// <summary>
+    /// Приоритет более полного и тщательного рассуждения
+    /// </summary>
+    High
 }

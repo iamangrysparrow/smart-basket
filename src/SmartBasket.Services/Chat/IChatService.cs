@@ -1,3 +1,4 @@
+using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Llm;
 
 namespace SmartBasket.Services.Chat;
@@ -48,4 +49,26 @@ public interface IChatService
     /// Добавить системное сообщение
     /// </summary>
     void SetSystemPrompt(string systemPrompt);
+
+    /// <summary>
+    /// Поддерживает ли текущий провайдер режим рассуждений
+    /// </summary>
+    bool SupportsReasoning { get; }
+
+    /// <summary>
+    /// Текущий режим рассуждений
+    /// </summary>
+    ReasoningMode CurrentReasoningMode { get; }
+
+    /// <summary>
+    /// Текущий уровень рассуждений
+    /// </summary>
+    ReasoningEffort CurrentReasoningEffort { get; }
+
+    /// <summary>
+    /// Установить параметры режима рассуждений для текущего провайдера
+    /// </summary>
+    /// <param name="mode">Режим рассуждений (null = использовать из конфигурации)</param>
+    /// <param name="effort">Уровень рассуждений (null = использовать из конфигурации)</param>
+    void SetReasoningParameters(ReasoningMode? mode, ReasoningEffort? effort);
 }

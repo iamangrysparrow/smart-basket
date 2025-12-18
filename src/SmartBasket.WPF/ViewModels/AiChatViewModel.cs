@@ -195,9 +195,77 @@ public partial class AiChatViewModel : ObservableObject
     /// </summary>
     public bool HasProviders => AvailableProviders.Count > 0;
 
+    /// <summary>
+    /// Поддерживает ли текущий провайдер режим рассуждений
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReasoningControlsVisible))]
+    private bool _supportsReasoning;
+
+    /// <summary>
+    /// Видимость контролов режима рассуждений
+    /// </summary>
+    public bool ReasoningControlsVisible => SupportsReasoning;
+
+    /// <summary>
+    /// Включен ли режим рассуждений
+    /// </summary>
+    [ObservableProperty]
+    private bool _isReasoningEnabled;
+
+    /// <summary>
+    /// Доступные уровни рассуждений
+    /// </summary>
+    public ObservableCollection<string> ReasoningEffortOptions { get; } = new()
+    {
+        "low",
+        "medium",
+        "high"
+    };
+
+    /// <summary>
+    /// Выбранный уровень рассуждений
+    /// </summary>
+    [ObservableProperty]
+    private string _selectedReasoningEffort = "low";
+
     partial void OnUserInputChanged(string value)
     {
         SendMessageCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsReasoningEnabledChanged(bool value)
+    {
+        UpdateReasoningParameters();
+        Log($"Режим рассуждений {(value ? "включен" : "выключен")}");
+    }
+
+    partial void OnSelectedReasoningEffortChanged(string value)
+    {
+        UpdateReasoningParameters();
+        Log($"Уровень рассуждений изменён на: {value}");
+    }
+
+    /// <summary>
+    /// Обновить параметры режима рассуждений в ChatService
+    /// </summary>
+    private void UpdateReasoningParameters()
+    {
+        if (!SupportsReasoning) return;
+
+        var mode = IsReasoningEnabled
+            ? ReasoningMode.EnabledHidden
+            : ReasoningMode.Disabled;
+
+        var effort = SelectedReasoningEffort switch
+        {
+            "low" => ReasoningEffort.Low,
+            "medium" => ReasoningEffort.Medium,
+            "high" => ReasoningEffort.High,
+            _ => ReasoningEffort.Low
+        };
+
+        _chatService.SetReasoningParameters(mode, effort);
     }
 
     partial void OnSelectedProviderChanged(string? oldValue, string? newValue)
@@ -223,6 +291,16 @@ public partial class AiChatViewModel : ObservableObject
                     Messages.Clear();
                 }
                 Log($"    История UI очищена (смена провайдера)");
+            }
+
+            // Проверяем поддержку режима рассуждений для нового провайдера
+            SupportsReasoning = _chatService.SupportsReasoning;
+            Log($"    SupportsReasoning: {SupportsReasoning}");
+
+            // Если режим рассуждений поддерживается, восстанавливаем текущие настройки
+            if (SupportsReasoning)
+            {
+                UpdateReasoningParameters();
             }
 
             ConnectionStatus = $"Провайдер: {newValue}";

@@ -57,10 +57,10 @@ public class QueryArgs
     public List<OrderByClause>? OrderBy { get; set; }
 
     /// <summary>
-    /// LIMIT (максимум 100)
+    /// LIMIT (по умолчанию 1000, максимум настраивается в appsettings.QueryMaxRows)
     /// </summary>
     [JsonPropertyName("limit")]
-    public int Limit { get; set; } = 20;
+    public int Limit { get; set; } = 1000;
 }
 
 /// <summary>

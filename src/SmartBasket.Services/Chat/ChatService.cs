@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Llm;
 using SmartBasket.Services.Tools;
 using SmartBasket.Services.Tools.Models;
@@ -61,6 +62,80 @@ public class ChatService : IChatService
         _isPrimed = false; // Сбрасываем priming при изменении промпта
         _logger.LogInformation("[ChatService] System prompt set ({Length} chars), priming reset", systemPrompt.Length);
         _logger.LogDebug("[ChatService] System prompt:\n{Prompt}", systemPrompt);
+    }
+
+    /// <summary>
+    /// Поддерживает ли текущий провайдер режим рассуждений
+    /// </summary>
+    public bool SupportsReasoning
+    {
+        get
+        {
+            var provider = GetCurrentProvider();
+            return provider is IReasoningProvider reasoningProvider && reasoningProvider.SupportsReasoning;
+        }
+    }
+
+    /// <summary>
+    /// Текущий режим рассуждений
+    /// </summary>
+    public ReasoningMode CurrentReasoningMode
+    {
+        get
+        {
+            var provider = GetCurrentProvider();
+            if (provider is IReasoningProvider reasoningProvider)
+            {
+                return reasoningProvider.CurrentReasoningMode;
+            }
+            return ReasoningMode.Disabled;
+        }
+    }
+
+    /// <summary>
+    /// Текущий уровень рассуждений
+    /// </summary>
+    public ReasoningEffort CurrentReasoningEffort
+    {
+        get
+        {
+            var provider = GetCurrentProvider();
+            if (provider is IReasoningProvider reasoningProvider)
+            {
+                return reasoningProvider.CurrentReasoningEffort;
+            }
+            return ReasoningEffort.Low;
+        }
+    }
+
+    /// <summary>
+    /// Установить параметры режима рассуждений для текущего провайдера
+    /// </summary>
+    public void SetReasoningParameters(ReasoningMode? mode, ReasoningEffort? effort)
+    {
+        var provider = GetCurrentProvider();
+        if (provider is IReasoningProvider reasoningProvider)
+        {
+            reasoningProvider.SetReasoningParameters(mode, effort);
+            _logger.LogInformation("[ChatService] Reasoning parameters set: Mode={Mode}, Effort={Effort}",
+                mode?.ToString() ?? "(default)", effort?.ToString() ?? "(default)");
+        }
+        else
+        {
+            _logger.LogWarning("[ChatService] Current provider does not support reasoning mode");
+        }
+    }
+
+    /// <summary>
+    /// Получить текущий провайдер (вспомогательный метод)
+    /// </summary>
+    private ILlmProvider? GetCurrentProvider()
+    {
+        if (!string.IsNullOrEmpty(_currentProviderKey))
+        {
+            return _providerFactory.GetProvider(_currentProviderKey);
+        }
+        return _providerFactory.GetProviderForOperation(AiOperation.Chat);
     }
 
     /// <summary>

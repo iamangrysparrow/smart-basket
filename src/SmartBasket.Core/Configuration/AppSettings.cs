@@ -35,4 +35,11 @@ public class AppSettings
     /// </summary>
     public int MaxUiLogEntries { get; set; } = 10000;
 
+    /// <summary>
+    /// Максимальное количество строк в результате query tool.
+    /// Защита от переполнения контекста LLM.
+    /// Default: 1000. Настраивается в appsettings.json: "QueryMaxRows": 1000
+    /// </summary>
+    public int QueryMaxRows { get; set; } = 1000;
+
 }

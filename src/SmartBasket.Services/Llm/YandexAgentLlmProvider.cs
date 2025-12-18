@@ -11,8 +11,9 @@ namespace SmartBasket.Services.Llm;
 /// <summary>
 /// LLM провайдер для Yandex AI Agent (через REST Assistant API)
 /// https://rest-assistant.api.cloud.yandex.net/v1/responses
+/// Примечание: Режим рассуждений для агентов настраивается в AI Studio, а не через API
 /// </summary>
-public class YandexAgentLlmProvider : ILlmProvider
+public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 {
     // REST Assistant API endpoint для Yandex AI Studio агентов
     private const string YandexAgentApiUrl = "https://rest-assistant.api.cloud.yandex.net/v1/responses";
@@ -24,11 +25,51 @@ public class YandexAgentLlmProvider : ILlmProvider
     // ID последнего ответа для поддержки истории диалога
     private string? _lastResponseId;
 
+    // Runtime override для reasoning параметров (устанавливаются из UI)
+    private Core.Configuration.ReasoningMode? _runtimeReasoningMode;
+    private Core.Configuration.ReasoningEffort? _runtimeReasoningEffort;
+
     public string Name => $"YandexAgent/{_config.AgentId}";
 
     public bool SupportsConversationReset => true;
 
     public bool SupportsTools => true; // YandexAgent поддерживает function calling через REST API
+
+    // YandexAgent (Responses API) поддерживает режим рассуждений через параметр reasoning_effort
+    public bool SupportsReasoning => true;
+
+    /// <summary>
+    /// Текущий режим рассуждений (runtime override или из конфигурации)
+    /// </summary>
+    public Core.Configuration.ReasoningMode CurrentReasoningMode =>
+        _runtimeReasoningMode ?? _config.ReasoningMode;
+
+    /// <summary>
+    /// Текущий уровень рассуждений (runtime override или из конфигурации)
+    /// </summary>
+    public Core.Configuration.ReasoningEffort CurrentReasoningEffort =>
+        _runtimeReasoningEffort ?? _config.ReasoningEffort;
+
+    /// <summary>
+    /// Устанавливает параметры режима рассуждений для текущей сессии
+    /// </summary>
+    public void SetReasoningParameters(Core.Configuration.ReasoningMode? mode, Core.Configuration.ReasoningEffort? effort)
+    {
+        _runtimeReasoningMode = mode;
+        _runtimeReasoningEffort = effort;
+        _logger.LogInformation("[YandexAgent] Reasoning parameters set: Mode={Mode}, Effort={Effort}",
+            mode?.ToString() ?? "(default)", effort?.ToString() ?? "(default)");
+    }
+
+    /// <summary>
+    /// Сбрасывает runtime override для reasoning параметров
+    /// </summary>
+    public void ResetReasoningParameters()
+    {
+        _runtimeReasoningMode = null;
+        _runtimeReasoningEffort = null;
+        _logger.LogInformation("[YandexAgent] Reasoning parameters reset to config defaults");
+    }
 
     public void ResetConversation()
     {
@@ -386,6 +427,21 @@ public class YandexAgentLlmProvider : ILlmProvider
                 inputItemsCount = inputList.Count;
             }
 
+            // Определяем reasoning параметры если режим включен
+            string? reasoningEffort = null;
+            ReasoningOptionsDto? reasoningOptions = null;
+            if (CurrentReasoningMode == Core.Configuration.ReasoningMode.EnabledHidden)
+            {
+                reasoningEffort = CurrentReasoningEffort switch
+                {
+                    Core.Configuration.ReasoningEffort.Low => "low",
+                    Core.Configuration.ReasoningEffort.Medium => "medium",
+                    Core.Configuration.ReasoningEffort.High => "high",
+                    _ => "low"
+                };
+                reasoningOptions = new ReasoningOptionsDto { Mode = "ENABLED_HIDDEN" };
+            }
+
             // REST Assistant API формат запроса
             var request = new RestAssistantChatRequest
             {
@@ -393,7 +449,9 @@ public class YandexAgentLlmProvider : ILlmProvider
                 Input = inputData,
                 Stream = true,
                 PreviousResponseId = _lastResponseId,
-                Tools = yandexTools
+                Tools = yandexTools,
+                ReasoningEffort = reasoningEffort,
+                ReasoningOptions = reasoningOptions
             };
 
             var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
@@ -410,6 +468,11 @@ public class YandexAgentLlmProvider : ILlmProvider
             _logger.LogInformation("[YandexAgent Chat] Input items: {Count} (total history: {TotalCount}), Tools: {ToolsCount}",
                 inputItemsCount, messageList.Count, yandexTools?.Count ?? 0);
             _logger.LogInformation("[YandexAgent Chat] Timeout: {Timeout}s", timeoutSeconds);
+            if (!string.IsNullOrEmpty(reasoningEffort))
+            {
+                _logger.LogInformation("[YandexAgent Chat] ReasoningEffort: {ReasoningEffort}, ReasoningOptions.Mode: {Mode}",
+                    reasoningEffort, reasoningOptions?.Mode ?? "null");
+            }
 
             // Полное логирование запроса
             _logger.LogDebug("[YandexAgent Chat] ===== FULL REQUEST JSON START =====");
@@ -1079,6 +1142,31 @@ public class YandexAgentLlmProvider : ILlmProvider
 
         [JsonPropertyName("tools")]
         public List<YandexAgentTool>? Tools { get; set; }
+
+        /// <summary>
+        /// Уровень рассуждений: "low", "medium", "high"
+        /// Yandex Cloud параметр для режима рассуждений
+        /// </summary>
+        [JsonPropertyName("reasoning_effort")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ReasoningEffort { get; set; }
+
+        /// <summary>
+        /// Опции режима рассуждений с параметром mode: "DISABLED" или "ENABLED_HIDDEN"
+        /// Yandex Cloud параметр для нативного API (некоторые модели используют этот формат)
+        /// </summary>
+        [JsonPropertyName("reasoning_options")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ReasoningOptionsDto? ReasoningOptions { get; set; }
+    }
+
+    /// <summary>
+    /// DTO для параметра reasoning_options в Yandex Cloud API
+    /// </summary>
+    private class ReasoningOptionsDto
+    {
+        [JsonPropertyName("mode")]
+        public string Mode { get; set; } = "DISABLED";
     }
 
     // DTO для tools в формате Yandex API

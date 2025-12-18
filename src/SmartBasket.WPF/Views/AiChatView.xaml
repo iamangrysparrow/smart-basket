@@ -132,6 +132,23 @@
 
                 <!-- Buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Reasoning mode controls (visible only for YandexGPT) -->
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,0"
+                                Visibility="{Binding ReasoningControlsVisible, Converter={StaticResource BoolToVis}}">
+                        <CheckBox IsChecked="{Binding IsReasoningEnabled}"
+                                  Content="Рассуждения"
+                                  VerticalAlignment="Center"
+                                  ToolTip="Включить режим рассуждений (reasoning mode)"
+                                  Margin="0,0,8,0"/>
+                        <ComboBox ItemsSource="{Binding ReasoningEffortOptions}"
+                                  SelectedItem="{Binding SelectedReasoningEffort}"
+                                  IsEnabled="{Binding IsReasoningEnabled}"
+                                  MinWidth="80"
+                                  ToolTip="Уровень рассуждений: low (быстро), medium (баланс), high (тщательно)"/>
+                    </StackPanel>
+
                     <!-- Prompt button -->
                     <Button Style="{StaticResource SecondaryButton}"
                             Click="PromptButton_Click"

@@ -9,6 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Режим рассуждений (Reasoning Mode) для YandexGPT и YandexAgent**:
+  - Чекбокс "Рассуждения" в окне чата для включения режима рассуждений
+  - Выбор уровня рассуждений: `low` (быстро), `medium` (баланс), `high` (тщательно)
+  - Параметр `reasoning_effort` в OpenAI-совместимом API и Responses API Yandex Cloud
+  - `IReasoningProvider` интерфейс для провайдеров с поддержкой режима рассуждений
+  - `ReasoningMode` и `ReasoningEffort` enum-ы в конфигурации
+  - Runtime override reasoning параметров через UI (не сохраняются в конфиг)
+  - Автоматическое определение поддержки режима при смене провайдера
+  - Поддержка обоих провайдеров: YandexGPT (OpenAI API) и YandexAgent (Responses API)
 - **UI для редактирования AI Prompts**:
   - `PromptEditorWindow` — модальное окно редактирования промптов
   - Кастомный промпт для каждой операции + провайдера (сохраняется в настройках)
