@@ -53,8 +53,15 @@ public partial class AiChatView : UserControl
 
     private void InputTextBox_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        if (e.Key == Key.Enter)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                // Shift+Enter = new line (allow default behavior for AcceptsReturn=True)
+                return;
+            }
+
+            // Enter without Shift = send message
             if (DataContext is AiChatViewModel viewModel && viewModel.SendMessageCommand.CanExecute(null))
             {
                 viewModel.SendMessageCommand.Execute(null);

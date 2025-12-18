@@ -61,6 +61,7 @@
             <converters:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVis"/>
             <converters:StringNotEqualsToVisibilityConverter x:Key="StringNotEqualsToVis"/>
             <converters:BoolToFontWeightConverter x:Key="BoolToFontWeight"/>
+            <converters:HeightPercentageConverter x:Key="HeightPercentage"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

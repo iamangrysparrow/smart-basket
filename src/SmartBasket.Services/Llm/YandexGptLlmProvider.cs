@@ -274,11 +274,14 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             // Конвертируем tools в OpenAI формат
             var openAiTools = tools != null ? ConvertToolsToOpenAi(tools).ToArray() : null;
 
-            // Определяем параметры режима рассуждений если включен
+            // ВАЖНО: Режим рассуждений (reasoning) несовместим с tool calling в YandexGPT.
+            // Когда включен reasoning, модель игнорирует tools и выводит JSON как текст.
+            // Поэтому отключаем reasoning когда есть tools.
             string? reasoningEffort = null;
             ReasoningOptionsDto? reasoningOptions = null;
+            bool hasTools = openAiTools?.Length > 0;
 
-            if (CurrentReasoningMode == Core.Configuration.ReasoningMode.EnabledHidden)
+            if (!hasTools && CurrentReasoningMode == Core.Configuration.ReasoningMode.EnabledHidden)
             {
                 // reasoning_effort для моделей gpt-oss-*
                 reasoningEffort = CurrentReasoningEffort switch
@@ -291,6 +294,10 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
 
                 // reasoning_options для YandexGPT Pro (нативный Yandex формат)
                 reasoningOptions = new ReasoningOptionsDto { Mode = "ENABLED_HIDDEN" };
+            }
+            else if (hasTools && CurrentReasoningMode == Core.Configuration.ReasoningMode.EnabledHidden)
+            {
+                _logger.LogWarning("[YandexGPT Chat] Reasoning отключен: несовместим с tool calling");
             }
 
             var request = new OpenAiChatRequest
@@ -452,15 +459,25 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
     // ==================== Вспомогательные методы ====================
 
     /// <summary>
-    /// Формирует URI модели в формате gpt://folder_id/model/latest
+    /// Формирует URI модели в формате gpt://folder_id/model/version
+    /// Если модель уже содержит версию (/rc, /latest, /deprecated), не добавляет /latest
     /// </summary>
     private string BuildModelUri()
     {
-        if (_config.Model.StartsWith("general:"))
+        var model = _config.Model;
+
+        // Если модель уже содержит версию - не добавляем /latest
+        if (model.StartsWith("general:") ||
+            model.EndsWith("/rc") ||
+            model.EndsWith("/latest") ||
+            model.EndsWith("/deprecated") ||
+            model.Contains("/latest@"))  // дообученные модели: yandexgpt-lite/latest@suffix
         {
-            return $"gpt://{_config.FolderId}/{_config.Model}";
+            return $"gpt://{_config.FolderId}/{model}";
         }
-        return $"gpt://{_config.FolderId}/{_config.Model}/latest";
+
+        // Для моделей без версии добавляем /latest
+        return $"gpt://{_config.FolderId}/{model}/latest";
     }
 
     /// <summary>

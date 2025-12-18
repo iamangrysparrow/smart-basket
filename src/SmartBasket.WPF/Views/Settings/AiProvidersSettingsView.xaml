@@ -137,13 +137,18 @@
                                   IsEditable="True" FontSize="12" Padding="4,3" Margin="0,0,0,6"
                                   Visibility="{Binding IsOllama, Converter={StaticResource BoolToVis}}"
                                   ItemsSource="{Binding DataContext.OllamaModels, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
-                        <!-- YandexGPT models -->
+                        <!-- YandexGPT models (согласно документации Yandex Cloud) -->
                         <ComboBox Grid.Row="2" Grid.Column="1" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
                                   IsEditable="True" FontSize="12" Padding="4,3" Margin="0,0,0,6"
                                   Visibility="{Binding IsYandexGpt, Converter={StaticResource BoolToVis}}">
-                            <ComboBoxItem Content="yandexgpt-lite"/>
-                            <ComboBoxItem Content="yandexgpt"/>
-                            <ComboBoxItem Content="yandexgpt-32k"/>
+                            <ComboBoxItem Content="yandexgpt/rc" ToolTip="YandexGPT Pro 5.1 (32k контекст, tool calling)"/>
+                            <ComboBoxItem Content="yandexgpt/latest" ToolTip="YandexGPT Pro 5 (32k контекст)"/>
+                            <ComboBoxItem Content="yandexgpt-lite" ToolTip="YandexGPT Lite 5 (32k контекст)"/>
+                            <ComboBoxItem Content="aliceai-llm" ToolTip="Alice AI LLM (32k контекст)"/>
+                            <ComboBoxItem Content="qwen3-235b-a22b-fp8/latest" ToolTip="Qwen3 235B (262k контекст)"/>
+                            <ComboBoxItem Content="gpt-oss-120b/latest" ToolTip="gpt-oss-120b (131k контекст)"/>
+                            <ComboBoxItem Content="gpt-oss-20b/latest" ToolTip="gpt-oss-20b (131k контекст)"/>
+                            <ComboBoxItem Content="gemma-3-27b-it/latest" ToolTip="Gemma 3 27B (131k контекст, vision)"/>
                         </ComboBox>
                         <!-- OpenAI models -->
                         <ComboBox Grid.Row="2" Grid.Column="1" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"

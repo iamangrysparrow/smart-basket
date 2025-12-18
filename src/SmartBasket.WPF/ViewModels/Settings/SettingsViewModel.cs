@@ -656,40 +656,45 @@ public partial class SettingsViewModel : ObservableObject
                     return;
                 }
 
-                // Реальный тест YandexGPT API
-                _log?.Invoke($"[Settings] YandexGPT: тестовый запрос к API...");
+                // Реальный тест YandexGPT API (OpenAI-совместимый endpoint)
+                _log?.Invoke($"[Settings] YandexGPT: тестовый запрос к OpenAI-совместимому API...");
 
                 using var client = _httpClientFactory.CreateClient();
                 client.Timeout = TimeSpan.FromSeconds(30);
 
                 // Формируем modelUri
+                // Если модель уже содержит версию (/rc, /latest, /deprecated), не добавляем /latest
                 var model = SelectedAiProvider.Model ?? "yandexgpt-lite";
                 var folderId = SelectedAiProvider.FolderId;
-                string modelUri = model.StartsWith("general:")
+                bool hasVersion = model.StartsWith("general:") ||
+                                  model.EndsWith("/rc") ||
+                                  model.EndsWith("/latest") ||
+                                  model.EndsWith("/deprecated") ||
+                                  model.Contains("/latest@");
+                string modelUri = hasVersion
                     ? $"gpt://{folderId}/{model}"
                     : $"gpt://{folderId}/{model}/latest";
 
+                // OpenAI-совместимый формат запроса
                 var requestBody = new
                 {
-                    modelUri = modelUri,
-                    completionOptions = new
-                    {
-                        stream = false,
-                        temperature = 0.1,
-                        maxTokens = "10"
-                    },
+                    model = modelUri,
                     messages = new[]
                     {
-                        new { role = "user", text = "Ответь одним словом: Работает" }
-                    }
+                        new { role = "user", content = "Ответь одним словом: Работает" }
+                    },
+                    max_tokens = 10,
+                    temperature = 0.1,
+                    stream = false
                 };
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
+                // OpenAI-совместимый endpoint
                 var request = new System.Net.Http.HttpRequestMessage(
                     System.Net.Http.HttpMethod.Post,
-                    "https://llm.api.cloud.yandex.net/foundationModels/v1/completion")
+                    "https://llm.api.cloud.yandex.net/v1/chat/completions")
                 {
                     Content = content
                 };
@@ -706,7 +711,7 @@ public partial class SettingsViewModel : ObservableObject
                 }
                 request.Headers.Add("x-folder-id", folderId);
 
-                _log?.Invoke($"[Settings] YandexGPT URL: https://llm.api.cloud.yandex.net/foundationModels/v1/completion");
+                _log?.Invoke($"[Settings] YandexGPT URL: https://llm.api.cloud.yandex.net/v1/chat/completions");
                 _log?.Invoke($"[Settings] YandexGPT Model: {modelUri}");
 
                 var response = await client.SendAsync(request);

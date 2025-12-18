@@ -817,6 +817,24 @@ public class ChatService : IChatService
                     };
                 }
             }
+
+            // FALLBACK для YandexGPT: прямые аргументы query без обёртки
+            // Формат: { "table": "Receipts", "columns": [...], ... }
+            // Модель выводит JSON аргументы напрямую, без { "name": "query", "arguments": {...} }
+            if (root.TryGetProperty("table", out var tableProp))
+            {
+                var tableName = tableProp.GetString();
+                if (!string.IsNullOrEmpty(tableName))
+                {
+                    _logger.LogDebug("[ChatService] Detected direct query arguments (table={Table}), wrapping as 'query' tool call", tableName);
+                    return new LlmToolCall
+                    {
+                        Id = Guid.NewGuid().ToString("N")[..8],
+                        Name = "query",
+                        Arguments = json  // Весь JSON — это аргументы для query
+                    };
+                }
+            }
         }
         catch (JsonException)
         {

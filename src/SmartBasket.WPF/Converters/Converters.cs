@@ -246,6 +246,32 @@ public class BoolToFontWeightConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts ActualHeight to percentage value for MaxHeight binding.
+/// Parameter is percentage as double (e.g., 0.25 for 25%)
+/// </summary>
+public class HeightPercentageConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is double height && parameter is double percentage)
+        {
+            return Math.Max(100, height * percentage); // Min 100px
+        }
+        if (value is double h && parameter is string percentStr &&
+            double.TryParse(percentStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var pct))
+        {
+            return Math.Max(100, h * pct); // Min 100px
+        }
+        return 200.0; // Default max height
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Attached behavior for highlighting search text in TextBlock
 /// </summary>
 public static class TextBlockHighlight

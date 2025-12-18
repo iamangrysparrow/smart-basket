@@ -317,19 +317,18 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBox Grid.Column="0"
+                <TextBox x:Name="InputTextBox"
+                         Grid.Column="0"
                          Text="{Binding UserInput, UpdateSourceTrigger=PropertyChanged}"
-                         VerticalContentAlignment="Center"
+                         VerticalContentAlignment="Top"
+                         VerticalScrollBarVisibility="Auto"
                          Padding="12,8"
-                         MaxHeight="100"
+                         MinHeight="40"
+                         MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource HeightPercentage}, ConverterParameter=0.25}"
                          TextWrapping="Wrap"
-                         AcceptsReturn="False"
+                         AcceptsReturn="True"
                          KeyDown="InputTextBox_KeyDown"
-                         IsEnabled="{Binding HasProviders}">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding SendMessageCommand}"/>
-                    </TextBox.InputBindings>
-                </TextBox>
+                         IsEnabled="{Binding HasProviders}"/>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
                     <!-- Cancel button (visible when processing) -->
