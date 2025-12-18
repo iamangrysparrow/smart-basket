@@ -9,11 +9,12 @@ namespace SmartBasket.Services.Llm;
 
 /// <summary>
 /// LLM провайдер для YandexGPT (Yandex Cloud) с поддержкой стриминга и tools
-/// https://cloud.yandex.ru/docs/yandexgpt/api-ref/v1/TextGeneration/completion
+/// Использует OpenAI-совместимый API: https://yandex.cloud/ru/docs/ai-studio/concepts/openai-compatibility
 /// </summary>
 public class YandexGptLlmProvider : ILlmProvider
 {
-    private const string YandexGptApiUrl = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion";
+    // OpenAI-совместимый endpoint для Completions API
+    private const string YandexGptApiUrl = "https://llm.api.cloud.yandex.net/v1/chat/completions";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<YandexGptLlmProvider> _logger;
@@ -23,9 +24,8 @@ public class YandexGptLlmProvider : ILlmProvider
 
     public bool SupportsConversationReset => false;
 
-    // YandexGPT пока не поддерживает native tool calling публично
-    // Используем fallback через prompt injection и парсинг текстового ответа
-    public bool SupportsTools => false;
+    // YandexGPT поддерживает tool calling через OpenAI-совместимый API
+    public bool SupportsTools => true;
 
     public void ResetConversation()
     {
@@ -104,33 +104,20 @@ public class YandexGptLlmProvider : ILlmProvider
             var maxTokens = _config.MaxTokens ?? 2000;
             var temperature = _config.Temperature;
 
-            string modelUri;
-            if (_config.Model.StartsWith("general:"))
-            {
-                modelUri = $"gpt://{_config.FolderId}/{_config.Model}";
-            }
-            else
-            {
-                modelUri = $"gpt://{_config.FolderId}/{_config.Model}/latest";
-            }
+            // OpenAI-совместимый формат модели
+            var modelUri = BuildModelUri();
 
-            var request = new YandexGptRequest
+            // OpenAI-совместимый запрос
+            var request = new OpenAiChatRequest
             {
-                ModelUri = modelUri,
-                CompletionOptions = new YandexCompletionOptions
-                {
-                    Stream = true,
-                    Temperature = temperature,
-                    MaxTokens = maxTokens.ToString()
-                },
+                Model = modelUri,
                 Messages = new[]
                 {
-                    new YandexMessage
-                    {
-                        Role = "user",
-                        Text = prompt
-                    }
-                }
+                    new OpenAiMessage { Role = "user", Content = prompt }
+                },
+                Temperature = temperature,
+                MaxTokens = maxTokens,
+                Stream = true
             };
 
             progress?.Report($"  [YandexGPT] Sending STREAMING request to {YandexGptApiUrl}...");
@@ -140,24 +127,7 @@ public class YandexGptLlmProvider : ILlmProvider
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging),
-                    Encoding.UTF8,
-                    "application/json")
-            };
-
-            if (_config.ApiKey.StartsWith("t1.") || _config.ApiKey.StartsWith("y"))
-            {
-                httpRequest.Headers.Add("Authorization", $"Bearer {_config.ApiKey}");
-            }
-            else
-            {
-                httpRequest.Headers.Add("Authorization", $"Api-Key {_config.ApiKey}");
-            }
-
-            httpRequest.Headers.Add("x-folder-id", _config.FolderId);
+            var httpRequest = CreateHttpRequest(request);
 
             HttpResponseMessage response;
             try
@@ -180,88 +150,17 @@ public class YandexGptLlmProvider : ILlmProvider
                 return result;
             }
 
-            progress?.Report($"  [YandexGPT] === STREAMING RESPONSE ===");
-            var fullResponse = new StringBuilder();
-            var lineBuffer = new StringBuilder();
-
-            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
-            using var reader = new StreamReader(stream);
-
-            while (!reader.EndOfStream)
-            {
-                linkedCts.Token.ThrowIfCancellationRequested();
-
-                var line = await reader.ReadLineAsync(linkedCts.Token);
-                if (string.IsNullOrEmpty(line)) continue;
-
-                try
-                {
-                    var chunk = JsonSerializer.Deserialize<YandexStreamChunk>(line,
-                        LlmJsonOptions.ForParsing);
-
-                    if (chunk?.Result?.Alternatives?.Length > 0)
-                    {
-                        var alternative = chunk.Result.Alternatives[0];
-                        var text = alternative.Message?.Text ?? string.Empty;
-
-                        var newText = text;
-                        if (text.Length > fullResponse.Length)
-                        {
-                            newText = text.Substring(fullResponse.Length);
-                        }
-                        else
-                        {
-                            newText = text.Length == fullResponse.Length ? "" : text;
-                        }
-
-                        if (!string.IsNullOrEmpty(newText))
-                        {
-                            foreach (var ch in newText)
-                            {
-                                if (ch == '\n')
-                                {
-                                    progress?.Report($"  {lineBuffer}");
-                                    lineBuffer.Clear();
-                                }
-                                else
-                                {
-                                    lineBuffer.Append(ch);
-                                }
-                            }
-                        }
-
-                        if (text.Length > fullResponse.Length)
-                        {
-                            fullResponse.Clear();
-                            fullResponse.Append(text);
-                        }
-
-                        if (alternative.Status == "ALTERNATIVE_STATUS_FINAL" ||
-                            alternative.Status == "ALTERNATIVE_STATUS_COMPLETE")
-                        {
-                            if (lineBuffer.Length > 0)
-                            {
-                                progress?.Report($"  {lineBuffer}");
-                                lineBuffer.Clear();
-                            }
-                            break;
-                        }
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Skip malformed lines
-                }
-            }
+            // Парсим OpenAI SSE streaming ответ
+            var (responseText, _) = await ParseOpenAiStreamingResponse(response, progress, linkedCts.Token);
 
             stopwatch.Stop();
             progress?.Report($"  [YandexGPT] === END STREAMING ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
 
-            if (fullResponse.Length > 0)
+            if (!string.IsNullOrEmpty(responseText))
             {
                 result.IsSuccess = true;
-                result.Response = fullResponse.ToString();
-                progress?.Report($"  [YandexGPT] Total response: {fullResponse.Length} chars");
+                result.Response = responseText;
+                progress?.Report($"  [YandexGPT] Total response: {responseText.Length} chars");
             }
             else
             {
@@ -321,40 +220,31 @@ public class YandexGptLlmProvider : ILlmProvider
             var maxTokens = _config.MaxTokens ?? 2000;
             var temperature = _config.Temperature;
 
-            string modelUri;
-            if (_config.Model.StartsWith("general:"))
-            {
-                modelUri = $"gpt://{_config.FolderId}/{_config.Model}";
-            }
-            else
-            {
-                modelUri = $"gpt://{_config.FolderId}/{_config.Model}/latest";
-            }
+            // OpenAI-совместимый формат модели
+            var modelUri = BuildModelUri();
 
-            // Конвертируем сообщения в формат YandexGPT
-            var yandexMessages = ConvertMessages(messages);
+            // Конвертируем сообщения в OpenAI формат
+            var openAiMessages = ConvertMessagesToOpenAi(messages);
 
-            // Конвертируем tools в формат YandexGPT (если поддерживаются)
-            var yandexTools = tools != null && SupportsTools ? ConvertTools(tools) : null;
+            // Конвертируем tools в OpenAI формат
+            var openAiTools = tools != null ? ConvertToolsToOpenAi(tools).ToArray() : null;
 
-            var request = new YandexGptRequestWithTools
+            var request = new OpenAiChatRequest
             {
-                ModelUri = modelUri,
-                CompletionOptions = new YandexCompletionOptions
-                {
-                    Stream = true,
-                    Temperature = temperature,
-                    MaxTokens = maxTokens.ToString()
-                },
-                Messages = yandexMessages,
-                Tools = yandexTools
+                Model = modelUri,
+                Messages = openAiMessages,
+                Temperature = temperature,
+                MaxTokens = maxTokens,
+                Stream = true,
+                Tools = openAiTools?.Length > 0 ? openAiTools : null,
+                ToolChoice = openAiTools?.Length > 0 ? "auto" : null
             };
 
             _logger.LogInformation("[YandexGPT Chat] ========================================");
-            _logger.LogInformation("[YandexGPT Chat] >>> ЗАПРОС К YandexGPT");
+            _logger.LogInformation("[YandexGPT Chat] >>> ЗАПРОС К YandexGPT (OpenAI-совместимый)");
             _logger.LogInformation("[YandexGPT Chat] Model: {Model}", modelUri);
-            _logger.LogInformation("[YandexGPT Chat] Messages count: {Count}", yandexMessages.Length);
-            _logger.LogInformation("[YandexGPT Chat] Tools count: {Count}", yandexTools?.Length ?? 0);
+            _logger.LogInformation("[YandexGPT Chat] Messages count: {Count}", openAiMessages.Length);
+            _logger.LogInformation("[YandexGPT Chat] Tools count: {Count}", openAiTools?.Length ?? 0);
             _logger.LogInformation("[YandexGPT Chat] Temperature: {Temp}, MaxTokens: {MaxTokens}",
                 temperature, maxTokens);
 
@@ -366,24 +256,35 @@ public class YandexGptLlmProvider : ILlmProvider
 
             // Полное логирование каждого сообщения
             _logger.LogDebug("[YandexGPT Chat] ===== MESSAGES DETAIL START =====");
-            for (var i = 0; i < yandexMessages.Length; i++)
+            for (var i = 0; i < openAiMessages.Length; i++)
             {
-                var msg = yandexMessages[i];
-                _logger.LogDebug("[YandexGPT Chat] [{Index}] Role={Role}, Text ({Length} chars)",
-                    i, msg.Role, msg.Text.Length);
-                _logger.LogDebug("[YandexGPT Chat] [{Index}] Text:\n{Text}", i, msg.Text);
+                var msg = openAiMessages[i];
+                _logger.LogDebug("[YandexGPT Chat] [{Index}] Role={Role}, Content ({Length} chars), ToolCallId={ToolCallId}",
+                    i, msg.Role, msg.Content?.Length ?? 0, msg.ToolCallId ?? "(null)");
+                if (!string.IsNullOrEmpty(msg.Content))
+                {
+                    _logger.LogDebug("[YandexGPT Chat] [{Index}] Content:\n{Content}", i, msg.Content);
+                }
+                if (msg.ToolCalls?.Length > 0)
+                {
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        _logger.LogDebug("[YandexGPT Chat] [{Index}] ToolCall: {Name} (id={Id}), Args: {Args}",
+                            i, tc.Function.Name, tc.Id, tc.Function.Arguments);
+                    }
+                }
             }
             _logger.LogDebug("[YandexGPT Chat] ===== MESSAGES DETAIL END =====");
 
             // Полное логирование tools
-            if (yandexTools != null && yandexTools.Length > 0)
+            if (openAiTools != null && openAiTools.Length > 0)
             {
                 _logger.LogDebug("[YandexGPT Chat] ===== TOOLS DETAIL START =====");
-                foreach (var tool in yandexTools)
+                foreach (var tool in openAiTools)
                 {
-                    _logger.LogDebug("[YandexGPT Chat] Tool: {Name}", tool.Function?.Name);
-                    _logger.LogDebug("[YandexGPT Chat]   Description: {Description}", tool.Function?.Description);
-                    if (tool.Function?.Parameters != null)
+                    _logger.LogDebug("[YandexGPT Chat] Tool: {Name}", tool.Function.Name);
+                    _logger.LogDebug("[YandexGPT Chat]   Description: {Description}", tool.Function.Description);
+                    if (tool.Function.Parameters != null)
                     {
                         var paramsJson = JsonSerializer.Serialize(tool.Function.Parameters, LlmJsonOptions.ForLogging);
                         _logger.LogDebug("[YandexGPT Chat]   Parameters:\n{Params}", paramsJson);
@@ -393,28 +294,14 @@ public class YandexGptLlmProvider : ILlmProvider
             }
 
             progress?.Report($"[YandexGPT Chat] >>> ЗАПРОС");
-            progress?.Report($"[YandexGPT Chat] Model: {modelUri}, Messages: {yandexMessages.Length}, Tools: {yandexTools?.Length ?? 0}");
+            progress?.Report($"[YandexGPT Chat] Model: {modelUri}, Messages: {openAiMessages.Length}, Tools: {openAiTools?.Length ?? 0}");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
-            {
-                Content = new StringContent(fullRequestJson, Encoding.UTF8, "application/json")
-            };
-
-            if (_config.ApiKey.StartsWith("t1.") || _config.ApiKey.StartsWith("y"))
-            {
-                httpRequest.Headers.Add("Authorization", $"Bearer {_config.ApiKey}");
-            }
-            else
-            {
-                httpRequest.Headers.Add("Authorization", $"Api-Key {_config.ApiKey}");
-            }
-
-            httpRequest.Headers.Add("x-folder-id", _config.FolderId);
+            var httpRequest = CreateHttpRequest(request);
 
             HttpResponseMessage response;
             try
@@ -437,123 +324,27 @@ public class YandexGptLlmProvider : ILlmProvider
                 return result;
             }
 
-            var fullResponse = new StringBuilder();
-            var lineBuffer = new StringBuilder();
-            var collectedToolCalls = new List<LlmToolCall>();
-
-            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
-            using var reader = new StreamReader(stream);
-
-            while (!reader.EndOfStream)
-            {
-                linkedCts.Token.ThrowIfCancellationRequested();
-
-                var line = await reader.ReadLineAsync(linkedCts.Token);
-                if (string.IsNullOrEmpty(line)) continue;
-
-                try
-                {
-                    var chunk = JsonSerializer.Deserialize<YandexStreamChunkWithTools>(line,
-                        LlmJsonOptions.ForParsing);
-
-                    if (chunk?.Result?.Alternatives?.Length > 0)
-                    {
-                        var alternative = chunk.Result.Alternatives[0];
-                        var text = alternative.Message?.Text ?? string.Empty;
-
-                        var newText = text;
-                        if (text.Length > fullResponse.Length)
-                        {
-                            newText = text.Substring(fullResponse.Length);
-                        }
-                        else
-                        {
-                            newText = text.Length == fullResponse.Length ? "" : text;
-                        }
-
-                        if (!string.IsNullOrEmpty(newText))
-                        {
-                            foreach (var ch in newText)
-                            {
-                                if (ch == '\n')
-                                {
-                                    progress?.Report($"  {lineBuffer}");
-                                    lineBuffer.Clear();
-                                }
-                                else
-                                {
-                                    lineBuffer.Append(ch);
-                                }
-                            }
-                        }
-
-                        if (text.Length > fullResponse.Length)
-                        {
-                            fullResponse.Clear();
-                            fullResponse.Append(text);
-                        }
-
-                        // Обработка tool calls
-                        if (alternative.Message?.ToolCalls != null)
-                        {
-                            foreach (var toolCall in alternative.Message.ToolCalls)
-                            {
-                                if (toolCall?.FunctionCall != null)
-                                {
-                                    var argsJson = toolCall.FunctionCall.Arguments != null
-                                        ? JsonSerializer.Serialize(toolCall.FunctionCall.Arguments)
-                                        : "{}";
-
-                                    collectedToolCalls.Add(new LlmToolCall
-                                    {
-                                        Id = Guid.NewGuid().ToString("N")[..8],
-                                        Name = toolCall.FunctionCall.Name ?? "",
-                                        Arguments = argsJson
-                                    });
-
-                                    _logger.LogInformation("[YandexGPT Chat] Tool call: {Name}({Args})",
-                                        toolCall.FunctionCall.Name, argsJson);
-                                    progress?.Report($"  [Tool Call] {toolCall.FunctionCall.Name}");
-                                }
-                            }
-                        }
-
-                        if (alternative.Status == "ALTERNATIVE_STATUS_FINAL" ||
-                            alternative.Status == "ALTERNATIVE_STATUS_COMPLETE")
-                        {
-                            if (lineBuffer.Length > 0)
-                            {
-                                progress?.Report($"  {lineBuffer}");
-                                lineBuffer.Clear();
-                            }
-                            break;
-                        }
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Skip malformed lines
-                }
-            }
+            // Парсим OpenAI streaming ответ
+            var (responseText, toolCalls) = await ParseOpenAiStreamingResponse(response, progress, linkedCts.Token);
 
             stopwatch.Stop();
 
-            if (fullResponse.Length > 0 || collectedToolCalls.Count > 0)
+            if (!string.IsNullOrEmpty(responseText) || toolCalls.Count > 0)
             {
                 result.IsSuccess = true;
-                result.Response = fullResponse.ToString();
+                result.Response = responseText;
 
-                if (collectedToolCalls.Count > 0)
+                if (toolCalls.Count > 0)
                 {
-                    result.ToolCalls = collectedToolCalls;
-                    _logger.LogInformation("[YandexGPT Chat] <<< TOOL CALLS: {Count}", collectedToolCalls.Count);
+                    result.ToolCalls = toolCalls;
+                    _logger.LogInformation("[YandexGPT Chat] <<< TOOL CALLS: {Count}", toolCalls.Count);
                 }
                 else
                 {
                     _logger.LogInformation("[YandexGPT Chat] <<< ОТВЕТ ПОЛУЧЕН ({Time}s)", stopwatch.Elapsed.TotalSeconds);
                 }
 
-                _logger.LogInformation("[YandexGPT Chat] Response length: {Length} chars", result.Response.Length);
+                _logger.LogInformation("[YandexGPT Chat] Response length: {Length} chars", result.Response?.Length ?? 0);
                 _logger.LogDebug("[YandexGPT Chat] ===== FINAL RESPONSE START =====");
                 _logger.LogDebug("[YandexGPT Chat] Response:\n{Response}", result.Response);
                 _logger.LogDebug("[YandexGPT Chat] ===== FINAL RESPONSE END =====");
@@ -587,47 +378,93 @@ public class YandexGptLlmProvider : ILlmProvider
         return result;
     }
 
-    private YandexMessage[] ConvertMessages(IEnumerable<LlmChatMessage> messages)
+    // ==================== Вспомогательные методы ====================
+
+    /// <summary>
+    /// Формирует URI модели в формате gpt://folder_id/model/latest
+    /// </summary>
+    private string BuildModelUri()
     {
-        var result = new List<YandexMessage>();
+        if (_config.Model.StartsWith("general:"))
+        {
+            return $"gpt://{_config.FolderId}/{_config.Model}";
+        }
+        return $"gpt://{_config.FolderId}/{_config.Model}/latest";
+    }
+
+    /// <summary>
+    /// Создаёт HTTP запрос с правильными заголовками
+    /// </summary>
+    private HttpRequestMessage CreateHttpRequest(OpenAiChatRequest request)
+    {
+        var json = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, YandexGptApiUrl)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        // Авторизация - Bearer для IAM токенов, Api-Key для API ключей
+        if (_config.ApiKey?.StartsWith("t1.") == true || _config.ApiKey?.StartsWith("y") == true)
+        {
+            httpRequest.Headers.Add("Authorization", $"Bearer {_config.ApiKey}");
+        }
+        else
+        {
+            httpRequest.Headers.Add("Authorization", $"Api-Key {_config.ApiKey}");
+        }
+
+        // Folder ID передаётся как project в OpenAI-совместимом API
+        // Но Yandex также принимает x-folder-id для обратной совместимости
+        httpRequest.Headers.Add("x-folder-id", _config.FolderId);
+
+        return httpRequest;
+    }
+
+    /// <summary>
+    /// Конвертирует сообщения из LlmChatMessage в OpenAI формат
+    /// </summary>
+    private OpenAiMessage[] ConvertMessagesToOpenAi(IEnumerable<LlmChatMessage> messages)
+    {
+        var result = new List<OpenAiMessage>();
 
         foreach (var m in messages)
         {
-            // YandexGPT поддерживает только system, user, assistant
-            // Конвертируем tool результаты в user сообщения
             if (m.Role == "tool")
             {
-                // Формируем сообщение с результатом инструмента
-                var toolResult = $"[Результат инструмента {m.ToolCallId}]:\n{m.Content}";
-                result.Add(new YandexMessage
+                // Tool result в OpenAI формате
+                result.Add(new OpenAiMessage
                 {
-                    Role = "user",
-                    Text = toolResult
+                    Role = "tool",
+                    Content = m.Content,
+                    ToolCallId = m.ToolCallId
                 });
             }
             else if (m.Role == "assistant" && m.ToolCalls != null && m.ToolCalls.Count > 0)
             {
-                // Assistant сообщение с tool calls — показываем какой инструмент был вызван
-                var toolCallsInfo = string.Join("\n", m.ToolCalls.Select(tc =>
-                    $"[Вызов инструмента {tc.Name}]: {tc.Arguments}"));
-
-                var text = string.IsNullOrEmpty(m.Content)
-                    ? toolCallsInfo
-                    : $"{m.Content}\n{toolCallsInfo}";
-
-                result.Add(new YandexMessage
+                // Assistant с tool calls
+                result.Add(new OpenAiMessage
                 {
                     Role = "assistant",
-                    Text = text
+                    Content = m.Content,
+                    ToolCalls = m.ToolCalls.Select(tc => new OpenAiToolCall
+                    {
+                        Id = tc.Id,
+                        Type = "function",
+                        Function = new OpenAiFunctionCall
+                        {
+                            Name = tc.Name,
+                            Arguments = tc.Arguments
+                        }
+                    }).ToArray()
                 });
             }
             else
             {
-                // Обычное сообщение
-                result.Add(new YandexMessage
+                // Обычное сообщение (user, assistant, system)
+                result.Add(new OpenAiMessage
                 {
                     Role = m.Role,
-                    Text = m.Content ?? ""
+                    Content = m.Content
                 });
             }
         }
@@ -635,76 +472,191 @@ public class YandexGptLlmProvider : ILlmProvider
         return result.ToArray();
     }
 
-    private YandexTool[] ConvertTools(IEnumerable<ToolDefinition> tools)
+    /// <summary>
+    /// Конвертирует tools в OpenAI формат
+    /// </summary>
+    private IEnumerable<OpenAiTool> ConvertToolsToOpenAi(IEnumerable<ToolDefinition> tools)
     {
-        return tools.Select(t => new YandexTool
+        return tools.Select(t => new OpenAiTool
         {
-            Function = new YandexToolFunction
+            Type = "function",
+            Function = new OpenAiFunction
             {
                 Name = t.Name,
                 Description = t.Description,
                 Parameters = t.ParametersSchema
             }
-        }).ToArray();
+        });
     }
 
-    // DTOs for YandexGPT API
-    private class YandexGptRequest
+    /// <summary>
+    /// Парсит OpenAI SSE streaming ответ
+    /// Формат: data: {...}\n\ndata: {...}\n\ndata: [DONE]
+    /// </summary>
+    private async Task<(string ResponseText, List<LlmToolCall> ToolCalls)> ParseOpenAiStreamingResponse(
+        HttpResponseMessage response,
+        IProgress<string>? progress,
+        CancellationToken ct)
     {
-        [JsonPropertyName("modelUri")]
-        public string ModelUri { get; set; } = string.Empty;
+        var fullResponse = new StringBuilder();
+        var toolCalls = new List<LlmToolCall>();
+        var toolCallsInProgress = new Dictionary<int, (string Id, string Name, StringBuilder Args)>();
 
-        [JsonPropertyName("completionOptions")]
-        public YandexCompletionOptions CompletionOptions { get; set; } = new();
+        progress?.Report($"  [YandexGPT] === STREAMING RESPONSE ===");
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var line = await reader.ReadLineAsync(ct);
+            if (string.IsNullOrEmpty(line)) continue;
+
+            // OpenAI SSE формат: "data: {...}" или "data: [DONE]"
+            if (!line.StartsWith("data: ")) continue;
+
+            var data = line.Substring(6); // Убираем "data: "
+
+            if (data == "[DONE]")
+            {
+                break;
+            }
+
+            try
+            {
+                var chunk = JsonSerializer.Deserialize<OpenAiStreamChunk>(data, LlmJsonOptions.ForParsing);
+                if (chunk?.Choices == null || chunk.Choices.Length == 0) continue;
+
+                var choice = chunk.Choices[0];
+                var delta = choice.Delta;
+
+                // Обработка текстового контента
+                if (!string.IsNullOrEmpty(delta?.Content))
+                {
+                    fullResponse.Append(delta.Content);
+                    progress?.Report($"  {delta.Content}");
+                }
+
+                // Обработка tool calls (streaming формат - приходят по частям)
+                if (delta?.ToolCalls != null)
+                {
+                    foreach (var tc in delta.ToolCalls)
+                    {
+                        if (!toolCallsInProgress.TryGetValue(tc.Index, out var inProgress))
+                        {
+                            // Новый tool call
+                            inProgress = (tc.Id ?? "", tc.Function?.Name ?? "", new StringBuilder());
+                            toolCallsInProgress[tc.Index] = inProgress;
+
+                            _logger.LogInformation("[YandexGPT Chat] Tool call started: {Name} (id={Id})",
+                                tc.Function?.Name, tc.Id);
+                            progress?.Report($"  [Tool Call] {tc.Function?.Name}");
+                        }
+
+                        // Накапливаем аргументы (приходят по частям)
+                        if (!string.IsNullOrEmpty(tc.Function?.Arguments))
+                        {
+                            inProgress.Args.Append(tc.Function.Arguments);
+                            toolCallsInProgress[tc.Index] = inProgress;
+                        }
+                    }
+                }
+
+                // Проверяем finish_reason
+                if (choice.FinishReason == "tool_calls" || choice.FinishReason == "stop")
+                {
+                    break;
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogDebug("[YandexGPT Chat] JSON parse error: {Error}, Data: {Data}", ex.Message, data);
+            }
+        }
+
+        // Собираем tool calls из накопленных данных
+        foreach (var (index, (id, name, args)) in toolCallsInProgress)
+        {
+            if (!string.IsNullOrEmpty(name))
+            {
+                var argsStr = args.ToString();
+                if (string.IsNullOrEmpty(argsStr)) argsStr = "{}";
+
+                toolCalls.Add(new LlmToolCall
+                {
+                    Id = string.IsNullOrEmpty(id) ? Guid.NewGuid().ToString("N")[..8] : id,
+                    Name = name,
+                    Arguments = argsStr
+                });
+
+                _logger.LogInformation("[YandexGPT Chat] Tool call completed: {Name}({Args})", name, argsStr);
+            }
+        }
+
+        return (fullResponse.ToString(), toolCalls);
+    }
+
+    // ==================== OpenAI-совместимые DTOs ====================
+
+    // Запрос в формате OpenAI chat.completions
+    private class OpenAiChatRequest
+    {
+        [JsonPropertyName("model")]
+        public string Model { get; set; } = string.Empty;
 
         [JsonPropertyName("messages")]
-        public YandexMessage[] Messages { get; set; } = Array.Empty<YandexMessage>();
-    }
-
-    private class YandexGptRequestWithTools
-    {
-        [JsonPropertyName("modelUri")]
-        public string ModelUri { get; set; } = string.Empty;
-
-        [JsonPropertyName("completionOptions")]
-        public YandexCompletionOptions CompletionOptions { get; set; } = new();
-
-        [JsonPropertyName("messages")]
-        public YandexMessage[] Messages { get; set; } = Array.Empty<YandexMessage>();
-
-        [JsonPropertyName("tools")]
-        public YandexTool[]? Tools { get; set; }
-    }
-
-    private class YandexCompletionOptions
-    {
-        [JsonPropertyName("stream")]
-        public bool Stream { get; set; }
+        public OpenAiMessage[] Messages { get; set; } = Array.Empty<OpenAiMessage>();
 
         [JsonPropertyName("temperature")]
         public double Temperature { get; set; }
 
-        [JsonPropertyName("maxTokens")]
-        public string MaxTokens { get; set; } = "2000";
+        [JsonPropertyName("max_tokens")]
+        public int MaxTokens { get; set; }
+
+        [JsonPropertyName("stream")]
+        public bool Stream { get; set; }
+
+        [JsonPropertyName("tools")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public OpenAiTool[]? Tools { get; set; }
+
+        [JsonPropertyName("tool_choice")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ToolChoice { get; set; }
     }
 
-    private class YandexMessage
+    // Сообщение OpenAI формата
+    private class OpenAiMessage
     {
         [JsonPropertyName("role")]
         public string Role { get; set; } = "user";
 
-        [JsonPropertyName("text")]
-        public string Text { get; set; } = string.Empty;
+        [JsonPropertyName("content")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Content { get; set; }
+
+        [JsonPropertyName("tool_calls")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public OpenAiToolCall[]? ToolCalls { get; set; }
+
+        [JsonPropertyName("tool_call_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ToolCallId { get; set; }
     }
 
-    // Tool DTOs
-    private class YandexTool
+    // Tool в формате OpenAI
+    private class OpenAiTool
     {
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "function";
+
         [JsonPropertyName("function")]
-        public YandexToolFunction? Function { get; set; }
+        public OpenAiFunction Function { get; set; } = new();
     }
 
-    private class YandexToolFunction
+    private class OpenAiFunction
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
@@ -716,97 +668,94 @@ public class YandexGptLlmProvider : ILlmProvider
         public object? Parameters { get; set; }
     }
 
-    // Streaming response chunk
-    private class YandexStreamChunk
+    // Tool call в ответе модели (OpenAI формат)
+    private class OpenAiToolCall
     {
-        [JsonPropertyName("result")]
-        public YandexGptResult? Result { get; set; }
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "function";
+
+        [JsonPropertyName("function")]
+        public OpenAiFunctionCall Function { get; set; } = new();
     }
 
-    private class YandexStreamChunkWithTools
+    private class OpenAiFunctionCall
     {
-        [JsonPropertyName("result")]
-        public YandexGptResultWithTools? Result { get; set; }
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("arguments")]
+        public string Arguments { get; set; } = "{}";
     }
 
-    private class YandexGptResult
+    // ==================== OpenAI Streaming Response DTOs ====================
+
+    // SSE chunk: data: {...}
+    private class OpenAiStreamChunk
     {
-        [JsonPropertyName("alternatives")]
-        public YandexAlternative[]? Alternatives { get; set; }
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
 
-        [JsonPropertyName("usage")]
-        public YandexUsage? Usage { get; set; }
+        [JsonPropertyName("object")]
+        public string? Object { get; set; }
 
-        [JsonPropertyName("modelVersion")]
-        public string? ModelVersion { get; set; }
+        [JsonPropertyName("created")]
+        public long? Created { get; set; }
+
+        [JsonPropertyName("model")]
+        public string? Model { get; set; }
+
+        [JsonPropertyName("choices")]
+        public OpenAiStreamChoice[]? Choices { get; set; }
     }
 
-    private class YandexGptResultWithTools
+    private class OpenAiStreamChoice
     {
-        [JsonPropertyName("alternatives")]
-        public YandexAlternativeWithTools[]? Alternatives { get; set; }
+        [JsonPropertyName("index")]
+        public int Index { get; set; }
 
-        [JsonPropertyName("usage")]
-        public YandexUsage? Usage { get; set; }
+        [JsonPropertyName("delta")]
+        public OpenAiDelta? Delta { get; set; }
 
-        [JsonPropertyName("modelVersion")]
-        public string? ModelVersion { get; set; }
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
     }
 
-    private class YandexAlternative
-    {
-        [JsonPropertyName("message")]
-        public YandexMessage? Message { get; set; }
-
-        [JsonPropertyName("status")]
-        public string? Status { get; set; }
-    }
-
-    private class YandexAlternativeWithTools
-    {
-        [JsonPropertyName("message")]
-        public YandexMessageWithToolCalls? Message { get; set; }
-
-        [JsonPropertyName("status")]
-        public string? Status { get; set; }
-    }
-
-    private class YandexMessageWithToolCalls
+    private class OpenAiDelta
     {
         [JsonPropertyName("role")]
-        public string Role { get; set; } = "assistant";
+        public string? Role { get; set; }
 
-        [JsonPropertyName("text")]
-        public string Text { get; set; } = string.Empty;
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
 
-        [JsonPropertyName("toolCalls")]
-        public YandexToolCall[]? ToolCalls { get; set; }
+        [JsonPropertyName("tool_calls")]
+        public OpenAiDeltaToolCall[]? ToolCalls { get; set; }
     }
 
-    private class YandexToolCall
+    private class OpenAiDeltaToolCall
     {
-        [JsonPropertyName("functionCall")]
-        public YandexFunctionCall? FunctionCall { get; set; }
+        [JsonPropertyName("index")]
+        public int Index { get; set; }
+
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("type")]
+        public string? Type { get; set; }
+
+        [JsonPropertyName("function")]
+        public OpenAiDeltaFunction? Function { get; set; }
     }
 
-    private class YandexFunctionCall
+    private class OpenAiDeltaFunction
     {
         [JsonPropertyName("name")]
         public string? Name { get; set; }
 
         [JsonPropertyName("arguments")]
-        public object? Arguments { get; set; }
-    }
-
-    private class YandexUsage
-    {
-        [JsonPropertyName("inputTextTokens")]
-        public string? InputTextTokens { get; set; }
-
-        [JsonPropertyName("completionTokens")]
-        public string? CompletionTokens { get; set; }
-
-        [JsonPropertyName("totalTokens")]
-        public string? TotalTokens { get; set; }
+        public string? Arguments { get; set; }
     }
 }
