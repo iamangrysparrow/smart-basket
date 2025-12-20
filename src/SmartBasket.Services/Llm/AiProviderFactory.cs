@@ -8,8 +8,24 @@ namespace SmartBasket.Services.Llm;
 /// </summary>
 public enum AiOperation
 {
+    /// <summary>
+    /// Этап 1: Выделение продукта из названия товара (Item → Product name)
+    /// </summary>
+    ProductExtraction,
+
+    /// <summary>
+    /// Этап 2: Классификация продукта в иерархию (Product → Category hierarchy)
+    /// </summary>
     Classification,
+
+    /// <summary>
+    /// Назначение меток товарам
+    /// </summary>
     Labels,
+
+    /// <summary>
+    /// AI чат с пользователем
+    /// </summary>
     Chat
 }
 
@@ -78,6 +94,7 @@ public class AiProviderFactory : IAiProviderFactory
     {
         var key = operation switch
         {
+            AiOperation.ProductExtraction => _settings.AiOperations.ProductExtraction,
             AiOperation.Classification => _settings.AiOperations.Classification,
             AiOperation.Labels => _settings.AiOperations.Labels,
             AiOperation.Chat => _settings.AiOperations.Chat,

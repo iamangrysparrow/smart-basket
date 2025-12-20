@@ -58,13 +58,13 @@ public class ProductViewModel
     public ProductViewModel(Product product)
     {
         Id = product.Id;
-        ParentId = product.ParentId;
+        CategoryId = product.CategoryId;
         Name = product.Name;
         ItemsCount = product.Items?.Count ?? 0;
     }
 
     public Guid Id { get; set; }
-    public Guid? ParentId { get; set; }
+    public Guid? CategoryId { get; set; }
     public string Name { get; set; } = string.Empty;
     public int ItemsCount { get; set; }
 }
@@ -136,6 +136,11 @@ public partial class ProductTreeItemViewModel : ObservableObject
 
     public bool IsSpecialNode { get; set; }
     public bool IsAllNode { get; set; }
+
+    /// <summary>
+    /// True if this is a product (leaf node), false if category
+    /// </summary>
+    public bool IsProduct { get; set; }
 
     public ObservableCollection<ProductTreeItemViewModel> Children { get; } = new();
 

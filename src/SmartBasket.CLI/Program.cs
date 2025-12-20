@@ -1208,9 +1208,23 @@ async Task<int> TestChatServiceAsync(AppSettings appSettings, string? providerKe
 
             chatService.SetSystemPrompt(systemPrompt);
 
-            var progress = new Progress<string>(msg =>
+            var progress = new Progress<ChatProgress>(p =>
             {
-                Console.WriteLine($"  {msg}");
+                switch (p.Type)
+                {
+                    case ChatProgressType.TextDelta:
+                        Console.Write(p.Text);
+                        break;
+                    case ChatProgressType.ToolCall:
+                        Console.WriteLine($"\n  [Tool: {p.ToolName}]");
+                        break;
+                    case ChatProgressType.ToolResult:
+                        Console.WriteLine($"  [Result: {(p.ToolSuccess == true ? "OK" : "Error")}]");
+                        break;
+                    case ChatProgressType.Complete:
+                        Console.WriteLine("\n  [Complete]");
+                        break;
+                }
             });
 
             var sw = Stopwatch.StartNew();

@@ -6,8 +6,15 @@ namespace SmartBasket.Core.Configuration;
 public class AiOperationsConfig
 {
     /// <summary>
-    /// Ключ провайдера для классификации товаров (Item → Product)
+    /// Этап 1: Ключ провайдера для выделения продукта из названия товара (Item → Product name).
+    /// Нормализует название: убирает бренды, объёмы, маркировки.
     /// Формат: "Provider/Model", например "Ollama/llama3.2:3b"
+    /// </summary>
+    public string? ProductExtraction { get; set; }
+
+    /// <summary>
+    /// Этап 2: Ключ провайдера для классификации продуктов в иерархию (Product → Category hierarchy)
+    /// Формат: "Provider/Model", например "YandexGPT/yandexgpt-lite"
     /// </summary>
     public string? Classification { get; set; }
 

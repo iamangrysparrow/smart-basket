@@ -114,7 +114,7 @@ public class ReceiptExportService : IReceiptExportService
             {
                 Id = item.Item.Product.Id,
                 Name = item.Item.Product.Name,
-                Category = item.Item.Product.Parent?.Name
+                Category = item.Item.Product.Category?.Name
             };
         }
 

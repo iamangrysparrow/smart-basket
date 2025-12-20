@@ -17,11 +17,12 @@ public class ItemService : IItemService
     {
         IQueryable<Item> query = _db.Items
             .Include(i => i.Product)
+                .ThenInclude(p => p!.Category)
             .Include(i => i.ReceiptItems)
             .Include(i => i.ItemLabels)
                 .ThenInclude(il => il.Label);
 
-        // Filter by product IDs (for hierarchy)
+        // Filter by product IDs
         if (filter.ProductIds != null && filter.ProductIds.Count > 0)
         {
             query = query.Where(i => filter.ProductIds.Contains(i.ProductId));
@@ -29,6 +30,22 @@ public class ItemService : IItemService
         else if (filter.ProductId.HasValue)
         {
             query = query.Where(i => i.ProductId == filter.ProductId.Value);
+        }
+
+        // Filter by category IDs
+        if (filter.CategoryIds != null && filter.CategoryIds.Count > 0)
+        {
+            query = query.Where(i => i.Product != null && i.Product.CategoryId.HasValue && filter.CategoryIds.Contains(i.Product.CategoryId.Value));
+        }
+        else if (filter.CategoryId.HasValue)
+        {
+            query = query.Where(i => i.Product != null && i.Product.CategoryId == filter.CategoryId.Value);
+        }
+
+        // Filter items without category
+        if (filter.WithoutCategory == true)
+        {
+            query = query.Where(i => i.Product == null || !i.Product.CategoryId.HasValue);
         }
 
         // Filter by label

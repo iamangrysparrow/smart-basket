@@ -19,6 +19,11 @@ public partial class AiOperationsSettingsView : UserControl
 
     private SettingsViewModel? SettingsViewModel => DataContext as SettingsViewModel;
 
+    private void EditProductExtractionPrompt_Click(object sender, RoutedEventArgs e)
+    {
+        EditPrompt("ProductExtraction", SettingsViewModel?.AiOperations.ProductExtraction);
+    }
+
     private void EditClassificationPrompt_Click(object sender, RoutedEventArgs e)
     {
         EditPrompt("Classification", SettingsViewModel?.AiOperations.Classification);
@@ -77,6 +82,18 @@ public partial class AiOperationsSettingsView : UserControl
     {
         var vm = SettingsViewModel;
         if (vm == null) return;
+
+        // ProductExtraction indicator
+        var extractionProvider = vm.AiOperations.ProductExtraction;
+        if (!string.IsNullOrWhiteSpace(extractionProvider) &&
+            vm.AiOperations.HasCustomPrompt("ProductExtraction", extractionProvider))
+        {
+            ProductExtractionPromptIndicator.Text = " (настроен)";
+        }
+        else
+        {
+            ProductExtractionPromptIndicator.Text = "";
+        }
 
         // Classification indicator
         var classificationProvider = vm.AiOperations.Classification;

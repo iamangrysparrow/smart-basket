@@ -49,6 +49,10 @@ public partial class MainWindow : Window
         _chatService = chatService;
         DataContext = viewModel;
 
+        // Set ProductsItemsView DataContext early (before Loaded event fires)
+        // This prevents binding errors when the view tries to bind to MainViewModel
+        ProductsItemsViewControl.DataContext = _productsItemsViewModel;
+
         // Enable thread-safe collection access BEFORE any async operations
         viewModel.EnableCollectionSynchronization();
         viewModel.EnableCategoryCollectionSynchronization();
@@ -95,9 +99,6 @@ public partial class MainWindow : Window
     {
         LogPanel.Visibility = Visibility.Visible;
 
-        // Set DataContext for ProductsItemsView
-        ProductsItemsViewControl.DataContext = _productsItemsViewModel;
-
         // Auto-load receipts on startup (first tab is Чеки)
         _viewModel.LoadReceiptsCommand.Execute(null);
     }
@@ -118,15 +119,19 @@ public partial class MainWindow : Window
         switch (MainTabControl.SelectedIndex)
         {
             case 0: // Чеки
-                // Load receipts if not already loaded
-                if (_viewModel.Receipts.Count == 0 && !_viewModel.IsProcessing)
+                // Refresh receipts when switching to this tab
+                if (!_viewModel.IsProcessing)
                 {
                     _viewModel.LoadReceiptsCommand.Execute(null);
                 }
                 break;
 
             case 1: // Продукты
-                // ProductsItemsView handles its own loading in UserControl_Loaded
+                // Refresh products/categories when switching to this tab
+                if (!_productsItemsViewModel.IsBusy)
+                {
+                    _productsItemsViewModel.RefreshCommand.Execute(null);
+                }
                 break;
         }
     }

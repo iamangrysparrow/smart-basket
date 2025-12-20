@@ -1,6 +1,12 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <!-- Default TreeViewItem style to prevent binding errors -->
+    <Style TargetType="TreeViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
     <!-- ProductsTreeView - TreeView for products/categories panel -->
     <Style x:Key="ProductsTreeView" TargetType="TreeView">
         <Setter Property="Background" Value="Transparent"/>

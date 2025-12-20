@@ -10,7 +10,7 @@ namespace SmartBasket.Services.Products;
 public interface IProductCleanupService
 {
     /// <summary>
-    /// Удалить Products без связанных Items и без дочерних Products
+    /// Удалить Products без связанных Items
     /// </summary>
     /// <returns>Количество удалённых Products</returns>
     Task<int> CleanupOrphanedProductsAsync(CancellationToken cancellationToken = default);
@@ -28,15 +28,13 @@ public class OrphanedProductInfo
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public Guid? ParentId { get; set; }
-    public string? ParentName { get; set; }
+    public Guid? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
 }
 
 /// <summary>
 /// Сервис очистки осиротевших продуктов
-/// Удаляет Products которые:
-/// - Не имеют связанных Items (через Item.ProductId)
-/// - Не являются родителями других Products (через Product.ParentId)
+/// Удаляет Products которые не имеют связанных Items (через Item.ProductId)
 /// </summary>
 public class ProductCleanupService : IProductCleanupService
 {
@@ -63,8 +61,6 @@ public class ProductCleanupService : IProductCleanupService
 
         _logger.LogInformation("Found {Count} orphaned products to delete", orphaned.Count);
 
-        // Удаляем в порядке: сначала дочерние (без ParentId среди orphaned), потом родительские
-        // Но так как мы уже отфильтровали только те, у которых нет дочерних - порядок не важен
         var orphanedIds = orphaned.Select(o => o.Id).ToList();
 
         var productsToDelete = await _dbContext.Products
@@ -86,32 +82,23 @@ public class ProductCleanupService : IProductCleanupService
 
     public async Task<List<OrphanedProductInfo>> GetOrphanedProductsAsync(CancellationToken cancellationToken = default)
     {
-        // Находим Products которые:
-        // 1. Не имеют связанных Items
-        // 2. Не являются родителями других Products
+        // Находим Products которые не имеют связанных Items
 
         // Подзапрос: ID Products у которых есть Items
         var productsWithItems = _dbContext.Items
             .Select(i => i.ProductId)
             .Distinct();
 
-        // Подзапрос: ID Products которые являются родителями
-        var parentProducts = _dbContext.Products
-            .Where(p => p.ParentId != null)
-            .Select(p => p.ParentId!.Value)
-            .Distinct();
-
-        // Находим orphaned: не в первом и не во втором множестве
+        // Находим orphaned: не в множестве products с Items
         var orphanedProducts = await _dbContext.Products
-            .Include(p => p.Parent)
+            .Include(p => p.Category)
             .Where(p => !productsWithItems.Contains(p.Id))
-            .Where(p => !parentProducts.Contains(p.Id))
             .Select(p => new OrphanedProductInfo
             {
                 Id = p.Id,
                 Name = p.Name,
-                ParentId = p.ParentId,
-                ParentName = p.Parent != null ? p.Parent.Name : null
+                CategoryId = p.CategoryId,
+                CategoryName = p.Category != null ? p.Category.Name : null
             })
             .ToListAsync(cancellationToken);
 

@@ -52,11 +52,8 @@
 │                                                             │            │
 │                                                    ┌────────▼─────────┐  │
 │                                                    │  Tool Handlers   │  │
-│                                                    │  - get_receipts  │  │
-│                                                    │  - get_items     │  │
-│                                                    │  - get_products  │  │
-│                                                    │  - get_labels    │  │
-│                                                    │  - ...           │  │
+│                                                    │  - describe_data │  │
+│                                                    │  - query         │  │
 │                                                    └──────────────────┘  │
 │                                                                           │
 │  SendAsync(userMessage):                                                  │
@@ -128,9 +125,31 @@ get_receipts - Получить список чеков
 ```
 
 ChatService парсит текстовый ответ, ища:
-1. JSON в code block: `\`\`\`json {...} \`\`\``
-2. Голый JSON: `{"name": "...", "arguments": {...}}`
-3. Function call формат: `get_receipts({"date_from": "2024-10-01"})`
+1. `[TOOL_CALL_START]` формат (YandexGPT fallback): `[TOOL_CALL_START]query\n{...}`
+2. JSON в code block: `\`\`\`json {...} \`\`\``
+3. Голый JSON: `{"name": "...", "arguments": {...}}`
+4. Function call формат: `get_receipts({"date_from": "2024-10-01"})`
+5. Теги `<tool_request>` / `<tool_response>` (qwen)
+6. Прямой JSON аргументов query (если есть `"table":`)
+
+### Формат [TOOL_CALL_START] (YandexGPT fallback)
+
+YandexGPT (без native tool calling) может выводить инструменты в текстовом формате:
+
+```
+Для получения информации мне нужно запросить данные.
+
+[TOOL_CALL_START]query
+{"columns":["Items.Name","Products.Name"],"joins":[{"on":["Receipts.Id","ReceiptItems.ReceiptId"],"table":"ReceiptItems"}],"limit":100,"table":"Receipts"}
+```
+
+`ChatService.TryParseToolCallStartFormat()`:
+1. Ищет `[TOOL_CALL_START]` в тексте ответа
+2. Извлекает имя инструмента (до `\n` или `{`)
+3. Парсит JSON с балансировкой скобок `{` / `}`
+4. Возвращает `LlmToolCall` если JSON валидный
+
+Текст **до** `[TOOL_CALL_START]` — это рассуждения модели. Они возвращаются в `result.Response` и отображаются пользователю.
 
 ### Обработка DeepSeek-R1 "thinking"
 
@@ -792,4 +811,4 @@ dotnet run --project SmartBasket.CLI -- test-query
 
 ---
 
-*Последнее обновление: 16.12.2025*
+*Последнее обновление: 21.12.2025*

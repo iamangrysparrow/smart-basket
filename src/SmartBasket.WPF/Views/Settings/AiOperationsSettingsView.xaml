@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="400" d:DesignWidth="600">
+             d:DesignHeight="500" d:DesignWidth="600">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -21,83 +21,113 @@
 
         <!-- Operations Configuration -->
         <Border Grid.Row="1" Style="{StaticResource Card}">
-            <StackPanel DataContext="{Binding AiOperations}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding AiOperations}">
 
-                <!-- Classification -->
-                <GroupBox Header="Классификация товаров" Style="{StaticResource ModernGroupBox}">
-                    <StackPanel>
-                        <TextBlock Text="Автоматическое распределение товаров (Item) по продуктам (Product)"
-                                   Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                    <!-- Product Extraction (Stage 1) -->
+                    <GroupBox Header="Этап 1: Выделение продукта" Style="{StaticResource ModernGroupBox}">
+                        <StackPanel>
+                            <TextBlock Text="Нормализация названия товара: удаление брендов, объёмов, маркировок. Быстрая модель."
+                                       Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Column="1" Text="{Binding Classification, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                      IsEditable="True" FontSize="12" Padding="4,3"/>
-                        </Grid>
-                        <!-- Edit Prompt Link -->
-                        <TextBlock Margin="100,6,0,0">
-                            <Hyperlink Click="EditClassificationPrompt_Click"
-                                       TextDecorations="None"
-                                       Foreground="{DynamicResource AccentBrush}">
-                                <Run Text="Редактировать промпт"/>
-                            </Hyperlink>
-                            <Run x:Name="ClassificationPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
-                        </TextBlock>
-                    </StackPanel>
-                </GroupBox>
+                                <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" Text="{Binding ProductExtraction, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          IsEditable="True" FontSize="12" Padding="4,3"/>
+                            </Grid>
+                            <!-- Edit Prompt Link -->
+                            <TextBlock Margin="100,6,0,0">
+                                <Hyperlink Click="EditProductExtractionPrompt_Click"
+                                           TextDecorations="None"
+                                           Foreground="{DynamicResource AccentBrush}">
+                                    <Run Text="Редактировать промпт"/>
+                                </Hyperlink>
+                                <Run x:Name="ProductExtractionPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </GroupBox>
 
-                <!-- Labels -->
-                <GroupBox Header="Назначение меток" Style="{StaticResource ModernGroupBox}">
-                    <StackPanel>
-                        <TextBlock Text="Автоматическое присвоение меток (Labels) товарам"
-                                   Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                    <!-- Classification (Stage 2) -->
+                    <GroupBox Header="Этап 2: Классификация продуктов" Style="{StaticResource ModernGroupBox}">
+                        <StackPanel>
+                            <TextBlock Text="Построение иерархии категорий для продуктов. Умная модель для сложной классификации."
+                                       Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Column="1" Text="{Binding Labels, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                      IsEditable="True" FontSize="12" Padding="4,3"/>
-                        </Grid>
-                        <!-- Edit Prompt Link -->
-                        <TextBlock Margin="100,6,0,0">
-                            <Hyperlink Click="EditLabelsPrompt_Click"
-                                       TextDecorations="None"
-                                       Foreground="{DynamicResource AccentBrush}">
-                                <Run Text="Редактировать промпт"/>
-                            </Hyperlink>
-                            <Run x:Name="LabelsPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
-                        </TextBlock>
-                    </StackPanel>
-                </GroupBox>
+                                <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" Text="{Binding Classification, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          IsEditable="True" FontSize="12" Padding="4,3"/>
+                            </Grid>
+                            <!-- Edit Prompt Link -->
+                            <TextBlock Margin="100,6,0,0">
+                                <Hyperlink Click="EditClassificationPrompt_Click"
+                                           TextDecorations="None"
+                                           Foreground="{DynamicResource AccentBrush}">
+                                    <Run Text="Редактировать промпт"/>
+                                </Hyperlink>
+                                <Run x:Name="ClassificationPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </GroupBox>
 
-                <!-- Info -->
-                <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="4" Padding="12" Margin="0,8,0,0">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap">
-                            <Run FontWeight="SemiBold">Подсказка:</Run>
-                            <LineBreak/>
-                            Выберите провайдер из списка доступных или введите ключ вручную в формате "Provider/Model".
-                            <LineBreak/>
-                            Например: Ollama/llama3.2:3b или YandexGPT/yandexgpt-lite
-                            <LineBreak/>
-                            <LineBreak/>
-                            Оставьте поле пустым, чтобы отключить операцию.
-                            <LineBreak/>
-                            <LineBreak/>
-                            <Run FontWeight="SemiBold">Промпты:</Run> для каждой операции можно настроить свой промпт под конкретного провайдера.
-                        </TextBlock>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                    <!-- Labels -->
+                    <GroupBox Header="Назначение меток" Style="{StaticResource ModernGroupBox}">
+                        <StackPanel>
+                            <TextBlock Text="Автоматическое присвоение меток (Labels) товарам"
+                                       Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" Text="{Binding Labels, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          IsEditable="True" FontSize="12" Padding="4,3"/>
+                            </Grid>
+                            <!-- Edit Prompt Link -->
+                            <TextBlock Margin="100,6,0,0">
+                                <Hyperlink Click="EditLabelsPrompt_Click"
+                                           TextDecorations="None"
+                                           Foreground="{DynamicResource AccentBrush}">
+                                    <Run Text="Редактировать промпт"/>
+                                </Hyperlink>
+                                <Run x:Name="LabelsPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Info -->
+                    <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap">
+                                <Run FontWeight="SemiBold">Подсказка:</Run>
+                                <LineBreak/>
+                                Выберите провайдер из списка доступных или введите ключ вручную в формате "Provider/Model".
+                                <LineBreak/>
+                                Например: Ollama/llama3.2:3b или YandexGPT/yandexgpt-lite
+                                <LineBreak/>
+                                <LineBreak/>
+                                Оставьте поле пустым, чтобы отключить операцию.
+                                <LineBreak/>
+                                <LineBreak/>
+                                <Run FontWeight="SemiBold">Промпты:</Run> для каждой операции можно настроить свой промпт под конкретного провайдера.
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </UserControl>

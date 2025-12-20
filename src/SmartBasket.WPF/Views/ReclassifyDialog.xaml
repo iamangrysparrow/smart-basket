@@ -1,0 +1,118 @@
+<Window x:Class="SmartBasket.WPF.Views.ReclassifyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Реклассификация продуктов"
+        Width="800" Height="600"
+        MinWidth="600" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource BackgroundBaseBrush}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock x:Name="HeaderText"
+                       Text="Промпт для реклассификации"
+                       Style="{StaticResource SubtitleText}"
+                       Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+            <TextBlock x:Name="CategoryInfoText"
+                       Style="{StaticResource CaptionText}"
+                       Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                       Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Prompt TextBox -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="4">
+            <TextBox x:Name="PromptTextBox"
+                     AcceptsReturn="True"
+                     AcceptsTab="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled"
+                     FontFamily="Consolas"
+                     FontSize="12"
+                     Padding="8"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+        </Border>
+
+        <!-- Stats row -->
+        <Grid Grid.Row="2" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="StatsText"
+                       Style="{StaticResource CaptionText}"
+                       Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+
+            <TextBlock Grid.Column="1"
+                       x:Name="CharCountText"
+                       Style="{StaticResource CaptionText}"
+                       Foreground="{DynamicResource ForegroundTertiaryBrush}"/>
+        </Grid>
+
+        <!-- Progress area -->
+        <Border Grid.Row="3" x:Name="ProgressPanel" Visibility="Collapsed"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,12,0,0">
+            <StackPanel>
+                <TextBlock x:Name="ProgressText"
+                           Text="Отправка запроса..."
+                           Style="{StaticResource BodyText}"
+                           Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                <ProgressBar x:Name="ProgressBar"
+                             IsIndeterminate="True"
+                             Height="4"
+                             Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Result area -->
+        <Border Grid.Row="3" x:Name="ResultPanel" Visibility="Collapsed"
+                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,12,0,0">
+            <StackPanel>
+                <TextBlock x:Name="ResultText"
+                           Style="{StaticResource BodyText}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="CancelButton"
+                    Content="Отмена"
+                    Style="{StaticResource SecondaryButton}"
+                    Click="CancelButton_Click"
+                    Width="100"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="SendButton"
+                    Content="Отправить"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="SendButton_Click"
+                    Width="120"/>
+        </StackPanel>
+    </Grid>
+</Window>

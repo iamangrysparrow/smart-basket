@@ -24,7 +24,8 @@ public class DescribeDataHandler : IToolHandler
         return new ToolDefinition(
             Name: Name,
             Description: "Получить схему базы данных и примеры данных с полными связями. " +
-                         "Вызови ОДИН РАЗ в начале диалога чтобы понять структуру данных.",
+                         "Вызови ОДИН РАЗ в начале диалога чтобы понять структуру данных." +
+                         "Функция вернет описание и ПРИМЕР данных. Внимание! Данные ПРИМЕРНЫЕ! Для получения реальных данных необходимо использовать инструмент query!",
             ParametersSchema: new
             {
                 type = "object",
@@ -315,42 +316,78 @@ public class DescribeDataHandler : IToolHandler
 
         if (productId == Guid.Empty) return hierarchy;
 
-        var currentId = productId;
-        int level = 1;
+        // Получаем продукт и его категорию
+        var product = await _db.Products
+            .Where(p => p.Id == productId)
+            .Select(p => new { p.Id, p.Name, p.CategoryId })
+            .FirstOrDefaultAsync(ct);
+
+        if (product == null) return hierarchy;
+
+        // Добавляем продукт
+        hierarchy.Add(new
+        {
+            id = product.Id,
+            name = product.Name,
+            type = "product",
+            level = 1
+        });
+
+        // Строим иерархию категорий если есть
+        if (product.CategoryId.HasValue)
+        {
+            var categoryHierarchy = await GetCategoryHierarchyAsync(product.CategoryId.Value, ct);
+
+            // Пересчитываем уровни и добавляем в начало
+            int categoryLevel = 1;
+            foreach (var cat in categoryHierarchy)
+            {
+                hierarchy.Insert(0, new
+                {
+                    id = ((dynamic)cat).id,
+                    name = ((dynamic)cat).name,
+                    type = "category",
+                    level = categoryLevel++
+                });
+            }
+
+            // Обновляем уровень продукта
+            hierarchy[hierarchy.Count - 1] = new
+            {
+                id = product.Id,
+                name = product.Name,
+                type = "product",
+                level = categoryHierarchy.Count + 1
+            };
+        }
+
+        return hierarchy;
+    }
+
+    private async Task<List<object>> GetCategoryHierarchyAsync(Guid categoryId, CancellationToken ct)
+    {
+        var hierarchy = new List<object>();
+        var currentId = categoryId;
         var visited = new HashSet<Guid>();
 
         while (currentId != Guid.Empty && !visited.Contains(currentId))
         {
             visited.Add(currentId);
 
-            var product = await _db.Products
-                .Where(p => p.Id == currentId)
-                .Select(p => new { p.Id, p.Name, p.ParentId })
+            var category = await _db.ProductCategories
+                .Where(c => c.Id == currentId)
+                .Select(c => new { c.Id, c.Name, c.ParentId })
                 .FirstOrDefaultAsync(ct);
 
-            if (product == null) break;
+            if (category == null) break;
 
             hierarchy.Insert(0, new
             {
-                id = product.Id,
-                name = product.Name,
-                level
+                id = category.Id,
+                name = category.Name
             });
 
-            currentId = product.ParentId ?? Guid.Empty;
-            level++;
-        }
-
-        // Пересчитываем уровни сверху вниз
-        for (int i = 0; i < hierarchy.Count; i++)
-        {
-            var h = (dynamic)hierarchy[i];
-            hierarchy[i] = new
-            {
-                id = h.id,
-                name = h.name,
-                level = i + 1
-            };
+            currentId = category.ParentId ?? Guid.Empty;
         }
 
         return hierarchy;

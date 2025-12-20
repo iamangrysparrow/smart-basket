@@ -62,6 +62,11 @@
             <converters:StringNotEqualsToVisibilityConverter x:Key="StringNotEqualsToVis"/>
             <converters:BoolToFontWeightConverter x:Key="BoolToFontWeight"/>
             <converters:HeightPercentageConverter x:Key="HeightPercentage"/>
+            <converters:NullToVisibilityConverter x:Key="NotNullToVis"/>
+            <converters:InverseNullToVisibilityConverter x:Key="NullToVis"/>
+            <converters:NullableBoolToVisibilityConverter x:Key="NullableBoolToVis"/>
+            <converters:BoolToExpandIconConverter x:Key="BoolToExpandIcon"/>
+            <converters:ViewModeToTextConverter x:Key="ViewModeToText"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

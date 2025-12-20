@@ -16,22 +16,29 @@ public partial class ProductDialog : Window
         set => NameTextBox.Text = value;
     }
 
+    // Legacy support for old code using SelectedParentId
     public Guid? SelectedParentId
     {
-        get => (ParentComboBox.SelectedItem as ParentItem)?.Id;
+        get => SelectedCategoryId;
+        set => SelectedCategoryId = value;
+    }
+
+    public Guid? SelectedCategoryId
+    {
+        get => (CategoryComboBox.SelectedItem as CategoryItem)?.Id;
         set
         {
             if (value == null)
             {
-                ParentComboBox.SelectedIndex = 0;
+                CategoryComboBox.SelectedIndex = 0;
             }
             else
             {
-                foreach (var item in ParentComboBox.Items.OfType<ParentItem>())
+                foreach (var item in CategoryComboBox.Items.OfType<CategoryItem>())
                 {
                     if (item.Id == value)
                     {
-                        ParentComboBox.SelectedItem = item;
+                        CategoryComboBox.SelectedItem = item;
                         break;
                     }
                 }
@@ -39,35 +46,41 @@ public partial class ProductDialog : Window
         }
     }
 
-    public void SetAvailableParents(IList<ProductTreeItemViewModel> products)
+    // Legacy support for old code
+    public void SetAvailableParents(IList<ProductTreeItemViewModel> categories)
     {
-        var items = new List<ParentItem>
-        {
-            new() { Id = null, DisplayName = "(Нет - корневой)" }
-        };
-
-        foreach (var product in products)
-        {
-            if (product.IsSpecialNode) continue;
-            AddProductWithChildren(items, product, 0);
-        }
-
-        ParentComboBox.ItemsSource = items;
-        ParentComboBox.SelectedIndex = 0;
+        SetAvailableCategories(categories);
     }
 
-    private void AddProductWithChildren(List<ParentItem> items, ProductTreeItemViewModel product, int depth)
+    public void SetAvailableCategories(IList<ProductTreeItemViewModel> categories)
+    {
+        var items = new List<CategoryItem>
+        {
+            new() { Id = null, DisplayName = "(Без категории)" }
+        };
+
+        foreach (var category in categories)
+        {
+            if (category.IsSpecialNode) continue;
+            AddCategoryWithChildren(items, category, 0);
+        }
+
+        CategoryComboBox.ItemsSource = items;
+        CategoryComboBox.SelectedIndex = 0;
+    }
+
+    private void AddCategoryWithChildren(List<CategoryItem> items, ProductTreeItemViewModel category, int depth)
     {
         var indent = new string(' ', depth * 3);
-        items.Add(new ParentItem
+        items.Add(new CategoryItem
         {
-            Id = product.Id,
-            DisplayName = $"{indent}{product.Name}"
+            Id = category.Id,
+            DisplayName = $"{indent}{category.Name}"
         });
 
-        foreach (var child in product.Children)
+        foreach (var child in category.Children)
         {
-            AddProductWithChildren(items, child, depth + 1);
+            AddCategoryWithChildren(items, child, depth + 1);
         }
     }
 
@@ -83,7 +96,7 @@ public partial class ProductDialog : Window
         DialogResult = true;
     }
 
-    public class ParentItem
+    public class CategoryItem
     {
         public Guid? Id { get; set; }
         public string DisplayName { get; set; } = string.Empty;

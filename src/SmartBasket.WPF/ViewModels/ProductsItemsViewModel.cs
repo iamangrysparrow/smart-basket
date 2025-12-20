@@ -4,9 +4,31 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using SmartBasket.Core.Entities;
+using SmartBasket.Services.Llm;
 using SmartBasket.Services.Products;
 
 namespace SmartBasket.WPF.ViewModels;
+
+/// <summary>
+/// Mode for left panel display
+/// </summary>
+public enum ProductsViewMode
+{
+    /// <summary>
+    /// Flat list of products sorted alphabetically
+    /// </summary>
+    Products,
+
+    /// <summary>
+    /// Hierarchical view by categories
+    /// </summary>
+    ByCategories,
+
+    /// <summary>
+    /// Labels view
+    /// </summary>
+    Labels
+}
 
 /// <summary>
 /// ViewModel for Products & Items tab
@@ -14,35 +36,74 @@ namespace SmartBasket.WPF.ViewModels;
 public partial class ProductsItemsViewModel : ObservableObject
 {
     private readonly IProductService _productService;
+    public readonly IProductCategoryService _categoryService;
     private readonly ILabelService _labelService;
     private readonly IItemService _itemService;
+    public readonly IProductClassificationService _classificationService;
 
     public ProductsItemsViewModel(
         IProductService productService,
+        IProductCategoryService categoryService,
         ILabelService labelService,
-        IItemService itemService)
+        IItemService itemService,
+        IProductClassificationService classificationService)
     {
         _productService = productService;
+        _categoryService = categoryService;
         _labelService = labelService;
         _itemService = itemService;
+        _classificationService = classificationService;
     }
 
     #region Mode
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsProductsMode))]
+    [NotifyPropertyChangedFor(nameof(IsCategoriesMode))]
     [NotifyPropertyChangedFor(nameof(IsLabelsMode))]
     [NotifyPropertyChangedFor(nameof(ShowIncludeChildren))]
-    private bool _isProductsMode = true;
+    [NotifyPropertyChangedFor(nameof(ShowProductsList))]
+    [NotifyPropertyChangedFor(nameof(ShowCategoriesTree))]
+    [NotifyPropertyChangedFor(nameof(ShowLabelsList))]
+    private ProductsViewMode _viewMode = ProductsViewMode.Products;
 
-    public bool IsLabelsMode => !IsProductsMode;
-    public bool ShowIncludeChildren => IsProductsMode;
-
-    partial void OnIsProductsModeChanged(bool value)
+    public bool IsProductsMode
     {
-        if (value)
-            LoadProductTreeCommand.Execute(null);
-        else
-            LoadLabelsCommand.Execute(null);
+        get => ViewMode == ProductsViewMode.Products;
+        set { if (value) ViewMode = ProductsViewMode.Products; }
+    }
+
+    public bool IsCategoriesMode
+    {
+        get => ViewMode == ProductsViewMode.ByCategories;
+        set { if (value) ViewMode = ProductsViewMode.ByCategories; }
+    }
+
+    public bool IsLabelsMode
+    {
+        get => ViewMode == ProductsViewMode.Labels;
+        set { if (value) ViewMode = ProductsViewMode.Labels; }
+    }
+
+    public bool ShowProductsList => ViewMode == ProductsViewMode.Products;
+    public bool ShowCategoriesTree => ViewMode == ProductsViewMode.ByCategories;
+    public bool ShowLabelsList => ViewMode == ProductsViewMode.Labels;
+    public bool ShowIncludeChildren => ViewMode == ProductsViewMode.ByCategories;
+
+    partial void OnViewModeChanged(ProductsViewMode value)
+    {
+        switch (value)
+        {
+            case ProductsViewMode.Products:
+                LoadProductListCommand.Execute(null);
+                break;
+            case ProductsViewMode.ByCategories:
+                LoadCategoryTreeCommand.Execute(null);
+                break;
+            case ProductsViewMode.Labels:
+                LoadLabelsCommand.Execute(null);
+                break;
+        }
     }
 
     #endregion
@@ -76,43 +137,68 @@ public partial class ProductsItemsViewModel : ObservableObject
     partial void OnSelectedLabelEmptinessFilterChanged(string value) => FilterLabels();
     partial void OnMasterSearchTextChanged(string value)
     {
-        if (IsProductsMode)
-            FilterProductTree();
-        else
-            FilterLabels();
+        switch (ViewMode)
+        {
+            case ProductsViewMode.Products:
+                FilterProductList();
+                break;
+            case ProductsViewMode.ByCategories:
+                FilterCategoryTree();
+                break;
+            case ProductsViewMode.Labels:
+                FilterLabels();
+                break;
+        }
     }
 
     #endregion
 
-    #region Products Tree
+    #region Products List (flat)
 
-    public ObservableCollection<ProductTreeItemViewModel> ProductTree { get; } = new();
-    private readonly object _productTreeLock = new();
+    public ObservableCollection<ProductListItemViewModel> ProductList { get; } = new();
+    private readonly object _productListLock = new();
+    private List<ProductListItemViewModel> _fullProductList = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditProduct))]
     [NotifyPropertyChangedFor(nameof(CanDeleteProduct))]
-    [NotifyPropertyChangedFor(nameof(CanAddChildProduct))]
-    private ProductTreeItemViewModel? _selectedProduct;
+    private ProductListItemViewModel? _selectedProductItem;
 
-    public bool CanEditProduct => SelectedProduct != null && !SelectedProduct.IsSpecialNode;
+    public bool CanEditProduct => SelectedProductItem != null && !SelectedProductItem.IsSpecialNode;
+    public bool CanDeleteProduct => SelectedProductItem != null
+                                    && !SelectedProductItem.IsSpecialNode
+                                    && SelectedProductItem.ItemCount == 0;
 
-    /// <summary>
-    /// Can add child: any product except "All" node
-    /// </summary>
-    public bool CanAddChildProduct => SelectedProduct != null && !SelectedProduct.IsAllNode;
-
-    /// <summary>
-    /// Can delete: must be non-special, have no children and no items
-    /// </summary>
-    public bool CanDeleteProduct => SelectedProduct != null
-                                    && !SelectedProduct.IsSpecialNode
-                                    && !SelectedProduct.HasChildren
-                                    && SelectedProduct.ItemCount == 0;
-
-    partial void OnSelectedProductChanged(ProductTreeItemViewModel? value)
+    partial void OnSelectedProductItemChanged(ProductListItemViewModel? value)
     {
-        if (IsProductsMode && value != null)
+        if (!_skipAutoLoad && IsProductsMode && value != null)
+            LoadItemsCommand.Execute(null);
+    }
+
+    #endregion
+
+    #region Categories Tree
+
+    public ObservableCollection<ProductTreeItemViewModel> CategoryTree { get; } = new();
+    private readonly object _categoryTreeLock = new();
+    private List<ProductTreeItemViewModel> _fullCategoryTree = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEditCategory))]
+    [NotifyPropertyChangedFor(nameof(CanDeleteCategory))]
+    [NotifyPropertyChangedFor(nameof(CanAddChildCategory))]
+    private ProductTreeItemViewModel? _selectedCategory;
+
+    public bool CanEditCategory => SelectedCategory != null && !SelectedCategory.IsSpecialNode;
+    public bool CanAddChildCategory => SelectedCategory != null && !SelectedCategory.IsAllNode;
+    public bool CanDeleteCategory => SelectedCategory != null
+                                    && !SelectedCategory.IsSpecialNode
+                                    && !SelectedCategory.HasChildren
+                                    && SelectedCategory.ItemCount == 0;
+
+    partial void OnSelectedCategoryChanged(ProductTreeItemViewModel? value)
+    {
+        if (!_skipAutoLoad && IsCategoriesMode && value != null)
             LoadItemsCommand.Execute(null);
     }
 
@@ -133,7 +219,7 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     partial void OnSelectedLabelChanged(LabelListItemViewModel? value)
     {
-        if (IsLabelsMode && value != null)
+        if (!_skipAutoLoad && IsLabelsMode && value != null)
             LoadItemsCommand.Execute(null);
     }
 
@@ -161,6 +247,9 @@ public partial class ProductsItemsViewModel : ObservableObject
     private int _totalProductsCount;
 
     [ObservableProperty]
+    private int _totalCategoriesCount;
+
+    [ObservableProperty]
     private int _totalItemsCount;
 
     [ObservableProperty]
@@ -182,6 +271,11 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     public bool IsNotBusy => !IsBusy;
 
+    /// <summary>
+    /// Flag to skip auto-loading items when selection changes during refresh
+    /// </summary>
+    private bool _skipAutoLoad;
+
     [ObservableProperty]
     private string _statusText = string.Empty;
 
@@ -191,7 +285,8 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     public void EnableCollectionSynchronization()
     {
-        BindingOperations.EnableCollectionSynchronization(ProductTree, _productTreeLock);
+        BindingOperations.EnableCollectionSynchronization(ProductList, _productListLock);
+        BindingOperations.EnableCollectionSynchronization(CategoryTree, _categoryTreeLock);
         BindingOperations.EnableCollectionSynchronization(Labels, _labelsLock);
         BindingOperations.EnableCollectionSynchronization(Items, _itemsLock);
         BindingOperations.EnableCollectionSynchronization(ShopFilters, _shopFiltersLock);
@@ -200,20 +295,40 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     #endregion
 
-    #region Product Tree Filtering
+    #region Filtering
 
-    // Full tree for filtering (cached)
-    private List<ProductTreeItemViewModel> _fullProductTree = new();
-
-    // Full labels for filtering (cached)
     private List<LabelListItemViewModel> _fullLabels = new();
 
-    private void FilterProductTree()
+    private void FilterProductList()
+    {
+        var searchText = MasterSearchText?.Trim() ?? string.Empty;
+        var hasSearch = !string.IsNullOrWhiteSpace(searchText);
+
+        lock (_productListLock)
+        {
+            ProductList.Clear();
+
+            foreach (var item in _fullProductList)
+            {
+                if (item.IsSpecialNode)
+                {
+                    ProductList.Add(item);
+                    continue;
+                }
+
+                if (hasSearch && !item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                ProductList.Add(item);
+            }
+        }
+    }
+
+    private void FilterCategoryTree()
     {
         var searchText = MasterSearchText?.Trim() ?? string.Empty;
 
-        // Apply search highlighting and expansion to all items
-        foreach (var item in _fullProductTree)
+        foreach (var item in _fullCategoryTree)
         {
             if (item.IsAllNode)
             {
@@ -224,11 +339,6 @@ public partial class ProductsItemsViewModel : ObservableObject
                 item.ApplySearch(searchText);
             }
         }
-
-        // If no search - just show full tree (highlighting already cleared)
-        // If search - show items that match (already expanded via ApplySearch)
-        // We don't hide non-matching items because the tree structure is needed
-        // Instead we just highlight matching items
     }
 
     private void FilterLabels()
@@ -243,10 +353,8 @@ public partial class ProductsItemsViewModel : ObservableObject
 
             foreach (var item in _fullLabels)
             {
-                // Special nodes (All, Without Labels) always shown unless emptiness filter
                 if (item.IsSpecialNode)
                 {
-                    // For emptiness filter, hide "All" if filtering
                     if (hasEmptinessFilter && item.IsAllNode)
                         continue;
 
@@ -254,11 +362,9 @@ public partial class ProductsItemsViewModel : ObservableObject
                     continue;
                 }
 
-                // Apply search filter
                 if (hasSearchFilter && !item.Name.ToLowerInvariant().Contains(searchLower))
                     continue;
 
-                // Apply emptiness filter
                 if (SelectedLabelEmptinessFilter == "Непустые" && item.ItemCount == 0)
                     continue;
                 if (SelectedLabelEmptinessFilter == "Пустые" && item.ItemCount > 0)
@@ -274,73 +380,45 @@ public partial class ProductsItemsViewModel : ObservableObject
     #region Commands - Load Data
 
     [RelayCommand]
-    private async Task LoadProductTreeAsync()
-    {
-        await LoadProductTreeAsync(preserveState: false);
-    }
-
-    private async Task LoadProductTreeAsync(bool preserveState, Guid? selectProductId = null)
+    private async Task LoadProductListAsync()
     {
         if (IsBusy) return;
         IsBusy = true;
 
         try
         {
-            // Save current state before reload
-            HashSet<Guid> expandedIds = new();
-            var selectedId = selectProductId ?? SelectedProduct?.Id;
+            var products = await _productService.GetAllSortedAsync();
 
-            if (preserveState)
+            lock (_productListLock)
             {
-                foreach (var item in _fullProductTree)
-                {
-                    item.CollectExpandedIds(expandedIds);
-                }
-            }
-
-            var products = await _productService.GetAllWithHierarchyAsync();
-
-            lock (_productTreeLock)
-            {
-                ProductTree.Clear();
-                _fullProductTree.Clear();
+                ProductList.Clear();
+                _fullProductList.Clear();
 
                 // Add "All" node
-                var allCount = products.Sum(p => CountItemsRecursive(p));
-                var allNode = new ProductTreeItemViewModel
+                var allCount = products.Sum(p => p.Items?.Count ?? 0);
+                var allNode = new ProductListItemViewModel
                 {
                     Name = "Все",
-                    Icon = "📁",
                     ItemCount = allCount,
                     IsSpecialNode = true,
                     IsAllNode = true
                 };
-                ProductTree.Add(allNode);
-                _fullProductTree.Add(allNode);
+                ProductList.Add(allNode);
+                _fullProductList.Add(allNode);
 
-                // Build tree from root products
-                var rootProducts = products.Where(p => p.ParentId == null).OrderBy(p => p.Name);
-                foreach (var product in rootProducts)
+                // Add products
+                foreach (var product in products)
                 {
-                    var treeItem = BuildProductTreeItem(product, products);
-                    ProductTree.Add(treeItem);
-                    _fullProductTree.Add(treeItem);
-                }
-
-                // Restore expanded state
-                if (preserveState && expandedIds.Count > 0)
-                {
-                    foreach (var item in _fullProductTree)
+                    var item = new ProductListItemViewModel
                     {
-                        item.RestoreExpandedState(expandedIds);
-                    }
+                        Id = product.Id,
+                        Name = product.Name,
+                        ItemCount = product.Items?.Count ?? 0,
+                        CategoryName = product.Category?.Name
+                    };
+                    ProductList.Add(item);
+                    _fullProductList.Add(item);
                 }
-            }
-
-            // Restore selection
-            if (selectedId.HasValue)
-            {
-                SelectedProduct = FindProductById(ProductTree, selectedId.Value);
             }
 
             var (totalProducts, totalItems) = await _productService.GetStatisticsAsync();
@@ -353,38 +431,176 @@ public partial class ProductsItemsViewModel : ObservableObject
         }
     }
 
-    private ProductTreeItemViewModel BuildProductTreeItem(Product product, IReadOnlyList<Product> allProducts)
+    [RelayCommand]
+    private async Task LoadCategoryTreeAsync()
     {
+        await LoadCategoryTreeAsync(preserveState: false);
+    }
+
+    private async Task LoadCategoryTreeAsync(bool preserveState, Guid? selectCategoryId = null)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+
+        try
+        {
+            HashSet<Guid> expandedIds = new();
+            var selectedId = selectCategoryId ?? SelectedCategory?.Id;
+
+            if (preserveState)
+            {
+                foreach (var item in _fullCategoryTree)
+                {
+                    item.CollectExpandedIds(expandedIds);
+                }
+            }
+
+            var categories = await _categoryService.GetAllWithHierarchyAsync();
+            var products = await _productService.GetAllAsync();
+
+            // Group products by category
+            var productsByCategory = products
+                .Where(p => p.CategoryId.HasValue)
+                .GroupBy(p => p.CategoryId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Products without category
+            var uncategorizedProducts = products.Where(p => !p.CategoryId.HasValue).ToList();
+
+            lock (_categoryTreeLock)
+            {
+                CategoryTree.Clear();
+                _fullCategoryTree.Clear();
+
+                // Add "All" node
+                var allCount = products.Sum(p => p.Items?.Count ?? 0);
+                var allNode = new ProductTreeItemViewModel
+                {
+                    Name = "Все",
+                    Icon = "📁",
+                    ItemCount = allCount,
+                    IsSpecialNode = true,
+                    IsAllNode = true
+                };
+                CategoryTree.Add(allNode);
+                _fullCategoryTree.Add(allNode);
+
+                // Build tree from root categories
+                var rootCategories = categories.Where(c => c.ParentId == null).OrderBy(c => c.Name);
+                foreach (var category in rootCategories)
+                {
+                    var treeItem = BuildCategoryTreeItem(category, categories, productsByCategory);
+                    CategoryTree.Add(treeItem);
+                    _fullCategoryTree.Add(treeItem);
+                }
+
+                // Add uncategorized products node if any
+                if (uncategorizedProducts.Count > 0)
+                {
+                    var uncategorizedNode = new ProductTreeItemViewModel
+                    {
+                        Name = "Без категории",
+                        Icon = "📁",
+                        ItemCount = uncategorizedProducts.Sum(p => p.Items?.Count ?? 0),
+                        IsSpecialNode = true,
+                        IsProduct = false
+                    };
+
+                    // Add uncategorized products as children
+                    foreach (var product in uncategorizedProducts.OrderBy(p => p.Name))
+                    {
+                        var productNode = new ProductTreeItemViewModel
+                        {
+                            Id = product.Id,
+                            Name = product.Name,
+                            Icon = "📦",
+                            ItemCount = product.Items?.Count ?? 0,
+                            IsProduct = true
+                        };
+                        uncategorizedNode.Children.Add(productNode);
+                    }
+
+                    CategoryTree.Add(uncategorizedNode);
+                    _fullCategoryTree.Add(uncategorizedNode);
+                }
+
+                // Restore expanded state
+                if (preserveState && expandedIds.Count > 0)
+                {
+                    foreach (var item in _fullCategoryTree)
+                    {
+                        item.RestoreExpandedState(expandedIds);
+                    }
+                }
+            }
+
+            // Restore selection
+            if (selectedId.HasValue)
+            {
+                SelectedCategory = FindCategoryById(CategoryTree, selectedId.Value);
+            }
+
+            var (totalCategories, totalProducts, totalItems) = await _categoryService.GetStatisticsAsync();
+            TotalCategoriesCount = totalCategories;
+            TotalProductsCount = totalProducts;
+            TotalItemsCount = totalItems;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private ProductTreeItemViewModel BuildCategoryTreeItem(
+        ProductCategory category,
+        IReadOnlyList<ProductCategory> allCategories,
+        Dictionary<Guid, List<Product>> productsByCategory)
+    {
+        var itemCount = 0;
+        List<Product>? categoryProducts = null;
+        if (productsByCategory.TryGetValue(category.Id, out categoryProducts))
+        {
+            itemCount = categoryProducts.Sum(p => p.Items?.Count ?? 0);
+        }
+
         var item = new ProductTreeItemViewModel
         {
-            Id = product.Id,
-            ParentId = product.ParentId,
-            Name = product.Name,
-            Icon = "📦",
-            ItemCount = product.Items?.Count ?? 0
+            Id = category.Id,
+            ParentId = category.ParentId,
+            Name = category.Name,
+            Icon = "📁",
+            ItemCount = itemCount,
+            IsProduct = false
         };
 
-        var children = allProducts.Where(p => p.ParentId == product.Id).OrderBy(p => p.Name);
-        foreach (var child in children)
+        // Add child categories first
+        var childCategories = allCategories.Where(c => c.ParentId == category.Id).OrderBy(c => c.Name);
+        foreach (var child in childCategories)
         {
-            item.Children.Add(BuildProductTreeItem(child, allProducts));
-            item.ItemCount += CountItemsRecursive(child);
+            var childItem = BuildCategoryTreeItem(child, allCategories, productsByCategory);
+            item.Children.Add(childItem);
+            item.ItemCount += childItem.ItemCount;
+        }
+
+        // Add products as leaf nodes
+        if (categoryProducts != null)
+        {
+            foreach (var product in categoryProducts.OrderBy(p => p.Name))
+            {
+                var productNode = new ProductTreeItemViewModel
+                {
+                    Id = product.Id,
+                    ParentId = category.Id,
+                    Name = product.Name,
+                    Icon = "📦",
+                    ItemCount = product.Items?.Count ?? 0,
+                    IsProduct = true
+                };
+                item.Children.Add(productNode);
+            }
         }
 
         return item;
-    }
-
-    private int CountItemsRecursive(Product product)
-    {
-        var count = product.Items?.Count ?? 0;
-        if (product.Children != null)
-        {
-            foreach (var child in product.Children)
-            {
-                count += CountItemsRecursive(child);
-            }
-        }
-        return count;
     }
 
     [RelayCommand]
@@ -403,7 +619,6 @@ public partial class ProductsItemsViewModel : ObservableObject
                 Labels.Clear();
                 _fullLabels.Clear();
 
-                // Add "All" node
                 var allNode = new LabelListItemViewModel
                 {
                     Name = "Все",
@@ -415,7 +630,6 @@ public partial class ProductsItemsViewModel : ObservableObject
                 Labels.Add(allNode);
                 _fullLabels.Add(allNode);
 
-                // Add labels
                 foreach (var (label, count) in labelsWithCounts)
                 {
                     var labelItem = new LabelListItemViewModel
@@ -429,7 +643,6 @@ public partial class ProductsItemsViewModel : ObservableObject
                     _fullLabels.Add(labelItem);
                 }
 
-                // Add "Without labels" node
                 var withoutNode = new LabelListItemViewModel
                 {
                     Name = "Без метки",
@@ -467,39 +680,71 @@ public partial class ProductsItemsViewModel : ObservableObject
                 Take = 500
             };
 
-            if (IsProductsMode && SelectedProduct != null)
+            switch (ViewMode)
             {
-                if (SelectedProduct.IsAllNode)
-                {
-                    // All items - no product filter
-                }
-                else if (SelectedProduct.Id.HasValue)
-                {
-                    if (IncludeChildrenItems)
+                case ProductsViewMode.Products:
+                    if (SelectedProductItem != null)
                     {
-                        var descendantIds = await _productService.GetDescendantIdsAsync(SelectedProduct.Id.Value);
-                        filter.ProductIds = descendantIds.Append(SelectedProduct.Id.Value).ToList();
+                        if (SelectedProductItem.IsAllNode)
+                        {
+                            // All items - no filter
+                        }
+                        else if (SelectedProductItem.Id.HasValue)
+                        {
+                            filter.ProductId = SelectedProductItem.Id.Value;
+                        }
                     }
-                    else
+                    break;
+
+                case ProductsViewMode.ByCategories:
+                    if (SelectedCategory != null)
                     {
-                        filter.ProductId = SelectedProduct.Id.Value;
+                        if (SelectedCategory.IsAllNode)
+                        {
+                            // All items
+                        }
+                        else if (SelectedCategory.IsProduct && SelectedCategory.Id.HasValue)
+                        {
+                            // Selected a product node - filter by ProductId
+                            filter.ProductId = SelectedCategory.Id.Value;
+                        }
+                        else if (SelectedCategory.Name == "Без категории")
+                        {
+                            filter.WithoutCategory = true;
+                        }
+                        else if (SelectedCategory.Id.HasValue)
+                        {
+                            // Selected a category - filter by CategoryId
+                            if (IncludeChildrenItems)
+                            {
+                                var descendantIds = await _categoryService.GetDescendantIdsAsync(SelectedCategory.Id.Value);
+                                filter.CategoryIds = descendantIds.Append(SelectedCategory.Id.Value).ToList();
+                            }
+                            else
+                            {
+                                filter.CategoryId = SelectedCategory.Id.Value;
+                            }
+                        }
                     }
-                }
-            }
-            else if (IsLabelsMode && SelectedLabel != null)
-            {
-                if (SelectedLabel.IsAllNode)
-                {
-                    // All items
-                }
-                else if (SelectedLabel.IsWithoutLabelsNode)
-                {
-                    filter.WithoutLabels = true;
-                }
-                else if (SelectedLabel.Id.HasValue)
-                {
-                    filter.LabelId = SelectedLabel.Id.Value;
-                }
+                    break;
+
+                case ProductsViewMode.Labels:
+                    if (SelectedLabel != null)
+                    {
+                        if (SelectedLabel.IsAllNode)
+                        {
+                            // All items
+                        }
+                        else if (SelectedLabel.IsWithoutLabelsNode)
+                        {
+                            filter.WithoutLabels = true;
+                        }
+                        else if (SelectedLabel.Id.HasValue)
+                        {
+                            filter.LabelId = SelectedLabel.Id.Value;
+                        }
+                    }
+                    break;
             }
 
             var items = await _itemService.GetItemsAsync(filter);
@@ -539,57 +784,74 @@ public partial class ProductsItemsViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        if (IsProductsMode)
+        // Prevent concurrent refresh
+        if (IsBusy) return;
+
+        switch (ViewMode)
         {
-            await LoadProductTreeAsync(preserveState: true);
+            case ProductsViewMode.Products:
+                var selectedProductId = SelectedProductItem?.Id;
+                var wasProductAllNode = SelectedProductItem?.IsAllNode ?? false;
 
-            // Ensure selection is valid
-            if (SelectedProduct == null && ProductTree.Count > 0)
-            {
-                SelectedProduct = ProductTree[0]; // Select "All"
-            }
+                // Temporarily disable auto-load on selection change
+                _skipAutoLoad = true;
+                await LoadProductListAsync();
 
-            await LoadItemsAsync();
-        }
-        else
-        {
-            // Save selected label ID
-            var selectedId = SelectedLabel?.Id;
-            var wasAllNode = SelectedLabel?.IsAllNode ?? false;
-            var wasWithoutLabelsNode = SelectedLabel?.IsWithoutLabelsNode ?? false;
+                if (selectedProductId.HasValue)
+                    SelectedProductItem = ProductList.FirstOrDefault(p => p.Id == selectedProductId);
+                else if (wasProductAllNode)
+                    SelectedProductItem = ProductList.FirstOrDefault(p => p.IsAllNode);
+                else if (ProductList.Count > 0)
+                    SelectedProductItem = ProductList[0];
 
-            await LoadLabelsAsync();
+                _skipAutoLoad = false;
+                await LoadItemsAsync();
+                break;
 
-            // Restore selection
-            if (selectedId.HasValue)
-            {
-                SelectedLabel = Labels.FirstOrDefault(l => l.Id == selectedId);
-            }
-            else if (wasAllNode)
-            {
-                SelectedLabel = Labels.FirstOrDefault(l => l.IsAllNode);
-            }
-            else if (wasWithoutLabelsNode)
-            {
-                SelectedLabel = Labels.FirstOrDefault(l => l.IsWithoutLabelsNode);
-            }
-            else if (Labels.Count > 0)
-            {
-                SelectedLabel = Labels[0]; // Select "All"
-            }
+            case ProductsViewMode.ByCategories:
+                // Temporarily disable auto-load on selection change
+                _skipAutoLoad = true;
+                await LoadCategoryTreeAsync(preserveState: true);
 
-            await LoadItemsAsync();
+                if (SelectedCategory == null && CategoryTree.Count > 0)
+                    SelectedCategory = CategoryTree[0];
+
+                _skipAutoLoad = false;
+                await LoadItemsAsync();
+                break;
+
+            case ProductsViewMode.Labels:
+                var selectedLabelId = SelectedLabel?.Id;
+                var wasAllNode = SelectedLabel?.IsAllNode ?? false;
+                var wasWithoutLabelsNode = SelectedLabel?.IsWithoutLabelsNode ?? false;
+
+                // Temporarily disable auto-load on selection change
+                _skipAutoLoad = true;
+                await LoadLabelsAsync();
+
+                if (selectedLabelId.HasValue)
+                    SelectedLabel = Labels.FirstOrDefault(l => l.Id == selectedLabelId);
+                else if (wasAllNode)
+                    SelectedLabel = Labels.FirstOrDefault(l => l.IsAllNode);
+                else if (wasWithoutLabelsNode)
+                    SelectedLabel = Labels.FirstOrDefault(l => l.IsWithoutLabelsNode);
+                else if (Labels.Count > 0)
+                    SelectedLabel = Labels[0];
+
+                _skipAutoLoad = false;
+                await LoadItemsAsync();
+                break;
         }
     }
 
-    private ProductTreeItemViewModel? FindProductById(IEnumerable<ProductTreeItemViewModel> items, Guid id)
+    private ProductTreeItemViewModel? FindCategoryById(IEnumerable<ProductTreeItemViewModel> items, Guid id)
     {
         foreach (var item in items)
         {
             if (item.Id == id)
                 return item;
 
-            var found = FindProductById(item.Children, id);
+            var found = FindCategoryById(item.Children, id);
             if (found != null)
                 return found;
         }
@@ -603,56 +865,100 @@ public partial class ProductsItemsViewModel : ObservableObject
     [RelayCommand]
     private async Task AddProductAsync()
     {
-        // Will be handled by dialog in View
         await Task.CompletedTask;
     }
 
     [RelayCommand]
     private async Task EditProductAsync()
     {
-        if (SelectedProduct == null || SelectedProduct.IsSpecialNode) return;
-        // Will be handled by dialog in View
+        if (SelectedProductItem == null || SelectedProductItem.IsSpecialNode) return;
         await Task.CompletedTask;
     }
 
     [RelayCommand]
     private async Task DeleteProductAsync()
     {
-        if (SelectedProduct?.Id == null || SelectedProduct.IsSpecialNode) return;
+        if (SelectedProductItem?.Id == null || SelectedProductItem.IsSpecialNode) return;
 
-        var (canDelete, itemsCount, childrenCount) = await _productService.CanDeleteAsync(SelectedProduct.Id.Value);
+        var (canDelete, itemsCount) = await _productService.CanDeleteAsync(SelectedProductItem.Id.Value);
 
         if (!canDelete)
-        {
-            // Will show error in View
             return;
-        }
 
-        var (success, _) = await _productService.DeleteAsync(SelectedProduct.Id.Value);
+        var (success, _) = await _productService.DeleteAsync(SelectedProductItem.Id.Value);
 
         if (success)
         {
-            await LoadProductTreeAsync(preserveState: true);
+            await LoadProductListAsync();
         }
     }
 
-    public async Task<Product> CreateProductAsync(string name, Guid? parentId)
+    public async Task<Product> CreateProductAsync(string name, Guid? categoryId)
     {
-        var product = await _productService.CreateAsync(name, parentId);
-        await LoadProductTreeAsync(preserveState: true, selectProductId: product.Id);
+        var product = await _productService.CreateAsync(name, categoryId);
+        await RefreshAsync();
         return product;
     }
 
-    public async Task<Product> UpdateProductAsync(Guid id, string name, Guid? parentId)
+    public async Task<Product> UpdateProductAsync(Guid id, string name, Guid? categoryId)
     {
-        var product = await _productService.UpdateAsync(id, name, parentId);
-        await LoadProductTreeAsync(preserveState: true, selectProductId: id);
+        var product = await _productService.UpdateAsync(id, name, categoryId);
+        await RefreshAsync();
         return product;
     }
 
-    public async Task<(bool CanDelete, int ItemsCount, int ChildrenCount)> CanDeleteProductAsync(Guid id)
+    public async Task<(bool CanDelete, int ItemsCount)> CanDeleteProductAsync(Guid id)
     {
         return await _productService.CanDeleteAsync(id);
+    }
+
+    #endregion
+
+    #region Commands - Category CRUD
+
+    [RelayCommand]
+    private async Task AddCategoryAsync()
+    {
+        await Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    private async Task EditCategoryAsync()
+    {
+        if (SelectedCategory == null || SelectedCategory.IsSpecialNode) return;
+        await Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    private async Task DeleteCategoryAsync()
+    {
+        if (SelectedCategory?.Id == null || SelectedCategory.IsSpecialNode) return;
+
+        var (canDelete, productsCount, childrenCount) = await _categoryService.CanDeleteAsync(SelectedCategory.Id.Value);
+
+        if (!canDelete)
+            return;
+
+        var (success, _) = await _categoryService.DeleteAsync(SelectedCategory.Id.Value);
+
+        if (success)
+        {
+            await LoadCategoryTreeAsync(preserveState: true);
+        }
+    }
+
+    public async Task<ProductCategory> CreateCategoryAsync(string name, Guid? parentId)
+    {
+        var category = await _categoryService.CreateAsync(name, parentId);
+        await LoadCategoryTreeAsync(preserveState: true, selectCategoryId: category.Id);
+        return category;
+    }
+
+    public async Task<ProductCategory> UpdateCategoryAsync(Guid id, string name, Guid? parentId)
+    {
+        var category = await _categoryService.UpdateAsync(id, name, parentId);
+        await LoadCategoryTreeAsync(preserveState: true, selectCategoryId: id);
+        return category;
     }
 
     #endregion
@@ -662,7 +968,6 @@ public partial class ProductsItemsViewModel : ObservableObject
     [RelayCommand]
     private async Task AddLabelAsync()
     {
-        // Will be handled by dialog in View
         await Task.CompletedTask;
     }
 
@@ -670,7 +975,6 @@ public partial class ProductsItemsViewModel : ObservableObject
     private async Task EditLabelAsync()
     {
         if (SelectedLabel == null || SelectedLabel.IsSpecialNode) return;
-        // Will be handled by dialog in View
         await Task.CompletedTask;
     }
 
@@ -702,7 +1006,7 @@ public partial class ProductsItemsViewModel : ObservableObject
     #region Commands - Item Actions
 
     [RelayCommand]
-    private async Task MoveItemsToProductAsync(ProductTreeItemViewModel? targetProduct)
+    private async Task MoveItemsToProductAsync(ProductListItemViewModel? targetProduct)
     {
         if (targetProduct?.Id == null || SelectedItems.Count == 0) return;
 
@@ -747,9 +1051,6 @@ public partial class ProductsItemsViewModel : ObservableObject
         await LoadItemsAsync();
     }
 
-    /// <summary>
-    /// Updates the product assignment for a single item (from ItemCardDialog)
-    /// </summary>
     public async Task UpdateItemProductAsync(Guid itemId, Guid newProductId)
     {
         await _itemService.MoveItemsToProductAsync(new List<Guid> { itemId }, newProductId);
@@ -758,18 +1059,72 @@ public partial class ProductsItemsViewModel : ObservableObject
 
     #endregion
 
-    #region Initialization
+    #region Shop Filters
 
-    public async Task InitializeAsync()
+    /// <summary>
+    /// Load shop filters for combobox
+    /// </summary>
+    private async Task LoadShopFiltersAsync()
     {
-        await LoadProductTreeAsync();
+        var shops = await _itemService.GetShopsAsync();
 
-        // Select "All" by default
-        if (ProductTree.Count > 0)
+        lock (_shopFiltersLock)
         {
-            SelectedProduct = ProductTree[0];
+            var currentSelection = SelectedShopFilter;
+            ShopFilters.Clear();
+            ShopFilters.Add(string.Empty); // "All" option
+
+            foreach (var shop in shops.Where(s => !string.IsNullOrEmpty(s)))
+            {
+                ShopFilters.Add(shop!);
+            }
+
+            // Restore selection if still valid
+            if (!string.IsNullOrEmpty(currentSelection) && ShopFilters.Contains(currentSelection))
+            {
+                SelectedShopFilter = currentSelection;
+            }
+            else
+            {
+                SelectedShopFilter = string.Empty;
+            }
         }
     }
 
     #endregion
+
+    #region Initialization
+
+    public async Task InitializeAsync()
+    {
+        await LoadProductListAsync();
+        await LoadShopFiltersAsync();
+
+        if (ProductList.Count > 0)
+        {
+            SelectedProductItem = ProductList[0];
+        }
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// ViewModel for flat product list item
+/// </summary>
+public partial class ProductListItemViewModel : ObservableObject
+{
+    public Guid? Id { get; set; }
+
+    [ObservableProperty]
+    private string _name = string.Empty;
+
+    [ObservableProperty]
+    private int _itemCount;
+
+    [ObservableProperty]
+    private string? _categoryName;
+
+    public bool IsSpecialNode { get; set; }
+    public bool IsAllNode { get; set; }
 }

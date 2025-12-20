@@ -96,6 +96,69 @@ public class NullToVisibilityConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts null to Visibility (null = Visible, not null = Collapsed)
+/// Inverse of NullToVisibilityConverter
+/// </summary>
+public class InverseNullToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value == null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts nullable bool to Visibility based on parameter
+/// Parameter "True" or "true": shows when ToolSuccess == true
+/// Parameter "False" or "false": shows when ToolSuccess == false
+/// If ToolSuccess is null, always Collapsed
+/// </summary>
+public class NullableBoolToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not bool boolValue)
+            return Visibility.Collapsed;
+
+        var expectedValue = parameter?.ToString()?.ToLowerInvariant() == "true";
+        return boolValue == expectedValue ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts bool to expand/collapse icon Geometry
+/// true = IconCollapse (down arrow), false = IconExpand (right arrow)
+/// </summary>
+public class BoolToExpandIconConverter : IValueConverter
+{
+    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool isExpanded)
+        {
+            // Return the key name - binding will resolve it through DynamicResource
+            var iconKey = isExpanded ? "IconCollapse" : "IconExpand";
+            return Application.Current?.TryFindResource(iconKey);
+        }
+        return Application.Current?.TryFindResource("IconExpand");
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Converts double to string with invariant culture (supports both . and , as input)
 /// </summary>
 public class DoubleToStringConverter : IValueConverter
@@ -266,6 +329,31 @@ public class HeightPercentageConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts three booleans (IsProductsMode, IsCategoriesMode, IsLabelsMode) to panel header text
+/// </summary>
+public class ViewModeToTextConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length >= 3 &&
+            values[0] is bool isProductsMode &&
+            values[1] is bool isCategoriesMode &&
+            values[2] is bool isLabelsMode)
+        {
+            if (isProductsMode) return "ПРОДУКТЫ";
+            if (isCategoriesMode) return "КАТЕГОРИИ";
+            if (isLabelsMode) return "МЕТКИ";
+        }
+        return "ПРОДУКТЫ";
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
     }

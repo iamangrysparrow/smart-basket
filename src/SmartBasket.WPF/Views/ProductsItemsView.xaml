@@ -27,14 +27,17 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Mode Switcher (Products/Labels) -->
+                <!-- Mode Switcher (Products/ByCategories/Labels) -->
                 <Border Grid.Column="0" Style="{StaticResource ViewTabsContainer}">
                     <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="ProductsModeBtn" Content="Продукты"
+                        <RadioButton Content="Продукты"
                                      IsChecked="{Binding IsProductsMode, Mode=TwoWay}"
                                      Style="{StaticResource ViewTabButton}"/>
+                        <RadioButton Content="По категориям"
+                                     IsChecked="{Binding IsCategoriesMode, Mode=TwoWay}"
+                                     Style="{StaticResource ViewTabButton}"/>
                         <RadioButton Content="Метки"
-                                     IsChecked="{Binding IsLabelsMode, Mode=OneWay}"
+                                     IsChecked="{Binding IsLabelsMode, Mode=TwoWay}"
                                      Style="{StaticResource ViewTabButton}"/>
                     </StackPanel>
                 </Border>
@@ -87,7 +90,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Master Panel (Left - Tree/List) -->
+            <!-- Master Panel (Left - List/Tree) -->
             <Border Grid.Column="0" Background="{DynamicResource BackgroundLayer1Brush}"
                     BorderBrush="{DynamicResource BorderDefaultBrush}"
                     BorderThickness="0,0,1,0">
@@ -108,35 +111,40 @@
 
                             <TextBlock Grid.Column="0" Style="{StaticResource PanelHeaderText}">
                                 <TextBlock.Text>
-                                    <Binding Path="IsLabelsMode">
-                                        <Binding.Converter>
-                                            <conv:BoolToStringConverter TrueValue="МЕТКИ" FalseValue="ПРОДУКТЫ"/>
-                                        </Binding.Converter>
-                                    </Binding>
+                                    <MultiBinding Converter="{StaticResource ViewModeToText}">
+                                        <Binding Path="IsProductsMode"/>
+                                        <Binding Path="IsCategoriesMode"/>
+                                        <Binding Path="IsLabelsMode"/>
+                                    </MultiBinding>
                                 </TextBlock.Text>
                             </TextBlock>
 
-                            <!-- Action buttons (only in Products mode) -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                        Visibility="{Binding IsProductsMode, Converter={StaticResource BoolToVis}}">
-                                <Button x:Name="AddProductBtn" Style="{StaticResource GhostButton}"
-                                        Click="AddProductInline_Click" ToolTip="Добавить продукт"
+                            <!-- Action buttons -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource GhostButton}"
+                                        Click="AddButton_Click" ToolTip="Добавить"
                                         Padding="4" Margin="0,0,2,0">
                                     <Path Data="{StaticResource IconAdd}" Fill="{DynamicResource AccentBrush}"
                                           Width="12" Height="12" Stretch="Uniform"/>
                                 </Button>
-                                <Button x:Name="AddChildProductBtn" Style="{StaticResource GhostButton}"
-                                        Click="AddChildProductInline_Click" ToolTip="Добавить подуровень"
-                                        Padding="4" Margin="0,0,2,0"
-                                        IsEnabled="{Binding CanAddChildProduct}">
-                                    <Path Data="{StaticResource IconAddChild}" Fill="{DynamicResource SuccessBrush}"
+                                <Button Style="{StaticResource GhostButton}"
+                                        Click="EditButton_Click" ToolTip="Редактировать"
+                                        Padding="4" Margin="0,0,2,0">
+                                    <Path Data="{StaticResource IconEdit}" Fill="{DynamicResource ForegroundSecondaryBrush}"
                                           Width="12" Height="12" Stretch="Uniform"/>
                                 </Button>
-                                <Button x:Name="DeleteProductBtn" Style="{StaticResource GhostButton}"
-                                        Click="DeleteProductInline_Click" ToolTip="Удалить"
-                                        Padding="4" Margin="0,0,2,0"
-                                        IsEnabled="{Binding CanDeleteProduct}">
+                                <Button Style="{StaticResource GhostButton}"
+                                        Click="DeleteButton_Click" ToolTip="Удалить"
+                                        Padding="4" Margin="0,0,2,0">
                                     <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}"
+                                          Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                                <!-- Reclassify button - only in categories mode -->
+                                <Button Style="{StaticResource GhostButton}"
+                                        Click="ReclassifyButton_Click" ToolTip="Реклассификация (AI)"
+                                        Padding="4" Margin="0,0,2,0"
+                                        Visibility="{Binding IsCategoriesMode, Converter={StaticResource BoolToVis}}">
+                                    <Path Data="{StaticResource IconAiChat}" Fill="{DynamicResource AccentBrush}"
                                           Width="12" Height="12" Stretch="Uniform"/>
                                 </Button>
                                 <Button Style="{StaticResource GhostButton}" Command="{Binding RefreshCommand}"
@@ -190,53 +198,45 @@
                         </Border>
                     </Grid>
 
-                    <!-- TreeView for Products -->
-                    <TreeView Grid.Row="2" x:Name="ProductTreeView"
-                              ItemsSource="{Binding ProductTree}"
-                              SelectedItemChanged="ProductTree_SelectedItemChanged"
+                    <!-- PRODUCTS MODE: Flat ListBox of Products -->
+                    <ListBox Grid.Row="2" x:Name="ProductListBox"
+                             ItemsSource="{Binding ProductList}"
+                             SelectedItem="{Binding SelectedProductItem}"
+                             SelectionChanged="ProductList_SelectionChanged"
+                             Style="{StaticResource SidebarListBox}"
+                             Padding="8,0"
+                             Visibility="{Binding ShowProductsList, Converter={StaticResource BoolToVis}}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource SidebarListBoxItem}"/>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center"
+                                             Fill="{DynamicResource AccentMutedBrush}"
+                                             Visibility="{Binding IsSpecialNode, Converter={StaticResource InverseBoolToVis}}"/>
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource TreeItemText}"/>
+                                    <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
+                                               Style="{StaticResource TreeItemCount}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- CATEGORIES MODE: TreeView of Categories -->
+                    <TreeView Grid.Row="2" x:Name="CategoryTreeView"
+                              ItemsSource="{Binding CategoryTree}"
+                              SelectedItemChanged="CategoryTree_SelectedItemChanged"
                               Style="{StaticResource ProductsTreeView}"
                               Padding="8,0"
-                              Visibility="{Binding IsProductsMode, Converter={StaticResource BoolToVis}}">
-                        <TreeView.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Добавить продукт" Click="AddProductInline_Click">
-                                    <MenuItem.Icon>
-                                        <Path Data="{StaticResource IconAdd}" Fill="{DynamicResource AccentBrush}"
-                                              Width="12" Height="12" Stretch="Uniform"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                                <MenuItem Header="Добавить подуровень" Click="AddChildProductInline_Click"
-                                          IsEnabled="{Binding CanAddChildProduct}">
-                                    <MenuItem.Icon>
-                                        <Path Data="{StaticResource IconAddChild}" Fill="{DynamicResource SuccessBrush}"
-                                              Width="12" Height="12" Stretch="Uniform"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                                <Separator/>
-                                <MenuItem Header="Переименовать" Click="RenameProduct_Click" InputGestureText="F2"
-                                          IsEnabled="{Binding CanEditProduct}">
-                                    <MenuItem.Icon>
-                                        <Path Data="{StaticResource IconEdit}" Fill="{DynamicResource ForegroundSecondaryBrush}"
-                                              Width="12" Height="12" Stretch="Uniform"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                                <MenuItem Header="Удалить" Click="DeleteProductContext_Click"
-                                          IsEnabled="{Binding CanDeleteProduct}">
-                                    <MenuItem.Icon>
-                                        <Path Data="{StaticResource IconTrash}" Fill="{DynamicResource ErrorBrush}"
-                                              Width="12" Height="12" Stretch="Uniform"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                            </ContextMenu>
-                        </TreeView.ContextMenu>
+                              Visibility="{Binding ShowCategoriesTree, Converter={StaticResource BoolToVis}}">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                 <Grid>
                                     <!-- Normal view -->
                                     <StackPanel Orientation="Horizontal"
                                                 Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}"
-                                                MouseLeftButtonDown="ProductItem_MouseLeftButtonDown">
-                                        <!-- Color dot for leaf items (no children) -->
+                                                MouseLeftButtonDown="CategoryItem_MouseLeftButtonDown">
                                         <Ellipse Style="{StaticResource TreeItemIcon}"
                                                  Fill="{DynamicResource AccentMutedBrush}"
                                                  Visibility="{Binding HasChildren, Converter={StaticResource InverseBoolToVis}}"/>
@@ -280,13 +280,14 @@
                         </TreeView.ItemContainerStyle>
                     </TreeView>
 
-                    <!-- ListView for Labels -->
+                    <!-- LABELS MODE: ListView for Labels -->
                     <ListBox Grid.Row="2" x:Name="LabelsListBox"
                              ItemsSource="{Binding Labels}"
                              SelectedItem="{Binding SelectedLabel}"
+                             SelectionChanged="LabelList_SelectionChanged"
                              Style="{StaticResource SidebarListBox}"
                              Padding="8,0"
-                             Visibility="{Binding IsLabelsMode, Converter={StaticResource BoolToVis}}">
+                             Visibility="{Binding ShowLabelsList, Converter={StaticResource BoolToVis}}">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem" BasedOn="{StaticResource SidebarListBoxItem}"/>
                         </ListBox.ItemContainerStyle>

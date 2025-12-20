@@ -9,6 +9,7 @@ public class SmartBasketDbContext : DbContext
     {
     }
 
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<Receipt> Receipts => Set<Receipt>();
@@ -22,8 +23,8 @@ public class SmartBasketDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Product (с иерархией)
-        modelBuilder.Entity<Product>(entity =>
+        // ProductCategory (иерархический справочник категорий)
+        modelBuilder.Entity<ProductCategory>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
@@ -35,6 +36,21 @@ public class SmartBasketDbContext : DbContext
                   .WithMany(p => p.Children)
                   .HasForeignKey(e => e.ParentId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Product (плоский справочник продуктов)
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
+            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.CategoryId);
+
+            // Связь с категорией (опционально)
+            entity.HasOne(e => e.Category)
+                  .WithMany(c => c.Products)
+                  .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Item (справочник товаров)

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Threading;
@@ -10,27 +11,6 @@ using SmartBasket.Services.Llm;
 using SmartBasket.WPF.Services;
 
 namespace SmartBasket.WPF.ViewModels;
-
-/// <summary>
-/// Сообщение в чате с поддержкой streaming обновлений
-/// </summary>
-public class ChatMessage : ObservableObject
-{
-    public string Role { get; init; } = string.Empty;
-
-    private string _content = string.Empty;
-    public string Content
-    {
-        get => _content;
-        set => SetProperty(ref _content, value);
-    }
-
-    public DateTime Timestamp { get; init; } = DateTime.Now;
-
-    public bool IsUser => Role == "user";
-    public bool IsAssistant => Role == "assistant";
-    public bool IsSystem => Role == "system";
-}
 
 /// <summary>
 /// ViewModel для AI чата с поддержкой tool calling через ChatService
@@ -229,6 +209,19 @@ public partial class AiChatViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedReasoningEffort = "low";
 
+    /// <summary>
+    /// Принудительно передавать инструменты в системном промпте вместо native tool calling.
+    /// Полезно для моделей которые плохо работают с native tools (YandexGPT).
+    /// </summary>
+    [ObservableProperty]
+    private bool _forcePromptInjection;
+
+    partial void OnForcePromptInjectionChanged(bool value)
+    {
+        _chatService.ForcePromptInjection = value;
+        Log($"ForcePromptInjection = {value}");
+    }
+
     partial void OnUserInputChanged(string value)
     {
         SendMessageCommand.NotifyCanExecuteChanged();
@@ -307,6 +300,13 @@ public partial class AiChatViewModel : ObservableObject
         }
     }
 
+    // Текущее сообщение ассистента (для streaming обновлений)
+    private ChatMessage? _currentAssistantMessage;
+    // Текущая часть Thinking (для накопления текста)
+    private AssistantResponsePart? _currentThinkingPart;
+    // StringBuilder для накопления текста между UI обновлениями
+    private readonly StringBuilder _thinkingBuffer = new();
+
     /// <summary>
     /// Отправить сообщение через ChatService с tool calling
     /// </summary>
@@ -329,8 +329,8 @@ public partial class AiChatViewModel : ObservableObject
         {
             Messages.Add(new ChatMessage
             {
-                Role = "user",
-                Content = userMessage
+                IsUser = true,
+                UserText = userMessage
             });
         }
 
@@ -338,117 +338,51 @@ public partial class AiChatViewModel : ObservableObject
         ConnectionStatus = "Думаю...";
         _cts = new CancellationTokenSource();
 
-        // Создаём временное сообщение ассистента для streaming
-        ChatMessage? streamingMessage = null;
-        var streamingContent = new System.Text.StringBuilder();
+        // Создаём сообщение ассистента с пустой коллекцией Parts
+        _currentAssistantMessage = new ChatMessage
+        {
+            IsUser = false,
+            Parts = new ObservableCollection<AssistantResponsePart>()
+        };
+        _currentThinkingPart = null;
+        _thinkingBuffer.Clear();
+
+        lock (_messagesLock)
+        {
+            Messages.Add(_currentAssistantMessage);
+        }
 
         // Получаем Dispatcher для UI обновлений
         var dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
 
-        // Throttling: обновляем UI не чаще чем раз в 100ms для предотвращения зависания
+        // Throttling для TextDelta
         var lastUiUpdate = DateTime.MinValue;
         var uiUpdateInterval = TimeSpan.FromMilliseconds(100);
         var pendingUiUpdate = false;
-        var contentLock = new object();
+        var bufferLock = new object();
 
         try
         {
-            // ThreadSafeProgress не захватывает SynchronizationContext - предотвращает зависание UI
-            var progressReporter = new ThreadSafeProgress<string>(msg =>
+            // ThreadSafeProgress для ChatProgress
+            var progressReporter = new ThreadSafeProgress<ChatProgress>(progress =>
             {
-                // Не логируем текстовые дельты (начинаются с "  ") - они спамят лог
-                if (!msg.StartsWith("  ") || msg.StartsWith("  ["))
+                switch (progress.Type)
                 {
-                    Log($"    {msg}");
-                }
+                    case ChatProgressType.TextDelta:
+                        HandleTextDelta(progress.Text, dispatcher, ref lastUiUpdate, uiUpdateInterval, bufferLock, ref pendingUiUpdate);
+                        break;
 
-                // Обновляем статус на основе прогресса (это легко, можно сразу)
-                if (msg.Contains("Выполняю") || msg.Contains("Tool call"))
-                {
-                    dispatcher.BeginInvoke(() => ConnectionStatus = msg);
-                }
+                    case ChatProgressType.ToolCall:
+                        HandleToolCall(progress.ToolName!, progress.ToolArgs, dispatcher);
+                        break;
 
-                // Показываем вызов инструмента пользователю
-                if (msg.StartsWith("Выполняю ") || msg.Contains("🔧 Tool call:"))
-                {
-                    string toolName;
-                    if (msg.StartsWith("Выполняю "))
-                    {
-                        toolName = msg.Replace("Выполняю ", "").TrimEnd('.', ' ');
-                    }
-                    else
-                    {
-                        var idx = msg.IndexOf("🔧 Tool call:");
-                        toolName = idx >= 0 ? msg[(idx + "🔧 Tool call:".Length)..].Trim() : "инструмент";
-                    }
+                    case ChatProgressType.ToolResult:
+                        HandleToolResult(progress.ToolName!, progress.ToolResult, progress.ToolSuccess, dispatcher);
+                        break;
 
-                    lock (contentLock)
-                    {
-                        // Добавляем перенос строки после tool call для читаемости
-                        streamingContent.Append($"🔧 Вызываю инструмент: {toolName}\n");
-                    }
-
-                    // Tool call показываем сразу
-                    dispatcher.BeginInvoke(() =>
-                    {
-                        if (streamingMessage == null)
-                        {
-                            streamingMessage = new ChatMessage { Role = "assistant", Content = "" };
-                            lock (_messagesLock) { Messages.Add(streamingMessage); }
-                        }
-                        lock (contentLock)
-                        {
-                            streamingMessage.Content = streamingContent.ToString();
-                        }
-                        ConnectionStatus = $"Выполняю {toolName}...";
-                    });
-                }
-
-                // Распознаём дельты текста (начинаются с "  " без "[")
-                if (msg.StartsWith("  ") && !msg.StartsWith("  ["))
-                {
-                    var delta = msg.Substring(2);
-
-                    lock (contentLock)
-                    {
-                        // Append без Line - дельты уже содержат \n если нужно
-                        streamingContent.Append(delta);
-                    }
-
-                    // Throttling: проверяем нужно ли обновить UI
-                    var now = DateTime.UtcNow;
-                    var shouldUpdate = false;
-
-                    lock (contentLock)
-                    {
-                        if (now - lastUiUpdate >= uiUpdateInterval)
-                        {
-                            lastUiUpdate = now;
-                            shouldUpdate = true;
-                            pendingUiUpdate = false;
-                        }
-                        else
-                        {
-                            pendingUiUpdate = true;
-                        }
-                    }
-
-                    if (shouldUpdate)
-                    {
-                        dispatcher.BeginInvoke(() =>
-                        {
-                            if (streamingMessage == null)
-                            {
-                                streamingMessage = new ChatMessage { Role = "assistant", Content = "" };
-                                lock (_messagesLock) { Messages.Add(streamingMessage); }
-                                ConnectionStatus = "Получаю ответ...";
-                            }
-                            lock (contentLock)
-                            {
-                                streamingMessage.Content = streamingContent.ToString();
-                            }
-                        });
-                    }
+                    case ChatProgressType.Complete:
+                        HandleComplete(dispatcher);
+                        break;
                 }
             });
 
@@ -459,15 +393,15 @@ public partial class AiChatViewModel : ObservableObject
                 {
                     await Task.Delay(150);
                     bool needsUpdate;
-                    lock (contentLock) { needsUpdate = pendingUiUpdate; pendingUiUpdate = false; }
+                    lock (bufferLock) { needsUpdate = pendingUiUpdate; pendingUiUpdate = false; }
 
-                    if (needsUpdate && streamingMessage != null)
+                    if (needsUpdate && _currentThinkingPart != null)
                     {
                         dispatcher.BeginInvoke(() =>
                         {
-                            lock (contentLock)
+                            lock (bufferLock)
                             {
-                                streamingMessage.Content = streamingContent.ToString();
+                                _currentThinkingPart.Text = _thinkingBuffer.ToString();
                             }
                         });
                     }
@@ -475,53 +409,29 @@ public partial class AiChatViewModel : ObservableObject
             });
 
             Log($"    Отправляю в ChatService...");
-            // КРИТИЧНО: Запускаем в Task.Run чтобы освободить UI поток (WPF_RULES #3)
-            // ChatService содержит синхронные операции которые могут блокировать UI
             var result = await Task.Run(async () =>
                 await _chatService.SendAsync(userMessage, progressReporter, _cts.Token));
 
             Log($"    Ответ получен:");
             Log($"    Success: {result.Success}");
             Log($"    ErrorMessage: {result.ErrorMessage ?? "(null)"}");
-            if (!string.IsNullOrEmpty(result.Content))
-            {
-                var preview = result.Content.Length > 500
-                    ? result.Content.Substring(0, 500) + "..."
-                    : result.Content;
-                Log($"    Content: {preview}");
-            }
 
-            if (result.Success && !string.IsNullOrEmpty(result.Content))
+            if (result.Success)
             {
-                // Если есть streaming сообщение — обновляем финальным контентом
-                if (streamingMessage != null)
+                // Финальное обновление текста из результата (если есть)
+                if (!string.IsNullOrEmpty(result.Content) && _currentThinkingPart != null)
                 {
-                    streamingMessage.Content = result.Content;
-                }
-                else
-                {
-                    // Иначе добавляем новое сообщение
-                    lock (_messagesLock)
-                    {
-                        Messages.Add(new ChatMessage
-                        {
-                            Role = "assistant",
-                            Content = result.Content
-                        });
-                    }
+                    _currentThinkingPart.Text = result.Content;
                 }
                 ConnectionStatus = "Готов";
-                Log($"    Сообщение добавлено в чат");
+                Log($"    Сообщение обработано");
             }
             else
             {
-                // Удаляем streaming сообщение если ошибка
-                if (streamingMessage != null)
+                // Добавляем ошибку как системное сообщение
+                lock (_messagesLock)
                 {
-                    lock (_messagesLock)
-                    {
-                        Messages.Remove(streamingMessage);
-                    }
+                    Messages.Remove(_currentAssistantMessage);
                 }
                 AddSystemMessage($"Ошибка: {result.ErrorMessage ?? "Неизвестная ошибка"}");
                 ConnectionStatus = "Ошибка";
@@ -543,10 +453,200 @@ public partial class AiChatViewModel : ObservableObject
         finally
         {
             IsProcessing = false;
+            _currentAssistantMessage = null;
+            _currentThinkingPart = null;
             _cts?.Dispose();
             _cts = null;
             Log("========================================");
         }
+    }
+
+    /// <summary>
+    /// Обработка дельты текста от модели
+    /// </summary>
+    private void HandleTextDelta(string? text, Dispatcher dispatcher, ref DateTime lastUiUpdate,
+        TimeSpan uiUpdateInterval, object bufferLock, ref bool pendingUiUpdate)
+    {
+        // Захватываем ссылку до BeginInvoke
+        var parts = _currentAssistantMessage?.Parts;
+        if (string.IsNullOrEmpty(text) || parts == null)
+            return;
+
+        // Если нет текущего Thinking — создаём
+        if (_currentThinkingPart == null)
+        {
+            _currentThinkingPart = new AssistantResponsePart
+            {
+                Type = ResponsePartType.Thinking,
+                IsExpanded = true // Во время streaming — развёрнуто
+            };
+
+            var thinkingPart = _currentThinkingPart;
+            dispatcher.BeginInvoke(() =>
+            {
+                parts.Add(thinkingPart);
+                ConnectionStatus = "Получаю ответ...";
+            });
+        }
+
+        // Накапливаем текст
+        lock (bufferLock)
+        {
+            _thinkingBuffer.Append(text);
+        }
+
+        // Throttling: обновляем UI не чаще чем раз в interval
+        var now = DateTime.UtcNow;
+        bool shouldUpdate;
+
+        lock (bufferLock)
+        {
+            if (now - lastUiUpdate >= uiUpdateInterval)
+            {
+                lastUiUpdate = now;
+                shouldUpdate = true;
+                pendingUiUpdate = false;
+            }
+            else
+            {
+                pendingUiUpdate = true;
+                shouldUpdate = false;
+            }
+        }
+
+        if (shouldUpdate)
+        {
+            var thinkingPart = _currentThinkingPart;
+            dispatcher.BeginInvoke(() =>
+            {
+                lock (bufferLock)
+                {
+                    if (thinkingPart != null)
+                        thinkingPart.Text = _thinkingBuffer.ToString();
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Обработка вызова инструмента
+    /// </summary>
+    private void HandleToolCall(string toolName, string? toolArgs, Dispatcher dispatcher)
+    {
+        Log($"    Tool call: {toolName}");
+
+        // Захватываем ссылку до BeginInvoke
+        var parts = _currentAssistantMessage?.Parts;
+        if (parts == null)
+            return;
+
+        // Текущий Thinking (если есть) остаётся как есть
+        // Следующий текст будет новым Thinking
+        _currentThinkingPart = null;
+        _thinkingBuffer.Clear();
+
+        // Создаём ToolCall part
+        var toolCallPart = new AssistantResponsePart
+        {
+            Type = ResponsePartType.ToolCall,
+            ToolName = toolName,
+            ToolArgs = toolArgs,
+            IsExpanded = true // Во время выполнения — развёрнуто
+        };
+
+        dispatcher.BeginInvoke(() =>
+        {
+            parts.Add(toolCallPart);
+            ConnectionStatus = $"Выполняю {toolName}...";
+        });
+    }
+
+    /// <summary>
+    /// Обработка результата инструмента
+    /// </summary>
+    private void HandleToolResult(string toolName, string? toolResult, bool? toolSuccess, Dispatcher dispatcher)
+    {
+        Log($"    Tool result: {toolName}, success={toolSuccess}");
+
+        // Захватываем ссылку до BeginInvoke
+        var parts = _currentAssistantMessage?.Parts;
+        if (parts == null)
+            return;
+
+        // Находим последний ToolCall с таким именем
+        dispatcher.BeginInvoke(() =>
+        {
+            for (int i = parts.Count - 1; i >= 0; i--)
+            {
+                var part = parts[i];
+                if (part.Type == ResponsePartType.ToolCall && part.ToolName == toolName && part.ToolResult == null)
+                {
+                    part.ToolResult = toolResult;
+                    part.ToolSuccess = toolSuccess;
+                    break;
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Обработка завершения ответа
+    /// </summary>
+    private void HandleComplete(Dispatcher dispatcher)
+    {
+        Log($"    Complete");
+
+        // Захватываем ссылку до BeginInvoke, т.к. _currentAssistantMessage может стать null
+        var message = _currentAssistantMessage;
+        var parts = message?.Parts;
+        if (parts == null)
+            return;
+
+        dispatcher.BeginInvoke(() =>
+        {
+            // Удаляем пустые Thinking части (могут появиться из-за фильтрации служебных сообщений)
+            for (int i = parts.Count - 1; i >= 0; i--)
+            {
+                if (parts[i].Type == ResponsePartType.Thinking &&
+                    string.IsNullOrWhiteSpace(parts[i].Text))
+                {
+                    parts.RemoveAt(i);
+                }
+            }
+
+            // Находим последний Thinking — он станет ответом (остаётся развёрнутым)
+            // Все остальные части сворачиваем
+            AssistantResponsePart? lastThinking = null;
+            int lastThinkingIndex = -1;
+
+            for (int i = 0; i < parts.Count; i++)
+            {
+                var part = parts[i];
+                if (part.Type == ResponsePartType.Thinking)
+                {
+                    lastThinking = part;
+                    lastThinkingIndex = i;
+                }
+            }
+
+            // Сворачиваем все части кроме последнего Thinking (который является ответом)
+            for (int i = 0; i < parts.Count; i++)
+            {
+                parts[i].IsExpanded = (i == lastThinkingIndex);
+            }
+
+            // Последний Thinking преобразуем в FinalAnswer для правильного отображения
+            if (lastThinking != null && lastThinkingIndex >= 0)
+            {
+                var finalAnswer = new AssistantResponsePart
+                {
+                    Type = ResponsePartType.FinalAnswer,
+                    Text = lastThinking.Text,
+                    IsExpanded = true
+                };
+                parts[lastThinkingIndex] = finalAnswer;
+            }
+        });
     }
 
     /// <summary>
@@ -640,8 +740,8 @@ public partial class AiChatViewModel : ObservableObject
         {
             Messages.Add(new ChatMessage
             {
-                Role = "system",
-                Content = content
+                IsSystem = true,
+                SystemText = content
             });
         }
     }

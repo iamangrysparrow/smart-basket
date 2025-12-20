@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Extensions.DependencyInjection;
+using SmartBasket.Core.Configuration;
 using SmartBasket.WPF.ViewModels;
 
 namespace SmartBasket.WPF.Views;
@@ -25,20 +27,41 @@ public partial class ProductsItemsView : UserControl
 
         // Rebuild context menus when collections change
         _viewModel.Labels.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(BuildContextMenus);
-        _viewModel.ProductTree.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(BuildContextMenus);
+        _viewModel.ProductList.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(BuildContextMenus);
+        _viewModel.CategoryTree.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(BuildContextMenus);
 
         await _viewModel.InitializeAsync();
 
         BuildContextMenus();
     }
 
-    private void ProductTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private void ProductList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_viewModel == null) return;
 
-        if (e.NewValue is ProductTreeItemViewModel selectedProduct)
+        if (e.AddedItems.Count > 0 && e.AddedItems[0] is ProductListItemViewModel selectedProduct)
         {
-            _viewModel.SelectedProduct = selectedProduct;
+            _viewModel.SelectedProductItem = selectedProduct;
+        }
+    }
+
+    private void CategoryTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (_viewModel == null) return;
+
+        if (e.NewValue is ProductTreeItemViewModel selectedCategory)
+        {
+            _viewModel.SelectedCategory = selectedCategory;
+        }
+    }
+
+    private void LabelList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_viewModel == null) return;
+
+        if (e.AddedItems.Count > 0 && e.AddedItems[0] is LabelListItemViewModel selectedLabel)
+        {
+            _viewModel.SelectedLabel = selectedLabel;
         }
     }
 
@@ -66,7 +89,6 @@ public partial class ProductsItemsView : UserControl
     {
         if (_viewModel == null) return;
 
-        // Get clicked item
         var item = ItemsDataGrid.SelectedItem as ItemGridViewModel;
         if (item == null) return;
 
@@ -83,7 +105,8 @@ public partial class ProductsItemsView : UserControl
         };
 
         dialog.SetItem(item);
-        dialog.SetAvailableProducts(_viewModel.ProductTree.ToList());
+        // Pass flat product list for selection
+        dialog.SetAvailableProductsList(_viewModel.ProductList.Where(p => !p.IsSpecialNode).ToList());
 
         if (dialog.ShowDialog() == true && dialog.ProductChanged && dialog.SelectedProductId.HasValue)
         {
@@ -95,12 +118,26 @@ public partial class ProductsItemsView : UserControl
     {
         if (_viewModel == null) return;
 
-        // Build "Move to Product" submenu
+        // Build "Move to Product" submenu (flat list)
         MoveToProductMenuItem.Items.Clear();
-        foreach (var product in _viewModel.ProductTree)
+        foreach (var product in _viewModel.ProductList)
         {
-            if (product.IsSpecialNode && !product.IsAllNode) continue;
-            AddProductMenuItem(MoveToProductMenuItem, product);
+            if (product.IsSpecialNode) continue;
+
+            var menuItem = new MenuItem
+            {
+                Header = product.Name,
+                Tag = product
+            };
+            menuItem.Click += (s, e) =>
+            {
+                if (s is MenuItem mi && mi.Tag is ProductListItemViewModel prod)
+                {
+                    _viewModel.MoveItemsToProductCommand.Execute(prod);
+                }
+                e.Handled = true;
+            };
+            MoveToProductMenuItem.Items.Add(menuItem);
         }
 
         // Build "Assign Label" submenu
@@ -126,30 +163,6 @@ public partial class ProductsItemsView : UserControl
         }
     }
 
-    private void AddProductMenuItem(MenuItem parent, ProductTreeItemViewModel product, int depth = 0)
-    {
-        var indent = new string(' ', depth * 2);
-        var menuItem = new MenuItem
-        {
-            Header = indent + product.Name,
-            Tag = product
-        };
-        menuItem.Click += (s, e) =>
-        {
-            if (s is MenuItem mi && mi.Tag is ProductTreeItemViewModel prod && prod.Id.HasValue)
-            {
-                _viewModel?.MoveItemsToProductCommand.Execute(prod);
-            }
-            e.Handled = true;
-        };
-        parent.Items.Add(menuItem);
-
-        foreach (var child in product.Children)
-        {
-            AddProductMenuItem(parent, child, depth + 1);
-        }
-    }
-
     private static FrameworkElement CreateColorCircle(string color)
     {
         return new System.Windows.Shapes.Ellipse
@@ -165,13 +178,17 @@ public partial class ProductsItemsView : UserControl
     {
         if (_viewModel == null) return;
 
-        if (_viewModel.IsProductsMode)
+        switch (_viewModel.ViewMode)
         {
-            await ShowProductDialogAsync(isEdit: false);
-        }
-        else
-        {
-            await ShowLabelDialogAsync(isEdit: false);
+            case ProductsViewMode.Products:
+                await ShowProductDialogAsync(isEdit: false);
+                break;
+            case ProductsViewMode.ByCategories:
+                await ShowCategoryDialogAsync(isEdit: false);
+                break;
+            case ProductsViewMode.Labels:
+                await ShowLabelDialogAsync(isEdit: false);
+                break;
         }
     }
 
@@ -179,13 +196,17 @@ public partial class ProductsItemsView : UserControl
     {
         if (_viewModel == null) return;
 
-        if (_viewModel.IsProductsMode && _viewModel.CanEditProduct)
+        switch (_viewModel.ViewMode)
         {
-            await ShowProductDialogAsync(isEdit: true);
-        }
-        else if (_viewModel.IsLabelsMode && _viewModel.CanEditLabel)
-        {
-            await ShowLabelDialogAsync(isEdit: true);
+            case ProductsViewMode.Products when _viewModel.CanEditProduct:
+                await ShowProductDialogAsync(isEdit: true);
+                break;
+            case ProductsViewMode.ByCategories when _viewModel.CanEditCategory:
+                await ShowCategoryDialogAsync(isEdit: true);
+                break;
+            case ProductsViewMode.Labels when _viewModel.CanEditLabel:
+                await ShowLabelDialogAsync(isEdit: true);
+                break;
         }
     }
 
@@ -193,53 +214,101 @@ public partial class ProductsItemsView : UserControl
     {
         if (_viewModel == null) return;
 
-        if (_viewModel.IsProductsMode && _viewModel.SelectedProduct?.Id != null)
+        switch (_viewModel.ViewMode)
         {
-            var (canDelete, itemsCount, childrenCount) = await _viewModel.CanDeleteProductAsync(
-                _viewModel.SelectedProduct.Id.Value);
-
-            if (!canDelete)
-            {
-                MessageBox.Show(
-                    $"Нельзя удалить продукт \"{_viewModel.SelectedProduct.Name}\":\n\n" +
-                    $"- Связано товаров: {itemsCount}\n" +
-                    $"- Дочерних продуктов: {childrenCount}\n\n" +
-                    "Сначала переместите товары и удалите дочерние продукты.",
-                    "Удаление невозможно",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            var result = MessageBox.Show(
-                $"Удалить продукт \"{_viewModel.SelectedProduct.Name}\"?",
-                "Подтверждение",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                await _viewModel.DeleteProductCommand.ExecuteAsync(null);
-            }
+            case ProductsViewMode.Products when _viewModel.SelectedProductItem?.Id != null:
+                await DeleteSelectedProductAsync();
+                break;
+            case ProductsViewMode.ByCategories when _viewModel.SelectedCategory?.Id != null:
+                await DeleteSelectedCategoryAsync();
+                break;
+            case ProductsViewMode.Labels when _viewModel.SelectedLabel?.Id != null:
+                await DeleteSelectedLabelAsync();
+                break;
         }
-        else if (_viewModel.IsLabelsMode && _viewModel.SelectedLabel?.Id != null)
+    }
+
+    private async Task DeleteSelectedProductAsync()
+    {
+        if (_viewModel?.SelectedProductItem?.Id == null) return;
+
+        var (canDelete, itemsCount) = await _viewModel.CanDeleteProductAsync(_viewModel.SelectedProductItem.Id.Value);
+
+        if (!canDelete)
         {
-            var itemCount = _viewModel.SelectedLabel.ItemCount;
-            var message = itemCount > 0
-                ? $"Метка \"{_viewModel.SelectedLabel.Name}\" назначена на {itemCount} товаров.\n\n" +
-                  "При удалении метка будет снята со всех товаров."
-                : $"Удалить метку \"{_viewModel.SelectedLabel.Name}\"?";
+            MessageBox.Show(
+                $"Нельзя удалить продукт \"{_viewModel.SelectedProductItem.Name}\":\n\n" +
+                $"Связано товаров: {itemsCount}\n\n" +
+                "Сначала переместите товары в другой продукт.",
+                "Удаление невозможно",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
-            var result = MessageBox.Show(
-                message,
-                "Удалить метку?",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+        var result = MessageBox.Show(
+            $"Удалить продукт \"{_viewModel.SelectedProductItem.Name}\"?",
+            "Подтверждение",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.Yes)
-            {
-                await _viewModel.DeleteLabelCommand.ExecuteAsync(null);
-            }
+        if (result == MessageBoxResult.Yes)
+        {
+            await _viewModel.DeleteProductCommand.ExecuteAsync(null);
+            BuildContextMenus();
+        }
+    }
+
+    private async Task DeleteSelectedCategoryAsync()
+    {
+        if (_viewModel?.SelectedCategory?.Id == null) return;
+
+        var (canDelete, productsCount, childrenCount) = await _viewModel._categoryService.CanDeleteAsync(_viewModel.SelectedCategory.Id.Value);
+
+        if (!canDelete)
+        {
+            MessageBox.Show(
+                $"Нельзя удалить категорию \"{_viewModel.SelectedCategory.Name}\":\n\n" +
+                $"- Продуктов: {productsCount}\n" +
+                $"- Дочерних категорий: {childrenCount}\n\n" +
+                "Сначала переместите продукты и удалите дочерние категории.",
+                "Удаление невозможно",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var result = MessageBox.Show(
+            $"Удалить категорию \"{_viewModel.SelectedCategory.Name}\"?",
+            "Подтверждение",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            await _viewModel.DeleteCategoryCommand.ExecuteAsync(null);
+        }
+    }
+
+    private async Task DeleteSelectedLabelAsync()
+    {
+        if (_viewModel?.SelectedLabel?.Id == null) return;
+
+        var itemCount = _viewModel.SelectedLabel.ItemCount;
+        var message = itemCount > 0
+            ? $"Метка \"{_viewModel.SelectedLabel.Name}\" назначена на {itemCount} товаров.\n\n" +
+              "При удалении метка будет снята со всех товаров."
+            : $"Удалить метку \"{_viewModel.SelectedLabel.Name}\"?";
+
+        var result = MessageBox.Show(
+            message,
+            "Удалить метку?",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            await _viewModel.DeleteLabelCommand.ExecuteAsync(null);
         }
     }
 
@@ -252,40 +321,77 @@ public partial class ProductsItemsView : UserControl
             Owner = Window.GetWindow(this)
         };
 
-        // Set up available parents
-        dialog.SetAvailableParents(_viewModel.ProductTree.ToList());
+        // Set up available categories (flat list for combo)
+        dialog.SetAvailableCategories(_viewModel.CategoryTree.Where(c => !c.IsSpecialNode && c.Name != "Без категории").ToList());
 
-        if (isEdit && _viewModel.SelectedProduct?.Id != null)
+        if (isEdit && _viewModel.SelectedProductItem?.Id != null)
         {
             dialog.Title = "Редактировать продукт";
-            dialog.ProductName = _viewModel.SelectedProduct.Name;
-            // Find parent ID from tree (would need additional logic)
+            dialog.ProductName = _viewModel.SelectedProductItem.Name;
+            // Would need to get category ID from service
         }
         else
         {
             dialog.Title = "Создать продукт";
-            // If product selected, offer to create as child
-            if (_viewModel.SelectedProduct?.Id != null)
+        }
+
+        if (dialog.ShowDialog() == true)
+        {
+            if (isEdit && _viewModel.SelectedProductItem?.Id != null)
             {
-                dialog.SelectedParentId = _viewModel.SelectedProduct.Id;
+                await _viewModel.UpdateProductAsync(
+                    _viewModel.SelectedProductItem.Id.Value,
+                    dialog.ProductName,
+                    dialog.SelectedCategoryId);
+            }
+            else
+            {
+                await _viewModel.CreateProductAsync(dialog.ProductName, dialog.SelectedCategoryId);
+            }
+
+            BuildContextMenus();
+        }
+    }
+
+    private async Task ShowCategoryDialogAsync(bool isEdit)
+    {
+        if (_viewModel == null) return;
+
+        var dialog = new CategoryDialog
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        dialog.SetAvailableParents(_viewModel.CategoryTree.Where(c => !c.IsSpecialNode && c.Name != "Без категории").ToList());
+
+        if (isEdit && _viewModel.SelectedCategory?.Id != null)
+        {
+            dialog.Title = "Редактировать категорию";
+            dialog.CategoryName = _viewModel.SelectedCategory.Name;
+            dialog.SelectedParentId = _viewModel.SelectedCategory.ParentId;
+        }
+        else
+        {
+            dialog.Title = "Создать категорию";
+            if (_viewModel.SelectedCategory?.Id != null && !_viewModel.SelectedCategory.IsSpecialNode)
+            {
+                dialog.SelectedParentId = _viewModel.SelectedCategory.Id;
             }
         }
 
         if (dialog.ShowDialog() == true)
         {
-            if (isEdit && _viewModel.SelectedProduct?.Id != null)
+            if (isEdit && _viewModel.SelectedCategory?.Id != null)
             {
-                await _viewModel.UpdateProductAsync(
-                    _viewModel.SelectedProduct.Id.Value,
-                    dialog.ProductName,
+                await _viewModel.UpdateCategoryAsync(
+                    _viewModel.SelectedCategory.Id.Value,
+                    dialog.CategoryName,
                     dialog.SelectedParentId);
             }
             else
             {
-                await _viewModel.CreateProductAsync(dialog.ProductName, dialog.SelectedParentId);
+                await _viewModel.CreateCategoryAsync(dialog.CategoryName, dialog.SelectedParentId);
             }
-
-            BuildContextMenus();
         }
     }
 
@@ -327,163 +433,51 @@ public partial class ProductsItemsView : UserControl
         }
     }
 
-    #region Inline Product Editing
+    #region Category Tree Inline Editing
 
-    private async void AddProductInline_Click(object sender, RoutedEventArgs e)
+    private void CategoryItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_viewModel == null) return;
-
-        // Add as sibling (same parent) of selected product
-        Guid? parentId = _viewModel.SelectedProduct?.ParentId;
-
-        var newProduct = await _viewModel.CreateProductAsync("Новый продукт", parentId);
-        BuildContextMenus();
-
-        // Scroll to and start editing the new product
-        if (newProduct != null)
-        {
-            var productVm = FindProductById(_viewModel.ProductTree, newProduct.Id);
-            if (productVm != null)
-            {
-                ScrollToAndFocusProduct(productVm);
-                // Start inline editing after UI updates
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
-                {
-                    productVm.StartEdit();
-                });
-            }
-        }
-    }
-
-    private async void AddChildProductInline_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewModel == null || _viewModel.SelectedProduct == null) return;
-
-        // Can't add child to special node
-        if (_viewModel.SelectedProduct.IsSpecialNode) return;
-
-        // Add as child of selected product
-        Guid? parentId = _viewModel.SelectedProduct.Id;
-
-        // Expand parent BEFORE creating child so state will be preserved when tree is rebuilt
-        _viewModel.SelectedProduct.IsExpanded = true;
-
-        var newProduct = await _viewModel.CreateProductAsync("Новый продукт", parentId);
-
-        BuildContextMenus();
-
-        // Scroll to and start editing the new product
-        if (newProduct != null)
-        {
-            var productVm = FindProductById(_viewModel.ProductTree, newProduct.Id);
-            if (productVm != null)
-            {
-                ScrollToAndFocusProduct(productVm);
-                // Start inline editing after UI updates
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
-                {
-                    productVm.StartEdit();
-                });
-            }
-        }
-    }
-
-    private void RenameProduct_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewModel?.SelectedProduct == null || _viewModel.SelectedProduct.IsSpecialNode) return;
-
-        _viewModel.SelectedProduct.StartEdit();
-    }
-
-    private async void DeleteProductContext_Click(object sender, RoutedEventArgs e)
-    {
-        await DeleteSelectedProductAsync();
-    }
-
-    private async void DeleteProductInline_Click(object sender, RoutedEventArgs e)
-    {
-        await DeleteSelectedProductAsync();
-    }
-
-    private async Task DeleteSelectedProductAsync()
-    {
-        if (_viewModel == null) return;
-
-        if (_viewModel.IsProductsMode && _viewModel.SelectedProduct?.Id != null)
-        {
-            // Button is already disabled if can't delete, but double-check
-            if (!_viewModel.CanDeleteProduct)
-            {
-                MessageBox.Show(
-                    $"Нельзя удалить продукт \"{_viewModel.SelectedProduct.Name}\":\n\n" +
-                    "Продукт содержит товары или дочерние продукты.\n" +
-                    "Сначала переместите товары и удалите дочерние продукты.",
-                    "Удаление невозможно",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            var result = MessageBox.Show(
-                $"Удалить продукт \"{_viewModel.SelectedProduct.Name}\"?",
-                "Подтверждение",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                await _viewModel.DeleteProductCommand.ExecuteAsync(null);
-                BuildContextMenus();
-            }
-        }
-    }
-
-    private void ProductItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is not FrameworkElement element || element.DataContext is not ProductTreeItemViewModel product)
+        if (sender is not FrameworkElement element || element.DataContext is not ProductTreeItemViewModel category)
             return;
 
-        // Ignore special nodes
-        if (product.IsSpecialNode) return;
+        if (category.IsSpecialNode) return;
 
-        // Double-click detection
         var now = DateTime.Now;
-        if (_lastClickedItem == product && (now - _lastClickTime).TotalMilliseconds < 500)
+        if (_lastClickedItem == category && (now - _lastClickTime).TotalMilliseconds < 500)
         {
-            // Double-click - start editing
-            product.StartEdit();
+            category.StartEdit();
             e.Handled = true;
         }
 
-        _lastClickedItem = product;
+        _lastClickedItem = category;
         _lastClickTime = now;
     }
 
     private async void EditTextBox_KeyDown(object sender, KeyEventArgs e)
     {
-        if (sender is not TextBox textBox || textBox.DataContext is not ProductTreeItemViewModel product)
+        if (sender is not TextBox textBox || textBox.DataContext is not ProductTreeItemViewModel category)
             return;
 
         if (e.Key == Key.Enter)
         {
-            await SaveProductEditAsync(product);
+            await SaveCategoryEditAsync(category);
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
         {
-            product.CancelEdit();
+            category.CancelEdit();
             e.Handled = true;
         }
     }
 
     private async void EditTextBox_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (sender is not TextBox textBox || textBox.DataContext is not ProductTreeItemViewModel product)
+        if (sender is not TextBox textBox || textBox.DataContext is not ProductTreeItemViewModel category)
             return;
 
-        if (product.IsEditing)
+        if (category.IsEditing)
         {
-            await SaveProductEditAsync(product);
+            await SaveCategoryEditAsync(category);
         }
     }
 
@@ -496,112 +490,108 @@ public partial class ProductsItemsView : UserControl
         }
     }
 
-    private async Task SaveProductEditAsync(ProductTreeItemViewModel product)
+    private async Task SaveCategoryEditAsync(ProductTreeItemViewModel category)
     {
-        if (_viewModel == null || !product.IsEditing) return;
+        if (_viewModel == null || !category.IsEditing) return;
 
-        var newName = product.EditName?.Trim();
-        var productId = product.Id;
+        var newName = category.EditName?.Trim();
+        var categoryId = category.Id;
 
         if (string.IsNullOrEmpty(newName))
         {
-            product.CancelEdit();
+            category.CancelEdit();
             return;
         }
 
-        if (newName != product.Name && productId.HasValue)
+        if (newName != category.Name && categoryId.HasValue)
         {
-            await _viewModel.UpdateProductAsync(productId.Value, newName, product.ParentId);
+            await _viewModel.UpdateCategoryAsync(categoryId.Value, newName, category.ParentId);
         }
 
-        product.CancelEdit();
-        BuildContextMenus();
-
-        // Focus and scroll to edited product (find by ID since tree was rebuilt)
-        if (productId.HasValue)
-        {
-            var updatedProduct = FindProductById(_viewModel.ProductTree, productId.Value);
-            ScrollToAndFocusProduct(updatedProduct);
-        }
+        category.CancelEdit();
     }
 
     #endregion
 
-    #region TreeView Focus and Scroll Helpers
+    #region Reclassify
 
-    /// <summary>
-    /// Scrolls to and focuses on a product in the TreeView
-    /// </summary>
-    private void ScrollToAndFocusProduct(ProductTreeItemViewModel? product)
+    private async void ReclassifyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (product == null || _viewModel == null) return;
+        if (_viewModel == null) return;
 
-        // Set SelectedProduct in ViewModel
-        _viewModel.SelectedProduct = product;
+        // Get selected category (or null for "Без категории" or root)
+        Guid? categoryId = null;
+        string categoryName = "Все продукты";
 
-        // Use dispatcher to ensure UI has updated
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+        if (_viewModel.SelectedCategory != null)
         {
-            var treeViewItem = FindTreeViewItem(ProductTreeView, product);
-            if (treeViewItem != null)
+            if (_viewModel.SelectedCategory.IsProduct)
             {
-                treeViewItem.IsSelected = true;
-                treeViewItem.BringIntoView();
-                treeViewItem.Focus();
-            }
-        });
-    }
-
-    /// <summary>
-    /// Finds a TreeViewItem for a given data item recursively
-    /// </summary>
-    private TreeViewItem? FindTreeViewItem(ItemsControl container, object item)
-    {
-        if (container == null) return null;
-
-        // Check if the container itself is a TreeViewItem with our data context
-        if (container is TreeViewItem tvi && tvi.DataContext == item)
-        {
-            return tvi;
-        }
-
-        // Iterate through children
-        for (int i = 0; i < container.Items.Count; i++)
-        {
-            var childContainer = container.ItemContainerGenerator.ContainerFromIndex(i) as TreeViewItem;
-            if (childContainer == null) continue;
-
-            if (childContainer.DataContext == item)
-            {
-                return childContainer;
+                MessageBox.Show(
+                    "Выберите категорию, а не продукт.\n\nРеклассификация применяется ко всем продуктам выбранной категории.",
+                    "Выберите категорию",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
             }
 
-            // Search recursively in children
-            var result = FindTreeViewItem(childContainer, item);
-            if (result != null)
+            if (_viewModel.SelectedCategory.Name == "Без категории")
             {
-                return result;
+                categoryId = null;
+                categoryName = "Без категории";
+            }
+            else if (_viewModel.SelectedCategory.Id.HasValue)
+            {
+                categoryId = _viewModel.SelectedCategory.Id;
+                categoryName = _viewModel.SelectedCategory.Name;
             }
         }
 
-        return null;
-    }
+        // Get product names for the category
+        var productNames = await _viewModel._classificationService.GetCategoryProductNamesAsync(categoryId);
 
-    /// <summary>
-    /// Finds a ProductTreeItemViewModel by ID recursively in the tree
-    /// </summary>
-    private ProductTreeItemViewModel? FindProductById(IEnumerable<ProductTreeItemViewModel> products, Guid id)
-    {
-        foreach (var product in products)
+        if (productNames.Count == 0)
         {
-            if (product.Id == id)
-                return product;
-
-            var found = FindProductById(product.Children, id);
-            if (found != null)
-                return found;
+            MessageBox.Show(
+                $"В категории \"{categoryName}\" нет продуктов для реклассификации.",
+                "Нет продуктов",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
         }
-        return null;
+
+        // Load custom prompt from AI Operations settings
+        var appSettings = App.Services.GetRequiredService<AppSettings>();
+        var ops = appSettings.AiOperations;
+        string? customPrompt = null;
+
+        if (!string.IsNullOrWhiteSpace(ops.Classification))
+        {
+            customPrompt = ops.GetCustomPrompt("Classification", ops.Classification);
+        }
+
+        // Set custom prompt before building prompt for preview
+        _viewModel._classificationService.SetCustomPrompt(customPrompt);
+
+        // Build prompt for preview
+        var prompt = await _viewModel._classificationService.BuildPromptForProductsAsync(productNames);
+
+        // Show dialog
+        var dialog = new ReclassifyDialog(
+            _viewModel._classificationService,
+            categoryId,
+            categoryName,
+            productNames,
+            prompt)
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() == true && dialog.ClassificationApplied)
+        {
+            // Refresh the view
+            await _viewModel.RefreshCommand.ExecuteAsync(null);
+        }
     }
 
     #endregion

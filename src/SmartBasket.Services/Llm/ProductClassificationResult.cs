@@ -3,58 +3,38 @@ using System.Text.Json.Serialization;
 namespace SmartBasket.Services.Llm;
 
 /// <summary>
-/// Продукт из результата классификации
+/// Продукт или категория из результата классификации.
+/// Модель возвращает и категории и продукты в одном списке.
 /// </summary>
 public class ClassifiedProduct
 {
     /// <summary>
-    /// Название продукта
+    /// Название продукта или категории
     /// </summary>
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Название родительского продукта (null для корневых)
+    /// Название родительской категории (null для корневых)
     /// </summary>
     [JsonPropertyName("parent")]
     public string? Parent { get; set; }
-}
-
-/// <summary>
-/// Товар с привязкой к продукту из результата классификации
-/// </summary>
-public class ClassifiedItem
-{
-    /// <summary>
-    /// Полное название товара из чека
-    /// </summary>
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Название продукта к которому относится товар
+    /// true = это конечный продукт (лист дерева)
+    /// false = это категория (может иметь потомков)
     /// </summary>
     [JsonPropertyName("product")]
-    public string Product { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Путь в иерархии продуктов (опционально, для умных моделей)
-    /// Например: ["Молочные продукты", "Молоко"]
-    /// </summary>
-    [JsonPropertyName("path")]
-    public List<string>? Path { get; set; }
+    public bool IsProduct { get; set; }
 }
 
 /// <summary>
-/// Результат классификации от Ollama (JSON ответ)
+/// Результат классификации от LLM (JSON ответ)
 /// </summary>
 public class ClassificationResponse
 {
     [JsonPropertyName("products")]
     public List<ClassifiedProduct> Products { get; set; } = new();
-
-    [JsonPropertyName("items")]
-    public List<ClassifiedItem> Items { get; set; } = new();
 }
 
 /// <summary>
@@ -73,17 +53,12 @@ public class ProductClassificationResult
     public string? Message { get; set; }
 
     /// <summary>
-    /// Список продуктов (существующих и новых)
+    /// Список продуктов и категорий
     /// </summary>
     public List<ClassifiedProduct> Products { get; set; } = new();
 
     /// <summary>
-    /// Список товаров с привязкой к продуктам
-    /// </summary>
-    public List<ClassifiedItem> Items { get; set; } = new();
-
-    /// <summary>
-    /// Сырой ответ от Ollama (для отладки)
+    /// Сырой ответ от LLM (для отладки)
     /// </summary>
     public string? RawResponse { get; set; }
 }

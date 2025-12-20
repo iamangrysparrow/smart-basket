@@ -86,4 +86,92 @@ public partial class AiChatView : UserControl
             viewModel.ApplySystemPromptCommand.Execute(null);
         }
     }
+
+    private void TogglePartExpand_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is AssistantResponsePart part)
+        {
+            part.IsExpanded = !part.IsExpanded;
+        }
+    }
+
+    private void CopyAnswerText_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is string text)
+        {
+            try
+            {
+                Clipboard.SetText(text);
+            }
+            catch
+            {
+                // Ignore clipboard errors
+            }
+        }
+    }
+
+    private void CopyToolCallText_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is AssistantResponsePart part)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"Tool: {part.ToolName}");
+                if (!string.IsNullOrEmpty(part.ToolArgs))
+                {
+                    sb.AppendLine("Arguments:");
+                    sb.AppendLine(part.ToolArgs);
+                }
+                if (!string.IsNullOrEmpty(part.ToolResult))
+                {
+                    sb.AppendLine("Result:");
+                    sb.AppendLine(part.ToolResult);
+                }
+                Clipboard.SetText(sb.ToString());
+            }
+            catch
+            {
+                // Ignore clipboard errors
+            }
+        }
+    }
+
+    /// <summary>
+    /// Пробрасывает MouseWheel из вложенных контролов в главный ScrollViewer.
+    /// Это нужно чтобы прокрутка мышкой работала когда курсор над MarkdownScrollViewer
+    /// или другими вложенными ScrollViewer-ами.
+    /// </summary>
+    private void OnChildPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // Если вложенный ScrollViewer не может скроллить дальше, передаём событие родителю
+        if (sender is ScrollViewer scrollViewer)
+        {
+            var atTop = scrollViewer.VerticalOffset <= 0 && e.Delta > 0;
+            var atBottom = scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight && e.Delta < 0;
+
+            if (atTop || atBottom || scrollViewer.ScrollableHeight <= 0)
+            {
+                // Пробрасываем событие в родительский ScrollViewer
+                e.Handled = true;
+                var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+                {
+                    RoutedEvent = MouseWheelEvent,
+                    Source = sender
+                };
+                MessagesScrollViewer.RaiseEvent(eventArg);
+            }
+        }
+        else
+        {
+            // Для MarkdownScrollViewer и других контролов просто пробрасываем всегда
+            e.Handled = true;
+            var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+            {
+                RoutedEvent = MouseWheelEvent,
+                Source = sender
+            };
+            MessagesScrollViewer.RaiseEvent(eventArg);
+        }
+    }
 }

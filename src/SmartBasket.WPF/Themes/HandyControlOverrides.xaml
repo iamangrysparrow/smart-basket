@@ -135,4 +135,132 @@
         </Setter>
     </Style>
 
+    <!-- ============================================= -->
+    <!-- ContextMenu and MenuItem Fixes               -->
+    <!-- Fix "Cannot find source for binding" errors  -->
+    <!-- when MenuItem is inside ContextMenu          -->
+    <!-- ============================================= -->
+
+    <!-- ContextMenu style with proper theming -->
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource BackgroundLayer1Brush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderDefaultBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.2" Color="Black"/>
+                        </Border.Effect>
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- MenuItem style that doesn't use RelativeSource FindAncestor to MenuBase/ItemsControl -->
+    <Style TargetType="MenuItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Border"
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            CornerRadius="3"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Icon"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Shortcut"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Icon -->
+                            <ContentPresenter x:Name="Icon"
+                                              Grid.Column="0"
+                                              ContentSource="Icon"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0"
+                                              Width="16" Height="16"/>
+
+                            <!-- Header -->
+                            <ContentPresenter Grid.Column="1"
+                                              ContentSource="Header"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+
+                            <!-- InputGestureText -->
+                            <TextBlock x:Name="InputGestureText"
+                                       Grid.Column="2"
+                                       Text="{TemplateBinding InputGestureText}"
+                                       Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="16,0,0,0"/>
+
+                            <!-- Submenu arrow -->
+                            <Path x:Name="SubMenuArrow"
+                                  Grid.Column="3"
+                                  Data="M0,0 L4,4 L0,8 Z"
+                                  Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                  VerticalAlignment="Center"
+                                  Margin="8,0,0,0"
+                                  Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- HasItems (submenu) -->
+                        <Trigger Property="HasItems" Value="True">
+                            <Setter TargetName="SubMenuArrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <!-- No Icon -->
+                        <Trigger Property="Icon" Value="{x:Null}">
+                            <Setter TargetName="Icon" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <!-- MouseOver -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+                        </Trigger>
+                        <!-- Highlighted (keyboard nav) -->
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+                        </Trigger>
+                        <!-- Disabled -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource ForegroundDisabledBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Separator style for menus -->
+    <Style TargetType="Separator">
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Margin" Value="4,4"/>
+        <Setter Property="Background" Value="{DynamicResource BorderDefaultBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Rectangle Fill="{TemplateBinding Background}" Height="1"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

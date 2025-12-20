@@ -117,6 +117,35 @@ public partial class ItemCardDialog : Window
         }
     }
 
+    public void SetAvailableProductsList(IList<ProductListItemViewModel> products)
+    {
+        _allProducts.Clear();
+
+        foreach (var product in products)
+        {
+            if (product.IsSpecialNode || !product.Id.HasValue) continue;
+            _allProducts.Add(new ProductItem
+            {
+                Id = product.Id.Value,
+                Name = product.Name,
+                DisplayName = product.Name,
+                Depth = 0
+            });
+        }
+
+        ProductComboBox.ItemsSource = _allProducts;
+
+        // Find and select original product
+        _originalProduct = _allProducts.FirstOrDefault(p => p.Id == _originalProductId);
+        if (_originalProduct != null)
+        {
+            _isUpdatingSelection = true;
+            ProductComboBox.SelectedItem = _originalProduct;
+            ProductComboBox.Text = _originalProduct.Name;
+            _isUpdatingSelection = false;
+        }
+    }
+
     private void AddProductWithChildren(List<ProductItem> items, ProductTreeItemViewModel product, int depth)
     {
         var indent = new string(' ', depth * 3);

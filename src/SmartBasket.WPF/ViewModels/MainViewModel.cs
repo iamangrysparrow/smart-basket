@@ -387,7 +387,7 @@ public partial class MainViewModel : ObservableObject
             _logger.LogDebug("Found {Count} orphaned products:", orphaned.Count);
             foreach (var p in orphaned.Take(20))
             {
-                _logger.LogDebug("  - {Name}{Parent}", p.Name, p.ParentName != null ? $" (parent: {p.ParentName})" : "");
+                _logger.LogDebug("  - {Name}{Category}", p.Name, p.CategoryName != null ? $" (category: {p.CategoryName})" : "");
             }
             if (orphaned.Count > 20)
             {
@@ -589,7 +589,7 @@ public partial class MainViewModel : ObservableObject
                 .Include(r => r.Items)
                     .ThenInclude(i => i.Item)
                         .ThenInclude(item => item!.Product)
-                            .ThenInclude(p => p!.Parent)
+                            .ThenInclude(p => p!.Category)
                 .Include(r => r.Items)
                     .ThenInclude(i => i.Item)
                         .ThenInclude(item => item!.ItemLabels)

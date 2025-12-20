@@ -49,14 +49,24 @@ public class ItemFilter
     public Guid? ProductId { get; set; }
 
     /// <summary>
-    /// Include items from child products
-    /// </summary>
-    public bool IncludeChildProducts { get; set; }
-
-    /// <summary>
-    /// Product IDs to include (for child products)
+    /// Product IDs to include (for multiple products)
     /// </summary>
     public IReadOnlyList<Guid>? ProductIds { get; set; }
+
+    /// <summary>
+    /// Filter by category ID (items whose product belongs to this category)
+    /// </summary>
+    public Guid? CategoryId { get; set; }
+
+    /// <summary>
+    /// Category IDs to include (for category with children)
+    /// </summary>
+    public IReadOnlyList<Guid>? CategoryIds { get; set; }
+
+    /// <summary>
+    /// Filter items without category (product.CategoryId is null)
+    /// </summary>
+    public bool? WithoutCategory { get; set; }
 
     /// <summary>
     /// Filter by label ID

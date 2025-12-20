@@ -22,7 +22,7 @@ public interface IChatService
     /// </summary>
     Task<ChatResponse> SendAsync(
         string userMessage,
-        IProgress<string>? progress = null,
+        IProgress<ChatProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -71,4 +71,10 @@ public interface IChatService
     /// <param name="mode">Режим рассуждений (null = использовать из конфигурации)</param>
     /// <param name="effort">Уровень рассуждений (null = использовать из конфигурации)</param>
     void SetReasoningParameters(ReasoningMode? mode, ReasoningEffort? effort);
+
+    /// <summary>
+    /// Принудительно передавать инструменты в системном промпте вместо native tool calling.
+    /// Полезно для моделей которые плохо работают с native tools (YandexGPT).
+    /// </summary>
+    bool ForcePromptInjection { get; set; }
 }

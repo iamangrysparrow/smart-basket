@@ -23,10 +23,10 @@
                      MaxLength="255"/>
         </StackPanel>
 
-        <!-- Parent -->
+        <!-- Category -->
         <StackPanel Grid.Row="1" Margin="0,12,0,0">
-            <TextBlock Text="Родитель:" Style="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-            <ComboBox x:Name="ParentComboBox" FontSize="11">
+            <TextBlock Text="Категория:" Style="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+            <ComboBox x:Name="CategoryComboBox" FontSize="11">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding DisplayName}"/>

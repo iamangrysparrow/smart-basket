@@ -127,8 +127,9 @@ public partial class App : Application
 
         // LLM Services (use AI providers via factory)
         services.AddSingleton<IResponseParser, ResponseParser>();
-        services.AddSingleton<IProductClassificationService, ProductClassificationService>();
-        services.AddSingleton<ILabelAssignmentService, LabelAssignmentService>();
+        services.AddTransient<IProductExtractionService, ProductExtractionService>();
+        services.AddTransient<IProductClassificationService, ProductClassificationService>();
+        services.AddTransient<ILabelAssignmentService, LabelAssignmentService>();
 
         // Parsers
         services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();
@@ -148,6 +149,7 @@ public partial class App : Application
         services.AddSingleton<SettingsService>();
 
         // Product/Item/Label services - Transient to avoid DbContext concurrency issues in WPF
+        services.AddTransient<IProductCategoryService, ProductCategoryService>();
         services.AddTransient<IProductService, ProductService>();
         services.AddTransient<ILabelService, LabelService>();
         services.AddTransient<IItemService, ItemService>();

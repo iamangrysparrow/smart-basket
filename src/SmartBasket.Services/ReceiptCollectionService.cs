@@ -53,14 +53,17 @@ public interface IReceiptCollectionService
 ///    - Найти парсер по имени
 ///    - Если парсер требует AI → получить провайдер
 ///    - Парсинг → ParsedReceipt
-///    - Классификация → Products/Items
+///    - Выделение продуктов (Stage 1)
 ///    - Сохранение в БД
 /// 3. Вернуть статистику
+///
+/// Классификация продуктов по категориям выполняется после загрузки всех чеков.
 /// </summary>
 public class ReceiptCollectionService : IReceiptCollectionService
 {
     private readonly IReceiptSourceFactory _sourceFactory;
     private readonly ReceiptTextParserFactory _parserFactory;
+    private readonly IProductExtractionService _extractionService;
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
     private readonly ILabelService _labelService;
@@ -71,6 +74,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
     public ReceiptCollectionService(
         IReceiptSourceFactory sourceFactory,
         ReceiptTextParserFactory parserFactory,
+        IProductExtractionService extractionService,
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
         ILabelService labelService,
@@ -80,6 +84,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
     {
         _sourceFactory = sourceFactory ?? throw new ArgumentNullException(nameof(sourceFactory));
         _parserFactory = parserFactory ?? throw new ArgumentNullException(nameof(parserFactory));
+        _extractionService = extractionService ?? throw new ArgumentNullException(nameof(extractionService));
         _classificationService = classificationService ?? throw new ArgumentNullException(nameof(classificationService));
         _labelAssignmentService = labelAssignmentService ?? throw new ArgumentNullException(nameof(labelAssignmentService));
         _labelService = labelService ?? throw new ArgumentNullException(nameof(labelService));
@@ -171,28 +176,34 @@ public class ReceiptCollectionService : IReceiptCollectionService
 
                         result.ReceiptsParsed++;
 
-                        // Классификация
-                        var existingProducts = await GetExistingProductsAsync(cancellationToken);
+                        // Stage 1: Выделение продуктов из названий товаров
                         var itemNames = parsed.Items.Select(i => i.Name).ToList();
 
-                        ProductClassificationResult classification;
+                        // Загрузить существующие продукты для передачи в extraction
+                        var existingProductNames = await _dbContext.Products
+                            .Select(p => p.Name)
+                            .ToListAsync(cancellationToken);
+
+                        ProductExtractionResult extraction;
                         try
                         {
-                            classification = await _classificationService.ClassifyAsync(
-                                itemNames, existingProducts, progress, cancellationToken);
+                            progress?.Report($"  [Stage 1] Extracting products from {itemNames.Count} items...");
+                            extraction = await _extractionService.ExtractAsync(
+                                itemNames, existingProductNames, progress, cancellationToken);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "Classification failed, using defaults");
-                            classification = new ProductClassificationResult
+                            _logger.LogWarning(ex, "Product extraction failed, using item names as products");
+                            extraction = new ProductExtractionResult
                             {
                                 IsSuccess = false,
-                                Message = ex.Message
+                                Message = ex.Message,
+                                Items = itemNames.Select(n => new ExtractedItem { Name = n, Product = n }).ToList()
                             };
                         }
 
-                        // Сохранение
-                        var receipt = await SaveReceiptAsync(raw, parsed, classification, progress, cancellationToken);
+                        // Сохранение чека + создание Products и Items
+                        var receipt = await SaveReceiptAsync(raw, parsed, extraction, progress, cancellationToken);
                         result.SavedReceipts.Add(receipt);
                         result.ReceiptsSaved++;
 
@@ -226,9 +237,33 @@ public class ReceiptCollectionService : IReceiptCollectionService
         }
 
         progress?.Report($"");
-        progress?.Report($"=== Collection complete ===");
+        progress?.Report($"=== Receipt collection complete ===");
         progress?.Report($"Sources: {result.SourcesProcessed}/{result.TotalSources}");
         progress?.Report($"Receipts: {result.ReceiptsSaved} saved, {result.ReceiptsSkipped} skipped, {result.Errors} errors");
+
+        // Классификация некатегоризированных продуктов после загрузки всех чеков
+        if (result.ReceiptsSaved > 0)
+        {
+            try
+            {
+                progress?.Report($"");
+                progress?.Report($"=== Classifying uncategorized products ===");
+                var classificationResult = await _classificationService.ClassifyAndApplyAsync(progress, cancellationToken);
+                if (classificationResult.IsSuccess)
+                {
+                    progress?.Report($"Classification complete: {classificationResult.Message}");
+                }
+                else
+                {
+                    progress?.Report($"Classification failed: {classificationResult.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Product classification failed");
+                progress?.Report($"[WARNING] Classification failed: {ex.Message}");
+            }
+        }
 
         return result;
     }
@@ -289,26 +324,10 @@ public class ReceiptCollectionService : IReceiptCollectionService
         return await llm.ParseAsync(raw.Content, raw.Date, progress, cancellationToken);
     }
 
-    private async Task<List<ExistingProduct>> GetExistingProductsAsync(CancellationToken cancellationToken)
-    {
-        var products = await _dbContext.Products
-            .Include(p => p.Parent)
-            .OrderBy(p => p.Name)
-            .ToListAsync(cancellationToken);
-
-        return products.Select(p => new ExistingProduct
-        {
-            Id = p.Id,
-            Name = p.Name,
-            ParentId = p.ParentId,
-            ParentName = p.Parent?.Name
-        }).ToList();
-    }
-
     private async Task<Receipt> SaveReceiptAsync(
         RawReceipt raw,
         ParsedReceipt parsed,
-        ProductClassificationResult classification,
+        ProductExtractionResult extraction,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -328,52 +347,59 @@ public class ReceiptCollectionService : IReceiptCollectionService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Обработать Products и Items
-        await ProcessReceiptItemsAsync(receipt, parsed, classification, progress, cancellationToken);
+        await ProcessReceiptItemsAsync(receipt, parsed, extraction, progress, cancellationToken);
 
         return receipt;
     }
 
+    /// <summary>
+    /// Обработка товаров чека: привязка к Products и создание Items.
+    /// </summary>
     private async Task ProcessReceiptItemsAsync(
         Receipt receipt,
         ParsedReceipt parsed,
-        ProductClassificationResult classification,
+        ProductExtractionResult extraction,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
-        // Создать lookup для классификации
-        var classificationLookup = classification.Items
-            .ToDictionary(ci => ci.Name, ci => ci.Product, StringComparer.OrdinalIgnoreCase);
+        // Создать lookup для extraction: itemName → productName
+        var extractionLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < parsed.Items.Count && i < extraction.Items.Count; i++)
+        {
+            var originalName = parsed.Items[i].Name;
+            var productName = extraction.Items[i].Product;
+            if (!string.IsNullOrWhiteSpace(originalName) && !extractionLookup.ContainsKey(originalName))
+            {
+                extractionLookup[originalName] = productName;
+            }
+        }
 
         // Загрузить существующие Products
         var existingProducts = await _dbContext.Products
             .ToDictionaryAsync(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        // Создать новые Products из классификации
-        foreach (var cp in classification.Products.OrderBy(p => p.Parent != null ? 1 : 0))
+        // Обеспечить наличие дефолтного продукта "Не категоризировано"
+        var uncategorizedProduct = await _dbContext.Products
+            .FirstOrDefaultAsync(p => p.Name == "Не категоризировано", cancellationToken);
+
+        if (uncategorizedProduct == null)
         {
-            if (string.IsNullOrWhiteSpace(cp.Name) || existingProducts.ContainsKey(cp.Name.Trim()))
-                continue;
-
-            var newProduct = new Product { Name = cp.Name.Trim() };
-
-            if (!string.IsNullOrWhiteSpace(cp.Parent) && existingProducts.TryGetValue(cp.Parent.Trim(), out var parent))
-            {
-                newProduct.ParentId = parent.Id;
-            }
-
-            _dbContext.Products.Add(newProduct);
+            uncategorizedProduct = new Product { Name = "Не категоризировано" };
+            _dbContext.Products.Add(uncategorizedProduct);
             await _dbContext.SaveChangesAsync(cancellationToken);
-            existingProducts[newProduct.Name] = newProduct;
-            progress?.Report($"  [Product] Created: {newProduct.Name}");
         }
+        existingProducts.TryAdd("Не категоризировано", uncategorizedProduct);
 
-        // Обеспечить наличие дефолтного продукта
-        if (!existingProducts.ContainsKey("Не категоризировано"))
+        // Нормализованный lookup для поиска (ё → е)
+        var normalizedLookup = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in existingProducts.Values)
         {
-            var uncategorized = new Product { Name = "Не категоризировано" };
-            _dbContext.Products.Add(uncategorized);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            existingProducts["Не категоризировано"] = uncategorized;
+            normalizedLookup.TryAdd(p.Name, p);
+            var normalized = NormalizeName(p.Name);
+            if (normalized != p.Name)
+            {
+                normalizedLookup.TryAdd(normalized, p);
+            }
         }
 
         // Создать Items и ReceiptItems
@@ -386,21 +412,39 @@ public class ReceiptCollectionService : IReceiptCollectionService
 
             var itemName = parsedItem.Name.Trim();
 
-            // Найти Product
+            // Найти название продукта из extraction
             string? productName = null;
-            if (classificationLookup.TryGetValue(itemName, out var pn))
+            if (extractionLookup.TryGetValue(itemName, out var pn))
             {
                 productName = pn?.Trim();
             }
 
-            Product product;
-            if (!string.IsNullOrWhiteSpace(productName) && existingProducts.TryGetValue(productName, out var p))
+            // Если productName пустой - использовать "Не категоризировано"
+            if (string.IsNullOrWhiteSpace(productName))
             {
-                product = p;
+                productName = "Не категоризировано";
+            }
+
+            // Найти Product (с учётом нормализации)
+            Product? product = null;
+            var normalizedProductName = NormalizeName(productName);
+
+            if (existingProducts.TryGetValue(productName, out product) ||
+                normalizedLookup.TryGetValue(productName, out product) ||
+                normalizedLookup.TryGetValue(normalizedProductName, out product))
+            {
+                // Найден существующий
             }
             else
             {
-                product = existingProducts["Не категоризировано"];
+                // Создаём новый Product (без категории - категоризация будет позже)
+                product = new Product { Name = productName };
+                _dbContext.Products.Add(product);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                existingProducts[productName] = product;
+                normalizedLookup[productName] = product;
+                normalizedLookup[normalizedProductName] = product;
+                progress?.Report($"  [Product] Created: {productName}");
             }
 
             // Найти или создать Item
@@ -423,6 +467,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
             }
             else if (item.ProductId != product.Id)
             {
+                // Обновить связь с продуктом если изменилась
                 item.ProductId = product.Id;
             }
 
@@ -545,11 +590,35 @@ public class ReceiptCollectionService : IReceiptCollectionService
     }
 
     /// <summary>
+    /// Нормализует имя для сравнения: заменяет ё на е
+    /// </summary>
+    private static string NormalizeName(string name)
+    {
+        return name.Replace('ё', 'е').Replace('Ё', 'Е');
+    }
+
+    /// <summary>
     /// Настраивает кастомные промпты из конфигурации для каждой операции
     /// </summary>
     private void SetupCustomPrompts(IProgress<string>? progress)
     {
         var ops = _settings.AiOperations;
+
+        // ProductExtraction prompt (Stage 1)
+        if (!string.IsNullOrWhiteSpace(ops.ProductExtraction))
+        {
+            var customPrompt = ops.GetCustomPrompt("ProductExtraction", ops.ProductExtraction);
+            if (!string.IsNullOrWhiteSpace(customPrompt))
+            {
+                _extractionService.SetCustomPrompt(customPrompt);
+                progress?.Report($"  [Setup] Custom prompt for ProductExtraction/{ops.ProductExtraction}");
+                _logger.LogDebug("Custom prompt loaded for ProductExtraction: {ProviderKey}", ops.ProductExtraction);
+            }
+            else
+            {
+                _extractionService.SetCustomPrompt(null);
+            }
+        }
 
         // Classification prompt
         if (!string.IsNullOrWhiteSpace(ops.Classification))

@@ -17,6 +17,7 @@ public partial class AiOperationsViewModel : ObservableObject
 
     public AiOperationsViewModel(AiOperationsConfig config)
     {
+        ProductExtraction = config.ProductExtraction ?? string.Empty;
         Classification = config.Classification ?? string.Empty;
         Labels = config.Labels ?? string.Empty;
 
@@ -27,6 +28,15 @@ public partial class AiOperationsViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Этап 1: Выделение продукта из названия товара
+    /// </summary>
+    [ObservableProperty]
+    private string _productExtraction = string.Empty;
+
+    /// <summary>
+    /// Этап 2: Классификация продукта в иерархию
+    /// </summary>
     [ObservableProperty]
     private string _classification = string.Empty;
 
@@ -74,6 +84,7 @@ public partial class AiOperationsViewModel : ObservableObject
     {
         var config = new AiOperationsConfig
         {
+            ProductExtraction = string.IsNullOrWhiteSpace(ProductExtraction) ? null : ProductExtraction,
             Classification = string.IsNullOrWhiteSpace(Classification) ? null : Classification,
             Labels = string.IsNullOrWhiteSpace(Labels) ? null : Labels
         };

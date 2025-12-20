@@ -28,6 +28,12 @@ public class ChatService : IChatService
     public IReadOnlyList<LlmChatMessage> History => _history.AsReadOnly();
     public string? CurrentProviderKey => _currentProviderKey;
 
+    /// <summary>
+    /// Принудительно передавать инструменты в системном промпте вместо native tool calling.
+    /// Полезно для моделей которые плохо работают с native tools (YandexGPT).
+    /// </summary>
+    public bool ForcePromptInjection { get; set; }
+
     public ChatService(
         IToolExecutor tools,
         IAiProviderFactory providerFactory,
@@ -223,7 +229,7 @@ public class ChatService : IChatService
 
     public async Task<ChatResponse> SendAsync(
         string userMessage,
-        IProgress<string>? progress = null,
+        IProgress<ChatProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var totalStopwatch = Stopwatch.StartNew();
@@ -237,7 +243,7 @@ public class ChatService : IChatService
         string primingContext = "";
         if (!_isPrimed)
         {
-            progress?.Report("Загружаю контекст базы данных...");
+            _logger.LogDebug("[ChatService] Loading priming context...");
             primingContext = await GetPrimingContextAsync(cancellationToken);
             _isPrimed = true;
             _logger.LogInformation("[ChatService] Priming context added ({Length} chars)", primingContext.Length);
@@ -287,9 +293,15 @@ public class ChatService : IChatService
             _logger.LogInformation("[ChatService] Priming context appended to system prompt");
         }
 
-        if (!provider.SupportsTools && tools.Count > 0)
+        // Используем prompt injection если:
+        // 1. Провайдер не поддерживает native tools ИЛИ
+        // 2. Установлен флаг ForcePromptInjection (для моделей которые плохо работают с native tools)
+        var usePromptInjection = !provider.SupportsTools || ForcePromptInjection;
+
+        if (usePromptInjection && tools.Count > 0)
         {
-            _logger.LogInformation("[ChatService] Provider doesn't support native tools, using prompt injection");
+            _logger.LogInformation("[ChatService] Using prompt injection for tools (SupportsTools={SupportsTools}, ForcePromptInjection={Force})",
+                provider.SupportsTools, ForcePromptInjection);
             effectiveSystemPrompt = BuildToolsSystemPrompt(effectiveSystemPrompt, tools);
             effectiveTools = null; // Не передаём tools в API
         }
@@ -305,14 +317,31 @@ public class ChatService : IChatService
 
             _logger.LogInformation("[ChatService] --- Iteration {Iteration}/{Max} ---",
                 iteration + 1, MaxIterations);
-            progress?.Report($"[Iteration {iteration + 1}] Отправляю запрос к LLM...");
 
-            // Вызов LLM
+            // Вызов LLM с адаптером для progress
+            // Провайдер использует IProgress<string> для streaming текста
+            // Мы конвертируем в типизированный ChatProgress
+            // Фильтруем служебные сообщения от провайдера
             var llmStopwatch = Stopwatch.StartNew();
+            var streamingProgress = progress != null
+                ? new Progress<string>(delta =>
+                {
+                    // Фильтруем служебные сообщения от провайдеров
+                    if (IsServiceMessage(delta)) return;
+
+                    // Убираем лишние пробелы в начале дельты (провайдеры добавляют "  ")
+                    var cleanDelta = delta?.TrimStart();
+                    if (!string.IsNullOrEmpty(cleanDelta))
+                    {
+                        progress.Report(new ChatProgress(ChatProgressType.TextDelta, Text: cleanDelta));
+                    }
+                })
+                : null;
+
             var result = await provider.ChatAsync(
                 messages,
                 effectiveTools,
-                progress: progress,
+                progress: streamingProgress,
                 cancellationToken: cancellationToken);
             llmStopwatch.Stop();
 
@@ -355,6 +384,15 @@ public class ChatService : IChatService
                     Content = response
                 });
 
+                // Если провайдер не стримил текст (например YandexAgent) — отправляем финальный текст через TextDelta
+                if (!string.IsNullOrEmpty(response))
+                {
+                    progress?.Report(new ChatProgress(ChatProgressType.TextDelta, Text: response));
+                }
+
+                // Уведомляем UI что ответ завершён
+                progress?.Report(new ChatProgress(ChatProgressType.Complete));
+
                 totalStopwatch.Stop();
                 _logger.LogInformation("[ChatService] <<< FINAL RESPONSE ({Length} chars) in {Time:F2}s total, {Iterations} iteration(s)",
                     response.Length, totalStopwatch.Elapsed.TotalSeconds, iteration + 1);
@@ -365,6 +403,12 @@ public class ChatService : IChatService
 
             // Обрабатываем tool calls (детали логируются в провайдере)
             _logger.LogDebug("[ChatService] Processing {Count} tool call(s)", result.ToolCalls!.Count);
+
+            // Если модель вернула текст вместе с tool calls (рассуждения) — отправляем через TextDelta
+            if (!string.IsNullOrEmpty(result.Response))
+            {
+                progress?.Report(new ChatProgress(ChatProgressType.TextDelta, Text: result.Response));
+            }
 
             // Добавляем assistant сообщение с tool calls
             _history.Add(new LlmChatMessage
@@ -380,7 +424,12 @@ public class ChatService : IChatService
             // Выполняем каждый tool call
             foreach (var call in result.ToolCalls)
             {
-                progress?.Report($"Выполняю {call.Name}...");
+                // Уведомляем UI о вызове инструмента
+                progress?.Report(new ChatProgress(
+                    ChatProgressType.ToolCall,
+                    ToolName: call.Name,
+                    ToolArgs: call.Arguments
+                ));
 
                 var toolStopwatch = Stopwatch.StartNew();
                 var toolResult = await _tools.ExecuteAsync(call.Name, call.Arguments, cancellationToken);
@@ -393,6 +442,14 @@ public class ChatService : IChatService
                 {
                     _logger.LogWarning("[ChatService] Tool error: {Error}", toolResult.ErrorMessage);
                 }
+
+                // Уведомляем UI о результате инструмента
+                progress?.Report(new ChatProgress(
+                    ChatProgressType.ToolResult,
+                    ToolName: call.Name,
+                    ToolResult: toolResult.JsonData,
+                    ToolSuccess: toolResult.Success
+                ));
 
                 // Добавляем результат tool в историю
                 _history.Add(new LlmChatMessage
@@ -489,6 +546,7 @@ public class ChatService : IChatService
     /// 3. Формат function call: tool_name({"arg": "value"})
     /// 4. Обрабатывает <think>...</think> блоки (DeepSeek-R1)
     /// 5. Теги <tool_request>...</tool_request> и <tool_response>...</tool_response> (qwen)
+    /// 6. Формат [TOOL_CALL_START]name\n{json}\n[TOOL_CALL_END] (YandexGPT fallback)
     /// </summary>
     private List<LlmToolCall> TryParseToolCallsFromText(string text)
     {
@@ -501,7 +559,17 @@ public class ChatService : IChatService
 
             if (string.IsNullOrWhiteSpace(text)) return result;
 
-            // Паттерн 0: Теги <tool_request> или <tool_response> (qwen иногда так отвечает)
+            // Паттерн 0a: [TOOL_CALL_START]name\n{json} (YandexGPT fallback format)
+            var toolCallStartCalls = TryParseToolCallStartFormat(text);
+            if (toolCallStartCalls.Count > 0)
+            {
+                result.AddRange(toolCallStartCalls);
+                _logger.LogInformation("[ChatService] Parsed {Count} tool call(s) from [TOOL_CALL_START] format",
+                    toolCallStartCalls.Count);
+                return result;
+            }
+
+            // Паттерн 0b: Теги <tool_request> или <tool_response> (qwen иногда так отвечает)
             var toolTagPattern = new System.Text.RegularExpressions.Regex(
                 @"<tool_(?:request|response)>\s*(\{[\s\S]*?\})\s*</tool_(?:request|response)>",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -641,8 +709,16 @@ public class ChatService : IChatService
     /// <summary>
     /// Извлекает текст до JSON tool call (для отображения пользователю)
     /// </summary>
-    private string ExtractTextBeforeToolCall(string text)
+    private static string ExtractTextBeforeToolCall(string text)
     {
+        // Ищем [TOOL_CALL_START] - это приоритетный маркер
+        const string startTag = "[TOOL_CALL_START]";
+        var toolCallStartIndex = text.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+        if (toolCallStartIndex > 0)
+        {
+            return text.Substring(0, toolCallStartIndex).Trim();
+        }
+
         // Ищем начало JSON массива или объекта
         var jsonStart = -1;
 
@@ -842,6 +918,219 @@ public class ChatService : IChatService
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Парсит формат [TOOL_CALL_START]name\n{json}\n[TOOL_CALL_END]
+    /// Используется YandexGPT и YandexAgent как fallback когда native tool calling не работает
+    /// </summary>
+    private List<LlmToolCall> TryParseToolCallStartFormat(string text)
+    {
+        var result = new List<LlmToolCall>();
+
+        try
+        {
+            const string startTag = "[TOOL_CALL_START]";
+            const string endTag = "[TOOL_CALL_END]";
+
+            var startIndex = text.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+            if (startIndex < 0) return result;
+
+            while (startIndex >= 0)
+            {
+                // Извлекаем имя инструмента (до \n или до {)
+                var nameStart = startIndex + startTag.Length;
+                var nameEnd = text.IndexOfAny(new[] { '\n', '\r', '{' }, nameStart);
+                if (nameEnd < 0) break;
+
+                var toolName = text.Substring(nameStart, nameEnd - nameStart).Trim();
+
+                // Ищем начало JSON
+                var jsonStart = text.IndexOf('{', nameEnd);
+                if (jsonStart < 0) break;
+
+                // Ищем конец JSON - либо до [TOOL_CALL_END], либо до следующего [TOOL_CALL_START], либо до конца
+                var endTagIndex = text.IndexOf(endTag, jsonStart, StringComparison.OrdinalIgnoreCase);
+                var nextStartIndex = text.IndexOf(startTag, jsonStart, StringComparison.OrdinalIgnoreCase);
+
+                int jsonEnd;
+                if (endTagIndex >= 0 && (nextStartIndex < 0 || endTagIndex < nextStartIndex))
+                {
+                    // Есть [TOOL_CALL_END] до следующего [TOOL_CALL_START]
+                    jsonEnd = endTagIndex;
+                }
+                else if (nextStartIndex >= 0)
+                {
+                    // Есть следующий [TOOL_CALL_START]
+                    jsonEnd = nextStartIndex;
+                }
+                else
+                {
+                    // До конца строки
+                    jsonEnd = text.Length;
+                }
+
+                // Извлекаем JSON и парсим с балансировкой скобок
+                var jsonCandidate = text.Substring(jsonStart, jsonEnd - jsonStart);
+                var jsonExtracted = ExtractBalancedJson(jsonCandidate);
+
+                // Если балансировка не удалась — попробуем исправить (модель могла обрезать JSON)
+                if (string.IsNullOrEmpty(jsonExtracted))
+                {
+                    jsonExtracted = TryFixUnbalancedJson(jsonCandidate.Trim());
+                    if (!string.IsNullOrEmpty(jsonExtracted))
+                    {
+                        _logger.LogDebug("[ChatService] Fixed unbalanced JSON in [TOOL_CALL_START] block");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("[ChatService] [TOOL_CALL_START] found but JSON is unbalanced and unfixable: {Tool}", toolName);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(jsonExtracted))
+                {
+                    try
+                    {
+                        // Проверяем что JSON валидный
+                        using var doc = JsonDocument.Parse(jsonExtracted);
+
+                        result.Add(new LlmToolCall
+                        {
+                            Id = Guid.NewGuid().ToString("N")[..8],
+                            Name = toolName,
+                            Arguments = jsonExtracted
+                        });
+
+                        _logger.LogDebug("[ChatService] Parsed [TOOL_CALL_START] tool call: {Name}", toolName);
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger.LogWarning("[ChatService] Invalid JSON in [TOOL_CALL_START] block for {Tool}: {Error}", toolName, ex.Message);
+                    }
+                }
+
+                // Продолжаем поиск
+                startIndex = text.IndexOf(startTag, jsonEnd, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("[ChatService] Error parsing [TOOL_CALL_START] format: {Error}", ex.Message);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Извлекает сбалансированный JSON из строки (подсчёт скобок { и })
+    /// </summary>
+    private static string ExtractBalancedJson(string text)
+    {
+        var bracketCount = 0;
+        var start = text.IndexOf('{');
+        if (start < 0) return string.Empty;
+
+        for (int i = start; i < text.Length; i++)
+        {
+            if (text[i] == '{') bracketCount++;
+            else if (text[i] == '}') bracketCount--;
+
+            if (bracketCount == 0)
+            {
+                return text.Substring(start, i - start + 1);
+            }
+        }
+
+        // Не сбалансировано - возвращаем пустую строку
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Пытается исправить несбалансированный JSON, добавляя недостающие закрывающие скобки.
+    /// Модели иногда обрезают JSON из-за лимита токенов.
+    /// </summary>
+    private static string TryFixUnbalancedJson(string text)
+    {
+        if (string.IsNullOrEmpty(text) || !text.StartsWith("{"))
+            return string.Empty;
+
+        // Подсчитываем незакрытые скобки
+        var braceCount = 0;
+        var bracketCount = 0;
+        var inString = false;
+        var escape = false;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (c == '\\' && inString)
+            {
+                escape = true;
+                continue;
+            }
+
+            if (c == '"')
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString) continue;
+
+            switch (c)
+            {
+                case '{': braceCount++; break;
+                case '}': braceCount--; break;
+                case '[': bracketCount++; break;
+                case ']': bracketCount--; break;
+            }
+        }
+
+        // Если всё сбалансировано — ничего делать не нужно
+        if (braceCount == 0 && bracketCount == 0)
+            return text;
+
+        // Если внутри строки — не можем исправить
+        if (inString)
+            return string.Empty;
+
+        // Добавляем недостающие закрывающие скобки
+        var suffix = new string(']', Math.Max(0, bracketCount)) + new string('}', Math.Max(0, braceCount));
+
+        if (string.IsNullOrEmpty(suffix))
+            return string.Empty;
+
+        return text + suffix;
+    }
+
+    /// <summary>
+    /// Проверяет, является ли сообщение служебным (debug-логом провайдера)
+    /// </summary>
+    private static bool IsServiceMessage(string? message)
+    {
+        if (string.IsNullOrEmpty(message)) return true;
+
+        var trimmed = message.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return true;
+
+        // Служебные маркеры провайдеров
+        return trimmed.StartsWith("[YandexGPT") ||
+               trimmed.StartsWith("[YandexAgent") ||
+               trimmed.StartsWith("[Ollama") ||
+               trimmed.StartsWith("[Tool Call]") ||
+               trimmed.Contains("=== STREAMING") ||
+               trimmed.Contains(">>> ЗАПРОС") ||
+               trimmed.Contains("=== END") ||
+               trimmed.Contains("Sending STREAMING request") ||
+               trimmed.StartsWith("Model:");
     }
 
     private const int MaxLogSize = 100 * 1024; // 100KB limit

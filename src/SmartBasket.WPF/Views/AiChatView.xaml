@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:SmartBasket.WPF.ViewModels"
+             xmlns:mdxaml="clr-namespace:MdXaml;assembly=MdXaml"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="800"
              Background="{DynamicResource BackgroundBaseBrush}">
@@ -21,16 +22,15 @@
             <Setter Property="MaxWidth" Value="600"/>
         </Style>
 
-        <!-- Assistant message style -->
+        <!-- Assistant message style - на всю ширину -->
         <Style x:Key="AssistantMessageBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource BackgroundLayer1Brush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderDefaultBrush}"/>
             <Setter Property="BorderThickness" Value="3,0,0,0"/>
             <Setter Property="CornerRadius" Value="8,8,8,0"/>
             <Setter Property="Padding" Value="12,8"/>
-            <Setter Property="Margin" Value="12,4,60,4"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="MaxWidth" Value="600"/>
+            <Setter Property="Margin" Value="12,4,12,4"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
 
         <!-- System message style -->
@@ -44,11 +44,57 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
 
-        <!-- Message template selector -->
+        <!-- Part header button style -->
+        <Style x:Key="PartHeaderButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Thinking part style - стилизован как Tool Call с оранжевым акцентом -->
+        <Style x:Key="ThinkingPartBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+        </Style>
+
+        <!-- Tool call part style -->
+        <Style x:Key="ToolCallPartBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+        </Style>
+
+        <!-- User message template -->
         <DataTemplate x:Key="UserMessageTemplate" DataType="{x:Type vm:ChatMessage}">
             <Border Style="{StaticResource UserMessageBorder}">
                 <StackPanel>
-                    <TextBlock Text="{Binding Content}"
+                    <TextBlock Text="{Binding UserText}"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
                     <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm}'}"
@@ -60,12 +106,276 @@
             </Border>
         </DataTemplate>
 
+        <!-- Selectable TextBox style (looks like TextBlock but selectable) -->
+        <Style x:Key="SelectableTextBoxStyle" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Cursor" Value="IBeam"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Background="{TemplateBinding Background}"
+                                      Focusable="False"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Disabled"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Copy button style -->
+        <Style x:Key="CopyButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="ToolTip" Value="Копировать текст"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="4">
+                            <Path x:Name="icon"
+                                  Data="{StaticResource IconCopy}"
+                                  Fill="{DynamicResource ForegroundTertiaryBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter TargetName="icon" Property="Fill" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource PressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Thinking part template -->
+        <DataTemplate x:Key="ThinkingPartTemplate" DataType="{x:Type vm:AssistantResponsePart}">
+            <Border Style="{StaticResource ThinkingPartBorder}">
+                <StackPanel>
+                    <!-- Header with collapse/expand and copy button -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Style="{StaticResource PartHeaderButton}"
+                                Click="TogglePartExpand_Click"
+                                Tag="{Binding}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconThinking}"
+                                      Fill="{DynamicResource WarningBrush}"
+                                      Width="14" Height="14" Stretch="Uniform"
+                                      Margin="0,0,6,0"/>
+                                <TextBlock Text="Рассуждения"
+                                           Style="{StaticResource CaptionText}"
+                                           Foreground="{DynamicResource WarningBrush}"/>
+                                <Path Data="{Binding IsExpanded, Converter={StaticResource BoolToExpandIcon}}"
+                                      Fill="{DynamicResource ForegroundTertiaryBrush}"
+                                      Width="10" Height="10" Stretch="Uniform"
+                                      Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource CopyButtonStyle}"
+                                Click="CopyAnswerText_Click"
+                                Tag="{Binding Text}"/>
+                    </Grid>
+                    <!-- Content (visible when expanded) - selectable -->
+                    <TextBox Text="{Binding Text, Mode=OneWay}"
+                             Style="{StaticResource SelectableTextBoxStyle}"
+                             Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                             FontStyle="Italic"
+                             Margin="0,4,0,0"
+                             Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- Tool call part template -->
+        <DataTemplate x:Key="ToolCallPartTemplate" DataType="{x:Type vm:AssistantResponsePart}">
+            <Border Style="{StaticResource ToolCallPartBorder}">
+                <StackPanel>
+                    <!-- Header with copy button -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Style="{StaticResource PartHeaderButton}"
+                                Click="TogglePartExpand_Click"
+                                Tag="{Binding}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconTool}"
+                                      Fill="{DynamicResource AccentBrush}"
+                                      Width="14" Height="14" Stretch="Uniform"
+                                      Margin="0,0,6,0"/>
+                                <TextBlock Style="{StaticResource CaptionText}"
+                                           Foreground="{DynamicResource AccentBrush}">
+                                    <Run Text="{Binding ToolName, Mode=OneWay}"/>
+                                </TextBlock>
+                                <!-- Status indicator -->
+                                <Path Data="{StaticResource IconCheck}"
+                                      Fill="{DynamicResource SuccessBrush}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      Margin="6,0,0,0"
+                                      Visibility="{Binding ToolSuccess, Converter={StaticResource NullableBoolToVis}, ConverterParameter=True}"/>
+                                <Path Data="{StaticResource IconWarning}"
+                                      Fill="{DynamicResource ErrorBrush}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      Margin="6,0,0,0"
+                                      Visibility="{Binding ToolSuccess, Converter={StaticResource NullableBoolToVis}, ConverterParameter=False}"/>
+                                <!-- Loading indicator (while result is null) -->
+                                <ProgressBar IsIndeterminate="True"
+                                             Width="12" Height="12"
+                                             Margin="6,0,0,0"
+                                             Visibility="{Binding ToolResult, Converter={StaticResource NullToVis}}"/>
+                                <Path Data="{Binding IsExpanded, Converter={StaticResource BoolToExpandIcon}}"
+                                      Fill="{DynamicResource ForegroundTertiaryBrush}"
+                                      Width="10" Height="10" Stretch="Uniform"
+                                      Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource CopyButtonStyle}"
+                                Click="CopyToolCallText_Click"
+                                Tag="{Binding}"/>
+                    </Grid>
+                    <!-- Details (visible when expanded) -->
+                    <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}"
+                                Margin="0,4,0,0">
+                        <!-- Arguments -->
+                        <TextBlock Text="Arguments:"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                   Visibility="{Binding ToolArgs, Converter={StaticResource NotNullToVis}}"/>
+                        <ScrollViewer MaxHeight="150"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Margin="0,2,0,4"
+                                      PreviewMouseWheel="OnChildPreviewMouseWheel"
+                                      Visibility="{Binding ToolArgs, Converter={StaticResource NotNullToVis}}">
+                            <TextBox Text="{Binding ToolArgs, Mode=OneWay}"
+                                     Style="{StaticResource SelectableTextBoxStyle}"
+                                     FontFamily="Consolas"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+                        </ScrollViewer>
+                        <!-- Result -->
+                        <TextBlock Text="Result:"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                   Visibility="{Binding ToolResult, Converter={StaticResource NotNullToVis}}"/>
+                        <ScrollViewer MaxHeight="300"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Margin="0,2,0,0"
+                                      PreviewMouseWheel="OnChildPreviewMouseWheel"
+                                      Visibility="{Binding ToolResult, Converter={StaticResource NotNullToVis}}">
+                            <TextBox Text="{Binding ToolResult, Mode=OneWay}"
+                                     Style="{StaticResource SelectableTextBoxStyle}"
+                                     FontFamily="Consolas"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+                        </ScrollViewer>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- MdXaml style for markdown rendering -->
+        <!-- Sasabune стиль адаптируется к цветам родителя (поддерживает тёмную тему) -->
+        <Style x:Key="MarkdownStyle" TargetType="mdxaml:MarkdownScrollViewer">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+            <Setter Property="MarkdownStyleName" Value="SasabuneStandard"/>
+            <Setter Property="IsSelectionEnabled" Value="True"/>
+        </Style>
+
+        <!-- Final answer part style - стилизован как Tool Call -->
+        <Style x:Key="FinalAnswerBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+        </Style>
+
+        <!-- Final answer part template - основной ответ с Markdown -->
+        <DataTemplate x:Key="FinalAnswerPartTemplate" DataType="{x:Type vm:AssistantResponsePart}">
+            <Border Style="{StaticResource FinalAnswerBorder}">
+                <StackPanel>
+                    <!-- Header with icon and copy button -->
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <Path Data="{StaticResource IconAnswer}"
+                                  Fill="{DynamicResource SuccessBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"
+                                  Margin="0,0,6,0"/>
+                            <TextBlock Text="Ответ"
+                                       Style="{StaticResource CaptionText}"
+                                       Foreground="{DynamicResource SuccessBrush}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource CopyButtonStyle}"
+                                Click="CopyAnswerText_Click"
+                                Tag="{Binding Text}"/>
+                    </Grid>
+                    <!-- Markdown content -->
+                    <mdxaml:MarkdownScrollViewer Markdown="{Binding Text}"
+                                                  Style="{StaticResource MarkdownStyle}"
+                                                  PreviewMouseWheel="OnChildPreviewMouseWheel"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- Part template selector using triggers -->
+        <DataTemplate x:Key="AssistantPartTemplate" DataType="{x:Type vm:AssistantResponsePart}">
+            <ContentControl Content="{Binding}">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl">
+                        <Setter Property="ContentTemplate" Value="{StaticResource FinalAnswerPartTemplate}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsThinking}" Value="True">
+                                <Setter Property="ContentTemplate" Value="{StaticResource ThinkingPartTemplate}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsToolCall}" Value="True">
+                                <Setter Property="ContentTemplate" Value="{StaticResource ToolCallPartTemplate}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
+        </DataTemplate>
+
+        <!-- Assistant message template with parts -->
         <DataTemplate x:Key="AssistantMessageTemplate" DataType="{x:Type vm:ChatMessage}">
             <Border Style="{StaticResource AssistantMessageBorder}">
                 <StackPanel>
-                    <TextBlock Text="{Binding Content}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                    <ItemsControl ItemsSource="{Binding Parts}"
+                                  ItemTemplate="{StaticResource AssistantPartTemplate}"/>
                     <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm}'}"
                                Style="{StaticResource CaptionText}"
                                Foreground="{DynamicResource ForegroundTertiaryBrush}"
@@ -75,9 +385,10 @@
             </Border>
         </DataTemplate>
 
+        <!-- System message template -->
         <DataTemplate x:Key="SystemMessageTemplate" DataType="{x:Type vm:ChatMessage}">
             <Border Style="{StaticResource SystemMessageBorder}">
-                <TextBlock Text="{Binding Content}"
+                <TextBlock Text="{Binding SystemText}"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource WarningBrush}"
                            FontStyle="Italic"
@@ -132,6 +443,13 @@
 
                 <!-- Buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Force prompt injection checkbox -->
+                    <CheckBox IsChecked="{Binding ForcePromptInjection}"
+                              Content="Tools в промпте"
+                              VerticalAlignment="Center"
+                              ToolTip="Передавать описание инструментов в системном промпте вместо native API. Включите, если модель игнорирует native tools."
+                              Margin="0,0,16,0"/>
+
                     <!-- Reasoning mode controls (visible only for YandexGPT) -->
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center"
@@ -210,10 +528,10 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Typing indicator (visible when processing) -->
+                <!-- Typing indicator (visible when processing and no parts yet) -->
                 <Border Style="{StaticResource AssistantMessageBorder}"
                         Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}}"
-                        Margin="12,4,60,8">
+                        Margin="12,4,12,8">
                     <StackPanel Orientation="Horizontal">
                         <!-- Animated dots -->
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
