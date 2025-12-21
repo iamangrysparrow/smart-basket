@@ -5,6 +5,7 @@ using System.Windows.Media;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
 using SmartBasket.Core.Configuration;
@@ -18,11 +19,13 @@ using SmartBasket.Services.Products;
 using SmartBasket.Services.Sources;
 using SmartBasket.Services.Tools;
 using SmartBasket.Services.Chat;
+using SmartBasket.Services.Shopping;
 using SmartBasket.WPF.Logging;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
 using SmartBasket.WPF.ViewModels.Settings;
+using SmartBasket.WPF.Views.Shopping;
 
 namespace SmartBasket.WPF;
 
@@ -163,10 +166,20 @@ public partial class App : Application
         // Chat service (with tool-use loop)
         services.AddTransient<IChatService, ChatService>();
 
+        // Shopping module - Singleton: one active session per app
+        services.Configure<SmartBasket.Core.Shopping.ShoppingSettings>(options =>
+        {
+            var shoppingSection = _appSettings!.Shopping;
+            options.Stores = shoppingSection.Stores;
+        });
+        services.AddSingleton<IShoppingSessionService, ShoppingSessionService>();
+        services.AddTransient<IShoppingChatService, ShoppingChatService>();
+
         // ViewModels
         services.AddTransient<MainViewModel>();
         services.AddTransient<ProductsItemsViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<ShoppingViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

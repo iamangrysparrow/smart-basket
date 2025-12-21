@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Extensions.DependencyInjection;
 using SmartBasket.Core.Configuration;
 using SmartBasket.Services.Chat;
 using SmartBasket.Services.Llm;
@@ -10,8 +11,10 @@ using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
 using SmartBasket.WPF.ViewModels;
 using SmartBasket.WPF.ViewModels.Settings;
+using SmartBasket.Services.Shopping;
 using SmartBasket.WPF.Views;
 using SmartBasket.WPF.Views.Settings;
+using SmartBasket.WPF.Views.Shopping;
 
 namespace SmartBasket.WPF;
 
@@ -24,11 +27,14 @@ public partial class MainWindow : Window
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAiProviderFactory _aiProviderFactory;
     private readonly IChatService _chatService;
+    private readonly IShoppingSessionService _shoppingSessionService;
     private LogWindow? _logWindow;
     private bool _userScrolledUp;
     private ScrollViewer? _logScrollViewer;
     private TabItem? _aiChatTabItem;
     private AiChatView? _aiChatView;
+    private TabItem? _shoppingTabItem;
+    private ShoppingView? _shoppingView;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -37,7 +43,8 @@ public partial class MainWindow : Window
         SettingsService settingsService,
         IHttpClientFactory httpClientFactory,
         IAiProviderFactory aiProviderFactory,
-        IChatService chatService)
+        IChatService chatService,
+        IShoppingSessionService shoppingSessionService)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -47,6 +54,7 @@ public partial class MainWindow : Window
         _httpClientFactory = httpClientFactory;
         _aiProviderFactory = aiProviderFactory;
         _chatService = chatService;
+        _shoppingSessionService = shoppingSessionService;
         DataContext = viewModel;
 
         // Set ProductsItemsView DataContext early (before Loaded event fires)
@@ -286,6 +294,105 @@ public partial class MainWindow : Window
         {
             MainTabControl.SelectedIndex = 0;
             TabReceipts.IsChecked = true;
+        }
+    }
+
+    private void OpenShopping_Click(object sender, RoutedEventArgs e)
+    {
+        // Если вкладка уже открыта - просто переключаемся на неё
+        if (_shoppingTabItem != null)
+        {
+            MainTabControl.SelectedItem = _shoppingTabItem;
+            TabShopping.IsChecked = true;
+            return;
+        }
+
+        // Получаем ShoppingViewModel из DI
+        var shoppingViewModel = App.Services.GetRequiredService<ShoppingViewModel>();
+        _shoppingView = new ShoppingView
+        {
+            DataContext = shoppingViewModel
+        };
+
+        _shoppingTabItem = new TabItem
+        {
+            Content = _shoppingView
+        };
+
+        MainTabControl.Items.Add(_shoppingTabItem);
+        MainTabControl.SelectedItem = _shoppingTabItem;
+
+        // Показываем вкладку Shopping в toolbar и выделяем её
+        ShoppingTabPanel.Visibility = Visibility.Visible;
+        TabShopping.IsChecked = true;
+
+        _viewModel.AddLogEntry("Модуль закупок открыт");
+    }
+
+    private void TabShopping_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_shoppingTabItem != null && MainTabControl != null)
+        {
+            MainTabControl.SelectedItem = _shoppingTabItem;
+        }
+    }
+
+    private void CloseShopping_Click(object sender, RoutedEventArgs e)
+    {
+        if (_shoppingTabItem == null) return;
+
+        // Запоминаем была ли вкладка активной
+        var wasSelected = MainTabControl.SelectedItem == _shoppingTabItem;
+
+        // Удаляем вкладку
+        MainTabControl.Items.Remove(_shoppingTabItem);
+        _shoppingTabItem = null;
+        _shoppingView = null;
+
+        // Скрываем вкладку Shopping в toolbar
+        ShoppingTabPanel.Visibility = Visibility.Collapsed;
+
+        // Если вкладка была активной - переключаемся на первую
+        if (wasSelected)
+        {
+            MainTabControl.SelectedIndex = 0;
+            TabReceipts.IsChecked = true;
+        }
+
+        _viewModel.AddLogEntry("Модуль закупок закрыт");
+    }
+
+    private void ShowAbout_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(
+            "Smart Basket\n\n" +
+            "Приложение для автоматического сбора и анализа чеков из различных источников с использованием AI для категоризации.\n\n" +
+            "Version: 1.0.0\n" +
+            "© 2024",
+            "О программе",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    private void DeleteSelectedReceipt_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SelectedReceipt == null)
+        {
+            MessageBox.Show("Выберите чек для удаления", "Нет выбранного чека", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var receipt = _viewModel.SelectedReceipt;
+        var result = MessageBox.Show(
+            $"Удалить чек?\n\n{receipt.Shop} от {receipt.Date:dd.MM.yyyy}\n{receipt.ItemCount} позиций на сумму {receipt.Total:N2}₽",
+            "Подтверждение удаления",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            _viewModel.AddLogEntry($"Удаление чека {receipt.Shop} от {receipt.Date:dd.MM.yyyy} - TODO: implement");
+            // TODO: Implement actual deletion via ViewModel command
         }
     }
 

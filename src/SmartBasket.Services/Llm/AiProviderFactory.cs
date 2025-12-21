@@ -26,7 +26,12 @@ public enum AiOperation
     /// <summary>
     /// AI чат с пользователем
     /// </summary>
-    Chat
+    Chat,
+
+    /// <summary>
+    /// Модуль закупок (Shopping) — формирование списка покупок
+    /// </summary>
+    Shopping
 }
 
 /// <summary>
@@ -98,6 +103,7 @@ public class AiProviderFactory : IAiProviderFactory
             AiOperation.Classification => _settings.AiOperations.Classification,
             AiOperation.Labels => _settings.AiOperations.Labels,
             AiOperation.Chat => _settings.AiOperations.Chat,
+            AiOperation.Shopping => _settings.AiOperations.Shopping,
             _ => null
         };
 

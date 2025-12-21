@@ -56,6 +56,7 @@
             <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
             <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
             <converters:IntToVisibilityConverter x:Key="IntToVis"/>
+            <converters:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
             <converters:StringToColorConverter x:Key="StringToColor"/>
             <converters:DoubleToStringConverter x:Key="DoubleToString"/>
             <converters:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVis"/>

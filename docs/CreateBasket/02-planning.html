@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Basket — Этап 2: Планирование</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Smart Basket Dark Theme */
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --bg-elevated: #3c3c3c;
+            --bg-hover: #3c3c3c;
+            --border: #3c3c3c;
+            --border-strong: #505050;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6e6e6e;
+            /* Purple accent */
+            --accent: #b388ff;
+            --accent-hover: #d1c4e9;
+            --accent-pressed: #9575cd;
+            --accent-subtle: #332940;
+            /* Semantic */
+            --success: #81c784;
+            --success-subtle: #1b3d1f;
+            --warning: #ffb74d;
+            --warning-subtle: #3d2e14;
+            --error: #e57373;
+            --error-subtle: #3d1f1f;
+            /* Store brands */
+            --samokat: #ff6b35;
+            --lavka: #ffcc00;
+            --kuper: #00b956;
+            --radius: 4px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans 3', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: var(--warning);
+            color: var(--bg-primary);
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .cancel-btn {
+            margin-left: auto;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .cancel-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            overflow: hidden;
+        }
+
+        /* Left: WebView placeholder */
+        .webview-panel {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+        }
+
+        .webview-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .webview-header .store-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .webview-header .store-badge.lavka {
+            background: var(--lavka);
+            color: var(--bg-primary);
+        }
+
+        .webview-container {
+            flex: 1;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .webview-placeholder {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .webview-placeholder-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .webview-placeholder-text {
+            color: #666;
+        }
+
+        /* Right: Progress panel */
+        .progress-panel {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-secondary);
+            overflow: hidden;
+        }
+
+        .progress-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .progress-header h2 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .progress-summary {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .progress-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* Store progress cards */
+        .store-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .store-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .store-card.active {
+            border-color: var(--accent);
+        }
+
+        .store-card.completed {
+            border-color: var(--success);
+        }
+
+        .store-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-tertiary);
+        }
+
+        .store-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            color: white;
+        }
+
+        .store-icon.samokat { background: var(--samokat); }
+        .store-icon.lavka { background: var(--lavka); color: var(--bg-primary); }
+        .store-icon.kuper { background: var(--kuper); }
+
+        .store-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .store-status {
+            margin-left: auto;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .store-status.pending { color: var(--text-muted); }
+        .store-status.active { color: var(--warning); }
+        .store-status.completed { color: var(--success); }
+        .store-status.error { color: var(--error); }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--warning);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .store-body {
+            padding: 12px 16px;
+        }
+
+        /* Item search progress */
+        .item-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .item-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            padding: 6px 0;
+        }
+
+        .item-status-icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .item-status-icon.pending { color: var(--text-muted); }
+        .item-status-icon.searching { color: var(--warning); }
+        .item-status-icon.found { color: var(--success); }
+        .item-status-icon.not-found { color: var(--error); }
+
+        .item-name {
+            flex: 1;
+            color: var(--text-primary);
+        }
+
+        .item-name.dimmed {
+            color: var(--text-muted);
+        }
+
+        .item-result {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .item-result.found {
+            color: var(--success);
+        }
+
+        .item-result.not-found {
+            color: var(--error);
+        }
+
+        /* Log section (inside progress panel) */
+        .log-section {
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            max-height: 200px;
+        }
+
+        .log-header {
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            margin-right: 8px;
+        }
+
+        .log-store {
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-right: 6px;
+            font-size: 10px;
+        }
+
+        .log-store.samokat { background: var(--samokat); color: white; }
+        .log-store.lavka { background: var(--lavka); color: var(--bg-primary); }
+        .log-store.kuper { background: var(--kuper); color: white; }
+
+        .log-action { color: var(--text-secondary); }
+        .log-success { color: var(--success); }
+        .log-error { color: var(--error); }
+        .log-info { color: var(--warning); }
+
+        /* Progress bar */
+        .total-progress {
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-hover);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Поиск товаров в магазинах</h1>
+            <span class="status-badge">Этап 2 из 3</span>
+            <button class="cancel-btn">Отмена</button>
+        </div>
+
+        <div class="main-content">
+            <!-- Left: WebView -->
+            <div class="webview-panel">
+                <div class="webview-header">
+                    <span>Сейчас:</span>
+                    <span class="store-badge lavka">Яндекс.Лавка</span>
+                    <span style="color: var(--text-secondary)">→ Поиск: Картофель</span>
+                </div>
+                <div class="webview-container">
+                    <div class="webview-placeholder">
+                        <div class="webview-placeholder-icon">🌐</div>
+                        <div class="webview-placeholder-text">
+                            Здесь отображается WebView2<br>
+                            с сайтом магазина
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Progress + Log -->
+            <div class="progress-panel">
+                <div class="progress-header">
+                    <h2>Прогресс поиска</h2>
+                    <div class="progress-summary">8 товаров × 3 магазина</div>
+                </div>
+                
+                <div class="progress-content">
+                    <div class="store-progress">
+                    <!-- Самокат - completed -->
+                    <div class="store-card completed">
+                        <div class="store-header">
+                            <div class="store-icon samokat">С</div>
+                            <span class="store-name">Самокат</span>
+                            <div class="store-status completed">
+                                ✓ Готово
+                            </div>
+                        </div>
+                        <div class="store-body">
+                            <div class="item-progress">
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Молоко 2.5%</span>
+                                    <span class="item-result found">97 ₽ × 2</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Сметана 20%</span>
+                                    <span class="item-result found">89 ₽</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Яйца С1</span>
+                                    <span class="item-result found">99 ₽</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Батон нарезной</span>
+                                    <span class="item-result found">45 ₽</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Картофель</span>
+                                    <span class="item-result found">69 ₽/кг</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Лук репчатый</span>
+                                    <span class="item-result found">49 ₽/кг</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Огурцы</span>
+                                    <span class="item-result found">159 ₽/кг</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Колбаса Докторская</span>
+                                    <span class="item-result found">289 ₽</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Яндекс.Лавка - active -->
+                    <div class="store-card active">
+                        <div class="store-header">
+                            <div class="store-icon lavka">Л</div>
+                            <span class="store-name">Яндекс.Лавка</span>
+                            <div class="store-status active">
+                                <div class="spinner"></div>
+                                Поиск...
+                            </div>
+                        </div>
+                        <div class="store-body">
+                            <div class="item-progress">
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Молоко 2.5%</span>
+                                    <span class="item-result found">94 ₽ × 2</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Сметана 20%</span>
+                                    <span class="item-result found">95 ₽</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Яйца С1</span>
+                                    <span class="item-result found">109 ₽</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon found">✓</span>
+                                    <span class="item-name">Батон нарезной</span>
+                                    <span class="item-result found">52 ₽</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon searching">
+                                        <div class="spinner" style="width:12px;height:12px;border-width:1.5px"></div>
+                                    </span>
+                                    <span class="item-name">Картофель</span>
+                                    <span class="item-result">поиск...</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">Лук репчатый</span>
+                                    <span class="item-result"></span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">Огурцы</span>
+                                    <span class="item-result"></span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">Колбаса Докторская</span>
+                                    <span class="item-result"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kuper - pending -->
+                    <div class="store-card">
+                        <div class="store-header">
+                            <div class="store-icon kuper">K</div>
+                            <span class="store-name">Kuper (Ашан)</span>
+                            <div class="store-status pending">
+                                Ожидание
+                            </div>
+                        </div>
+                        <div class="store-body">
+                            <div class="item-progress">
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">Молоко 2.5%</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">Сметана 20%</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">Яйца С1</span>
+                                </div>
+                                <div class="item-row">
+                                    <span class="item-status-icon pending">○</span>
+                                    <span class="item-name dimmed">+ ещё 5 товаров</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+                </div>
+                
+                <!-- Log section внутри progress-panel -->
+                <div class="log-section">
+                    <div class="log-header">
+                        📋 Лог операций
+                    </div>
+                    <div class="log-content">
+                    <div class="log-entry">
+                        <span class="log-time">12:34:15</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-action">Начинаем поиск...</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:18</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Молоко 2.5% → Домик в деревне 930мл</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:21</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Сметана 20% → Простоквашино 300г</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:24</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Яйца С1 → Окское 10шт</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:27</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Батон → Коломенский 400г</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:30</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Картофель → мытый 2кг</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:33</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Лук → репчатый 0.5кг</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:36</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Огурцы → свежие 0.5кг</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:39</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-success">✓ Колбаса → Докторская Клинский 400г</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:40</span>
+                        <span class="log-store samokat">Самокат</span>
+                        <span class="log-info">Завершено: 8/8 товаров найдено</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:41</span>
+                        <span class="log-store lavka">Лавка</span>
+                        <span class="log-action">Начинаем поиск...</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:44</span>
+                        <span class="log-store lavka">Лавка</span>
+                        <span class="log-success">✓ Молоко 2.5% → Домик в деревне 930мл</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:47</span>
+                        <span class="log-store lavka">Лавка</span>
+                        <span class="log-success">✓ Сметана 20% → Домик в деревне 300г</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:50</span>
+                        <span class="log-store lavka">Лавка</span>
+                        <span class="log-success">✓ Яйца С1 → Лавка 10шт</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:53</span>
+                        <span class="log-store lavka">Лавка</span>
+                        <span class="log-success">✓ Батон → нарезной 400г</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">12:34:56</span>
+                        <span class="log-store lavka">Лавка</span>
+                        <span class="log-action">Поиск: Картофель...</span>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="total-progress">
+            <div class="progress-label">
+                <span>Общий прогресс</span>
+                <span>13 из 24 (54%)</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 54%"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

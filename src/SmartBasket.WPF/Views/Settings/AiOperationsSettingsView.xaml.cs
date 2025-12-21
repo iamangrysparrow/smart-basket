@@ -34,6 +34,11 @@ public partial class AiOperationsSettingsView : UserControl
         EditPrompt("Labels", SettingsViewModel?.AiOperations.Labels);
     }
 
+    private void EditShoppingPrompt_Click(object sender, RoutedEventArgs e)
+    {
+        EditPrompt("Shopping", SettingsViewModel?.AiOperations.Shopping);
+    }
+
     private void EditPrompt(string operation, string? providerKey)
     {
         var vm = SettingsViewModel;
@@ -117,6 +122,18 @@ public partial class AiOperationsSettingsView : UserControl
         else
         {
             LabelsPromptIndicator.Text = "";
+        }
+
+        // Shopping indicator
+        var shoppingProvider = vm.AiOperations.Shopping;
+        if (!string.IsNullOrWhiteSpace(shoppingProvider) &&
+            vm.AiOperations.HasCustomPrompt("Shopping", shoppingProvider))
+        {
+            ShoppingPromptIndicator.Text = " (настроен)";
+        }
+        else
+        {
+            ShoppingPromptIndicator.Text = "";
         }
     }
 }

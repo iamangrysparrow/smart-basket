@@ -1,0 +1,983 @@
+<UserControl x:Class="SmartBasket.WPF.Views.Shopping.ShoppingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SmartBasket.WPF.Views.Shopping"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="900"
+             Background="{DynamicResource BackgroundBaseBrush}">
+
+    <UserControl.Resources>
+        <!-- User message style -->
+        <Style x:Key="UserMessageBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource AccentLightBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,3,0"/>
+            <Setter Property="CornerRadius" Value="8,8,0,8"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="60,4,12,4"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="MaxWidth" Value="500"/>
+        </Style>
+
+        <!-- Assistant message style -->
+        <Style x:Key="AssistantMessageBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundLayer1Brush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="3,0,0,0"/>
+            <Setter Property="CornerRadius" Value="8,8,8,0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="12,4,60,4"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="MaxWidth" Value="500"/>
+        </Style>
+
+        <!-- System message style -->
+        <Style x:Key="SystemMessageBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource WarningLightBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="40,4"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Draft item card style -->
+        <Style x:Key="DraftItemCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundLayer1Brush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+
+        <!-- Quantity button style -->
+        <Style x:Key="QuantityButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{DynamicResource BackgroundLayer2Brush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderDefaultBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Remove button style -->
+        <Style x:Key="RemoveButton" TargetType="Button" BasedOn="{StaticResource QuantityButton}">
+            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+            <Setter Property="ToolTip" Value="Удалить"/>
+        </Style>
+
+        <!-- User message template -->
+        <DataTemplate x:Key="UserMessageTemplate" DataType="{x:Type local:ShoppingChatMessage}">
+            <Border Style="{StaticResource UserMessageBorder}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Text}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                    <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm}'}"
+                               Style="{StaticResource CaptionText}"
+                               Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                               HorizontalAlignment="Right"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- Assistant message template -->
+        <DataTemplate x:Key="AssistantMessageTemplate" DataType="{x:Type local:ShoppingChatMessage}">
+            <Border Style="{StaticResource AssistantMessageBorder}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Text}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                    <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm}'}"
+                               Style="{StaticResource CaptionText}"
+                               Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                               HorizontalAlignment="Left"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- System message template -->
+        <DataTemplate x:Key="SystemMessageTemplate" DataType="{x:Type local:ShoppingChatMessage}">
+            <Border Style="{StaticResource SystemMessageBorder}">
+                <TextBlock Text="{Binding Text}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningBrush}"
+                           FontStyle="Italic"
+                           FontSize="12"/>
+            </Border>
+        </DataTemplate>
+
+        <!-- Draft item template -->
+        <DataTemplate x:Key="DraftItemTemplate">
+            <Border Style="{StaticResource DraftItemCard}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Name and category -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}"
+                                   Style="{StaticResource BodyText}"
+                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <!-- Quantity controls -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
+                        <Button Style="{StaticResource QuantityButton}"
+                                Content="-"
+                                Command="{Binding DataContext.DecreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                        <TextBlock VerticalAlignment="Center"
+                                   Margin="8,0"
+                                   MinWidth="40"
+                                   TextAlignment="Center"
+                                   Foreground="{DynamicResource ForegroundPrimaryBrush}">
+                            <Run Text="{Binding Quantity, StringFormat='{}{0:0.##}'}"/>
+                            <Run Text="{Binding Unit}" Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+                        </TextBlock>
+                        <Button Style="{StaticResource QuantityButton}"
+                                Content="+"
+                                Command="{Binding DataContext.IncreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </StackPanel>
+
+                    <!-- Remove button -->
+                    <Button Grid.Column="2"
+                            Style="{StaticResource RemoveButton}"
+                            Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}">
+                        <Path Data="{StaticResource IconClose}"
+                              Fill="{DynamicResource ErrorBrush}"
+                              Width="10" Height="10" Stretch="Uniform"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Welcome screen (no session) -->
+        <Border x:Name="WelcomePanel"
+                Visibility="{Binding ShowWelcome, Converter={StaticResource BoolToVis}}"
+                Background="{DynamicResource BackgroundBaseBrush}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="400">
+                <Path Data="{StaticResource IconCart}"
+                      Fill="{DynamicResource AccentBrush}"
+                      Width="64" Height="64" Stretch="Uniform"
+                      HorizontalAlignment="Center"
+                      Margin="0,0,0,24"/>
+
+                <TextBlock Text="Еженедельные закупки"
+                           Style="{StaticResource TitleText}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,8"/>
+
+                <TextBlock Text="Сформируйте список покупок с помощью AI-помощника. Он проанализирует ваши чеки и предложит товары на неделю."
+                           Style="{StaticResource BodyText}"
+                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="0,0,0,24"/>
+
+                <Button Style="{StaticResource PrimaryButton}"
+                        Content="Начать"
+                        Command="{Binding StartSessionCommand}"
+                        HorizontalAlignment="Center"
+                        Padding="32,12"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Drafting screen (active session) -->
+        <Grid x:Name="DraftingPanel"
+              Visibility="{Binding ShowDrafting, Converter={StaticResource BoolToVis}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="300"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="340" MinWidth="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Chat area -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Chat header -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BackgroundLayer1Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconAiChat}"
+                              Fill="{DynamicResource AccentBrush}"
+                              Width="20" Height="20" Stretch="Uniform"/>
+                        <TextBlock Text="AI-помощник"
+                                   Style="{StaticResource SubtitleText}"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Messages area -->
+                <ScrollViewer Grid.Row="1"
+                              x:Name="MessagesScrollViewer"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Background="{DynamicResource BackgroundBaseBrush}">
+                    <StackPanel Margin="0,8,0,8">
+                        <ItemsControl ItemsSource="{Binding Messages}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ContentControl Content="{Binding}">
+                                        <ContentControl.Style>
+                                            <Style TargetType="ContentControl">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource AssistantMessageTemplate}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                                        <Setter Property="ContentTemplate" Value="{StaticResource UserMessageTemplate}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSystem}" Value="True">
+                                                        <Setter Property="ContentTemplate" Value="{StaticResource SystemMessageTemplate}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ContentControl.Style>
+                                    </ContentControl>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Typing indicator -->
+                        <Border Style="{StaticResource AssistantMessageBorder}"
+                                Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}}"
+                                Margin="12,4,60,8">
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,3,0" Opacity="0.5"/>
+                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,3,0" Opacity="0.7"/>
+                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Opacity="0.9"/>
+                                </StackPanel>
+                                <TextBlock Text="Думаю..."
+                                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                           FontStyle="Italic"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Input area -->
+                <Border Grid.Row="2"
+                        Background="{DynamicResource BackgroundLayer1Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="InputTextBox"
+                                 Grid.Column="0"
+                                 Text="{Binding UserInput, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalContentAlignment="Center"
+                                 Padding="12,8"
+                                 MinHeight="36"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="False"
+                                 KeyDown="InputTextBox_KeyDown"/>
+
+                        <Button Grid.Column="1"
+                                Style="{StaticResource PrimaryButton}"
+                                Command="{Binding SendMessageCommand}"
+                                ToolTip="Отправить (Enter)"
+                                Padding="12,8"
+                                Margin="8,0,0,0">
+                            <Path Data="{StaticResource IconSend}"
+                                  Fill="{DynamicResource TextOnAccentBrush}"
+                                  Width="16" Height="16" Stretch="Uniform"/>
+                        </Button>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1"
+                          Width="4"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
+                          Background="{DynamicResource BorderDefaultBrush}"
+                          Cursor="SizeWE"/>
+
+            <!-- Right: Basket panel -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Basket header -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BackgroundLayer1Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <Path Data="{StaticResource IconCart}"
+                                  Fill="{DynamicResource AccentBrush}"
+                                  Width="20" Height="20" Stretch="Uniform"/>
+                            <TextBlock Text="Список покупок"
+                                       Style="{StaticResource SubtitleText}"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding TotalQuantityText}"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- Items list -->
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Background="{DynamicResource BackgroundBaseBrush}"
+                              Padding="12,8">
+                    <!-- Grouped by category -->
+                    <ItemsControl ItemsSource="{Binding GroupedItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,12">
+                                    <!-- Category header -->
+                                    <TextBlock Text="{Binding Category}"
+                                               Style="{StaticResource CaptionText}"
+                                               Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,4"/>
+
+                                    <!-- Items in category -->
+                                    <ItemsControl ItemsSource="{Binding Items}"
+                                                  ItemTemplate="{StaticResource DraftItemTemplate}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Empty state -->
+                <StackPanel Grid.Row="1"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Visibility="{Binding TotalItemsCount, Converter={StaticResource ZeroToVis}}">
+                    <Path Data="{StaticResource IconCart}"
+                          Fill="{DynamicResource ForegroundTertiaryBrush}"
+                          Width="48" Height="48" Stretch="Uniform"
+                          HorizontalAlignment="Center"
+                          Opacity="0.5"/>
+                    <TextBlock Text="Список пуст"
+                               Style="{StaticResource CaptionText}"
+                               Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Text="Напишите что нужно купить"
+                               Style="{StaticResource CaptionText}"
+                               Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Actions footer -->
+                <Border Grid.Row="2"
+                        Background="{DynamicResource BackgroundLayer1Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Clear button -->
+                        <Button Grid.Column="0"
+                                Style="{StaticResource SecondaryButton}"
+                                Content="Очистить"
+                                Command="{Binding ClearListCommand}"
+                                Padding="12,8"/>
+
+                        <!-- Proceed button -->
+                        <Button Grid.Column="2"
+                                Style="{StaticResource PrimaryButton}"
+                                Command="{Binding StartPlanningCommand}"
+                                Padding="16,8">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Собрать корзины" VerticalAlignment="Center"/>
+                                <Path Data="{StaticResource IconArrowRight}"
+                                      Fill="{DynamicResource TextOnAccentBrush}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Planning screen (searching in stores) -->
+        <Grid x:Name="PlanningPanel"
+              Visibility="{Binding ShowPlanning, Converter={StaticResource BoolToVis}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Path Data="{StaticResource IconSearch}"
+                              Fill="{DynamicResource AccentBrush}"
+                              Width="20" Height="20" Stretch="Uniform"/>
+                        <TextBlock Text="Поиск товаров в магазинах"
+                                   Style="{StaticResource SubtitleText}"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource SecondaryButton}"
+                            Content="Отмена"
+                            Command="{Binding CancelPlanningCommand}"
+                            Padding="12,6"/>
+                </Grid>
+            </Border>
+
+            <!-- Main content -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="400"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="380"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- WebView (left) -->
+                <Border Grid.Column="0"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="1"
+                        Margin="16">
+                    <wv2:WebView2 x:Name="ParserWebView"/>
+                </Border>
+
+                <!-- Splitter -->
+                <GridSplitter Grid.Column="1"
+                              Width="4"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Stretch"
+                              Background="{DynamicResource BorderDefaultBrush}"
+                              Cursor="SizeWE"/>
+
+                <!-- Progress panel (right) -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Store cards -->
+                    <ItemsControl Grid.Row="0"
+                                  ItemsSource="{Binding StoreProgress}"
+                                  Margin="12,12,12,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource BackgroundLayer1Brush}"
+                                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12"
+                                        Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Store name -->
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding StoreName}"
+                                                   Style="{StaticResource BodyText}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+
+                                        <!-- Progress bar -->
+                                        <ProgressBar Grid.Row="1"
+                                                     Value="{Binding ProgressPercent}"
+                                                     Maximum="100"
+                                                     Height="4"
+                                                     Margin="0,8,0,4"/>
+
+                                        <!-- Status -->
+                                        <TextBlock Grid.Row="2"
+                                                   Text="{Binding StatusText}"
+                                                   Style="{StaticResource CaptionText}"
+                                                   Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Log -->
+                    <Border Grid.Row="1"
+                            Background="{DynamicResource BackgroundLayer1Brush}"
+                            BorderBrush="{DynamicResource BorderDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Margin="12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="Лог операций"
+                                       Style="{StaticResource CaptionText}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                       Margin="12,8"/>
+
+                            <ScrollViewer Grid.Row="1"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding PlanningLog}"
+                                              Margin="12,0,12,8">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"
+                                                       Style="{StaticResource CaptionText}"
+                                                       Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- Overall progress -->
+            <Border Grid.Row="2"
+                    Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding CurrentOperationText}"
+                                   Style="{StaticResource BodyText}"
+                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"/>
+                        <ProgressBar Value="{Binding OverallProgress}"
+                                     Maximum="100"
+                                     Height="6"
+                                     Margin="0,8,0,0"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding OverallProgress, StringFormat='{}{0:0}%'}"
+                               Style="{StaticResource SubtitleText}"
+                               Foreground="{DynamicResource AccentBrush}"
+                               VerticalAlignment="Center"
+                               Margin="16,0,0,0"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Analyzing screen (comparing baskets) -->
+        <Grid x:Name="AnalyzingPanel"
+              Visibility="{Binding ShowAnalyzing, Converter={StaticResource BoolToVis}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Path Data="{StaticResource IconChart}"
+                              Fill="{DynamicResource AccentBrush}"
+                              Width="20" Height="20" Stretch="Uniform"/>
+                        <TextBlock Text="Сравнение корзин"
+                                   Style="{StaticResource SubtitleText}"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource SecondaryButton}"
+                            Content="← Изменить список"
+                            Command="{Binding BackToDraftingCommand}"
+                            Padding="12,6"/>
+                </Grid>
+            </Border>
+
+            <!-- Basket cards -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Background="{DynamicResource BackgroundBaseBrush}"
+                          Padding="16">
+                <ItemsControl ItemsSource="{Binding Baskets}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="320"
+                                    Margin="0,0,16,16"
+                                    Background="{DynamicResource BackgroundLayer1Brush}"
+                                    BorderThickness="2"
+                                    CornerRadius="8"
+                                    Padding="16"
+                                    Cursor="Hand">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderDefaultBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                            </DataTrigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentLightBrush}"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Border.InputBindings>
+                                    <MouseBinding MouseAction="LeftClick"
+                                                  Command="{Binding DataContext.SelectBasketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  CommandParameter="{Binding}"/>
+                                </Border.InputBindings>
+
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Store name with selection indicator -->
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                        <Ellipse Width="12" Height="12"
+                                                 Fill="{Binding Color}"
+                                                 VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding StoreName}"
+                                                   Style="{StaticResource SubtitleText}"
+                                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                                                   Margin="8,0,0,0"/>
+                                        <Path Data="{StaticResource IconCheck}"
+                                              Fill="{DynamicResource SuccessBrush}"
+                                              Width="16" Height="16" Stretch="Uniform"
+                                              Margin="8,0,0,0"
+                                              Visibility="{Binding IsSelected, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+
+                                    <!-- Total price -->
+                                    <TextBlock Grid.Row="1"
+                                               Style="{StaticResource TitleText}"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               Margin="0,8,0,0">
+                                        <Run Text="{Binding TotalPrice, StringFormat='{}{0:N0}'}" FontWeight="Bold"/>
+                                        <Run Text="₽"/>
+                                    </TextBlock>
+
+                                    <!-- Items status -->
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="{Binding ItemsStatusText}"
+                                                   Style="{StaticResource CaptionText}"
+                                                   Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+                                        <TextBlock Text=" • "
+                                                   Style="{StaticResource CaptionText}"
+                                                   Foreground="{DynamicResource ForegroundTertiaryBrush}"/>
+                                        <TextBlock Text="{Binding DeliveryTime}"
+                                                   Style="{StaticResource CaptionText}"
+                                                   Foreground="{DynamicResource ForegroundSecondaryBrush}"/>
+                                        <TextBlock Text=" • "
+                                                   Style="{StaticResource CaptionText}"
+                                                   Foreground="{DynamicResource ForegroundTertiaryBrush}"/>
+                                        <TextBlock Text="{Binding DeliveryPrice}"
+                                                   Style="{StaticResource CaptionText}"
+                                                   Foreground="{DynamicResource SuccessBrush}"/>
+                                    </StackPanel>
+
+                                    <!-- Items list -->
+                                    <ItemsControl Grid.Row="3"
+                                                  ItemsSource="{Binding Items}"
+                                                  Margin="0,12,0,0"
+                                                  MaxHeight="200">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Name}"
+                                                               Style="{StaticResource CaptionText}"
+                                                               Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding LineTotal, StringFormat='{}{0:N0} ₽'}"
+                                                               Style="{StaticResource CaptionText}"
+                                                               Foreground="{DynamicResource ForegroundPrimaryBrush}"
+                                                               Margin="8,0,0,0"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- Progress bar for items found -->
+                                    <ProgressBar Grid.Row="4"
+                                                 Value="{Binding FoundPercent, Mode=OneWay}"
+                                                 Maximum="100"
+                                                 Height="4"
+                                                 Margin="0,12,0,0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Footer with action button -->
+            <Border Grid.Row="2"
+                    Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Selected basket info -->
+                    <StackPanel Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding SelectedBasket, Converter={StaticResource NotNullToVis}}">
+                        <TextBlock Style="{StaticResource BodyText}"
+                                   Foreground="{DynamicResource ForegroundPrimaryBrush}">
+                            <Run Text="Выбрано:"/>
+                            <Run Text="{Binding SelectedBasket.StoreName}" FontWeight="SemiBold"/>
+                            <Run Text="—"/>
+                            <Run Text="{Binding SelectedBasket.TotalPrice, StringFormat='{}{0:N0} ₽'}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Create cart button -->
+                    <Button Grid.Column="1"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding CreateCartCommand}"
+                            Padding="24,10">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Оформить заказ" VerticalAlignment="Center"/>
+                            <Path Data="{StaticResource IconArrowRight}"
+                                  Fill="{DynamicResource TextOnAccentBrush}"
+                                  Width="12" Height="12" Stretch="Uniform"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Finalizing screen (adding to cart) -->
+        <Grid x:Name="FinalizingPanel"
+              Visibility="{Binding ShowFinalizing, Converter={StaticResource BoolToVis}}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressBar IsIndeterminate="True"
+                             Width="200"
+                             Height="4"/>
+                <TextBlock Text="Добавляю товары в корзину..."
+                           Style="{StaticResource SubtitleText}"
+                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,16,0,0"/>
+                <TextBlock Text="{Binding SelectedStoreName, StringFormat='Магазин: {0}'}"
+                           Style="{StaticResource BodyText}"
+                           Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Completed screen -->
+        <Grid x:Name="CompletedPanel"
+              Visibility="{Binding ShowCompleted, Converter={StaticResource BoolToVis}}"
+              Background="{DynamicResource BackgroundBaseBrush}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
+                <!-- Success icon -->
+                <Border Width="80" Height="80"
+                        Background="{DynamicResource SuccessLightBrush}"
+                        CornerRadius="40"
+                        HorizontalAlignment="Center">
+                    <Path Data="{StaticResource IconCheck}"
+                          Fill="{DynamicResource SuccessBrush}"
+                          Width="40" Height="40" Stretch="Uniform"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"/>
+                </Border>
+
+                <TextBlock Text="Корзина собрана!"
+                           Style="{StaticResource TitleText}"
+                           HorizontalAlignment="Center"
+                           Margin="0,24,0,0"/>
+
+                <TextBlock Style="{StaticResource BodyText}"
+                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                           TextAlignment="Center"
+                           Margin="0,8,0,0">
+                    <Run Text="Товары добавлены в корзину"/>
+                    <Run Text="{Binding SelectedStoreName}" FontWeight="SemiBold"/>
+                </TextBlock>
+
+                <!-- Order summary -->
+                <Border Background="{DynamicResource BackgroundLayer1Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="24,16"
+                        Margin="0,24,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Итого к оплате"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Style="{StaticResource TitleText}"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,4,0,0">
+                            <Run Text="{Binding OrderTotal, StringFormat='{}{0:N0}'}" FontSize="32"/>
+                            <Run Text="₽" FontSize="24"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- Action buttons -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0,24,0,0">
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Command="{Binding OpenCheckoutUrlCommand}"
+                            Padding="24,12">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconExternalLink}"
+                                  Fill="{DynamicResource TextOnAccentBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"
+                                  VerticalAlignment="Center"/>
+                            <TextBlock Text="Открыть корзину"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Content="Новая корзина"
+                            Command="{Binding StartNewSessionCommand}"
+                            Padding="24,12"
+                            Margin="12,0,0,0"/>
+                </StackPanel>
+
+                <!-- Checkout URL (for reference) -->
+                <TextBlock Text="{Binding CheckoutUrl}"
+                           Style="{StaticResource CaptionText}"
+                           Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,16,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

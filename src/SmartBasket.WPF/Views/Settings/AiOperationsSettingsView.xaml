@@ -108,6 +108,34 @@
                         </StackPanel>
                     </GroupBox>
 
+                    <!-- Shopping -->
+                    <GroupBox Header="Закупки" Style="{StaticResource ModernGroupBox}">
+                        <StackPanel>
+                            <TextBlock Text="Модуль формирования списка покупок. Рекомендуется YandexAgent с tool calling."
+                                       Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" Text="{Binding Shopping, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          IsEditable="True" FontSize="12" Padding="4,3"/>
+                            </Grid>
+                            <!-- Edit Prompt Link -->
+                            <TextBlock Margin="100,6,0,0">
+                                <Hyperlink Click="EditShoppingPrompt_Click"
+                                           TextDecorations="None"
+                                           Foreground="{DynamicResource AccentBrush}">
+                                    <Run Text="Редактировать промпт"/>
+                                </Hyperlink>
+                                <Run x:Name="ShoppingPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </GroupBox>
+
                     <!-- Info -->
                     <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="4" Padding="12" Margin="0,8,0,0">
                         <StackPanel>

@@ -29,6 +29,12 @@ public class AiOperationsConfig
     public string? Chat { get; set; }
 
     /// <summary>
+    /// Ключ провайдера для модуля закупок (формирование списка покупок).
+    /// Рекомендуется YandexAgent с tool calling.
+    /// </summary>
+    public string? Shopping { get; set; }
+
+    /// <summary>
     /// Кастомные промпты для операций в связке с провайдером.
     /// Ключ: "Operation/ProviderKey", например "Classification/Ollama/llama3.2:3b"
     /// Значение: текст промпта

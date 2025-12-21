@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Basket — Этап 3: Анализ корзин</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --bg-hover: #3e3e42;
+            --border: #3e3e42;
+            --text-primary: #cccccc;
+            --text-secondary: #858585;
+            --text-muted: #6e6e6e;
+            --accent: #0e639c;
+            --accent-hover: #1177bb;
+            --success: #4ec9b0;
+            --warning: #dcdcaa;
+            --error: #f14c4c;
+            --samokat: #ff6b35;
+            --lavka: #ffcc00;
+            --kuper: #00b956;
+            --radius: 4px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans 3', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: var(--success);
+            color: var(--bg-primary);
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            margin-left: auto;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .back-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Main layout */
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            overflow: hidden;
+        }
+
+        /* Left: Basket cards */
+        .baskets-panel {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .ai-recommendation {
+            background: linear-gradient(135deg, rgba(78, 201, 176, 0.1), rgba(14, 99, 156, 0.1));
+            border: 1px solid rgba(78, 201, 176, 0.3);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .ai-icon {
+            font-size: 24px;
+        }
+
+        .ai-text {
+            flex: 1;
+        }
+
+        .ai-text strong {
+            color: var(--success);
+        }
+
+        .ai-text p {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 4px;
+            color: var(--text-secondary);
+        }
+
+        /* Basket cards grid */
+        .baskets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .basket-card {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .basket-card:hover {
+            border-color: var(--text-secondary);
+        }
+
+        .basket-card.selected {
+            border-color: var(--success);
+        }
+
+        .basket-card.best {
+            border-color: var(--success);
+        }
+
+        .basket-card.best::before {
+            content: "🏆 Лучшая цена";
+            display: block;
+            background: var(--success);
+            color: var(--bg-primary);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 12px;
+            text-align: center;
+        }
+
+        .basket-card.incomplete::before {
+            content: "⚠️ Не все товары";
+            display: block;
+            background: var(--warning);
+            color: var(--bg-primary);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 12px;
+            text-align: center;
+        }
+
+        .basket-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-tertiary);
+        }
+
+        .store-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+        }
+
+        .store-icon.samokat { background: var(--samokat); }
+        .store-icon.lavka { background: var(--lavka); color: var(--bg-primary); }
+        .store-icon.kuper { background: var(--kuper); }
+
+        .store-info {
+            flex: 1;
+        }
+
+        .store-name {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .store-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .basket-price {
+            text-align: right;
+        }
+
+        .price-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .basket-card.best .price-value {
+            color: var(--success);
+        }
+
+        .price-diff {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .price-diff.cheaper {
+            color: var(--success);
+        }
+
+        .price-diff.expensive {
+            color: var(--error);
+        }
+
+        .basket-body {
+            padding: 16px;
+        }
+
+        .basket-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .stat-icon {
+            font-size: 14px;
+        }
+
+        .stat.success { color: var(--success); }
+        .stat.warning { color: var(--warning); }
+        .stat.error { color: var(--error); }
+
+        .basket-items-preview {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .basket-actions {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .action-btn.primary {
+            background: var(--success);
+            border: none;
+            color: var(--bg-primary);
+        }
+
+        .action-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .action-btn.secondary {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .action-btn.secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Right: Details panel */
+        .details-panel {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .details-header {
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .details-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .details-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .details-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        /* Comparison table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .comparison-table th {
+            text-align: left;
+            padding: 8px 6px;
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        .comparison-table td {
+            padding: 8px 6px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .comparison-table tr:hover td {
+            background: var(--bg-hover);
+        }
+
+        .item-cell {
+            max-width: 120px;
+        }
+
+        .item-cell .name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .item-cell .qty {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .price-cell {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .price-cell.best {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .price-cell.na {
+            color: var(--error);
+        }
+
+        /* Summary */
+        .summary-section {
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .summary-row.total {
+            font-weight: 600;
+            font-size: 15px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 8px;
+        }
+
+        .summary-row .label {
+            color: var(--text-secondary);
+        }
+
+        .summary-row.total .label {
+            color: var(--text-primary);
+        }
+
+        .summary-row .value.best {
+            color: var(--success);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Анализ корзин</h1>
+            <span class="status-badge">Этап 3 из 3</span>
+            <button class="back-btn">← Вернуться к списку</button>
+        </div>
+
+        <div class="main-content">
+            <!-- Left: Basket cards -->
+            <div class="baskets-panel">
+                <div class="ai-recommendation">
+                    <div class="ai-icon">💡</div>
+                    <div class="ai-text">
+                        <strong>Рекомендую Самокат</strong>
+                        <p>
+                            Все 8 товаров в наличии, самая низкая цена — 1,247 ₽. 
+                            В Лавке дороже на 65 ₽, в Kuper нет огурцов.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="baskets-grid">
+                    <!-- Самокат - best -->
+                    <div class="basket-card best selected">
+                        <div class="basket-header">
+                            <div class="store-icon samokat">С</div>
+                            <div class="store-info">
+                                <div class="store-name">Самокат</div>
+                                <div class="store-meta">Доставка 15-30 мин</div>
+                            </div>
+                            <div class="basket-price">
+                                <div class="price-value">1,247 ₽</div>
+                            </div>
+                        </div>
+                        <div class="basket-body">
+                            <div class="basket-stats">
+                                <div class="stat success">
+                                    <span class="stat-icon">✓</span>
+                                    8/8 товаров
+                                </div>
+                                <div class="stat">
+                                    <span class="stat-icon">📦</span>
+                                    ~4.5 кг
+                                </div>
+                                <div class="stat success">
+                                    <span class="stat-icon">🚚</span>
+                                    Бесплатно
+                                </div>
+                            </div>
+                            <div class="basket-items-preview">
+                                Молоко ×2, Сметана, Яйца, Батон, Картофель 2кг, Лук, Огурцы, Колбаса
+                            </div>
+                        </div>
+                        <div class="basket-actions">
+                            <button class="action-btn primary">Оформить заказ →</button>
+                            <button class="action-btn secondary">Детали</button>
+                        </div>
+                    </div>
+
+                    <!-- Яндекс.Лавка -->
+                    <div class="basket-card">
+                        <div class="basket-header">
+                            <div class="store-icon lavka">Л</div>
+                            <div class="store-info">
+                                <div class="store-name">Яндекс.Лавка</div>
+                                <div class="store-meta">Доставка 10-20 мин</div>
+                            </div>
+                            <div class="basket-price">
+                                <div class="price-value">1,312 ₽</div>
+                                <div class="price-diff expensive">+65 ₽</div>
+                            </div>
+                        </div>
+                        <div class="basket-body">
+                            <div class="basket-stats">
+                                <div class="stat success">
+                                    <span class="stat-icon">✓</span>
+                                    8/8 товаров
+                                </div>
+                                <div class="stat">
+                                    <span class="stat-icon">📦</span>
+                                    ~4.5 кг
+                                </div>
+                                <div class="stat success">
+                                    <span class="stat-icon">🚚</span>
+                                    Бесплатно
+                                </div>
+                            </div>
+                            <div class="basket-items-preview">
+                                Молоко ×2, Сметана, Яйца, Батон, Картофель 2кг, Лук, Огурцы, Колбаса
+                            </div>
+                        </div>
+                        <div class="basket-actions">
+                            <button class="action-btn secondary">Оформить заказ →</button>
+                            <button class="action-btn secondary">Детали</button>
+                        </div>
+                    </div>
+
+                    <!-- Kuper - incomplete -->
+                    <div class="basket-card incomplete">
+                        <div class="basket-header">
+                            <div class="store-icon kuper">K</div>
+                            <div class="store-info">
+                                <div class="store-name">Kuper (Ашан)</div>
+                                <div class="store-meta">Доставка 60-90 мин</div>
+                            </div>
+                            <div class="basket-price">
+                                <div class="price-value">1,189 ₽</div>
+                                <div class="price-diff cheaper">−58 ₽</div>
+                            </div>
+                        </div>
+                        <div class="basket-body">
+                            <div class="basket-stats">
+                                <div class="stat warning">
+                                    <span class="stat-icon">⚠</span>
+                                    7/8 товаров
+                                </div>
+                                <div class="stat">
+                                    <span class="stat-icon">📦</span>
+                                    ~4.2 кг
+                                </div>
+                                <div class="stat success">
+                                    <span class="stat-icon">🚚</span>
+                                    Бесплатно
+                                </div>
+                            </div>
+                            <div class="basket-items-preview">
+                                <span style="color: var(--error)">✗ Огурцы — нет в наличии</span><br>
+                                Молоко ×2, Сметана, Яйца, Батон, Картофель, Лук, Колбаса
+                            </div>
+                        </div>
+                        <div class="basket-actions">
+                            <button class="action-btn secondary">Оформить заказ →</button>
+                            <button class="action-btn secondary">Детали</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Details panel -->
+            <div class="details-panel">
+                <div class="details-header">
+                    <h3>Сравнение цен</h3>
+                    <div class="details-subtitle">Все магазины, по товарам</div>
+                </div>
+
+                <div class="details-content">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Товар</th>
+                                <th style="text-align:right">Самокат</th>
+                                <th style="text-align:right">Лавка</th>
+                                <th style="text-align:right">Kuper</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Молоко 2.5%</div>
+                                    <div class="qty">2 л</div>
+                                </td>
+                                <td class="price-cell best">194 ₽</td>
+                                <td class="price-cell">188 ₽</td>
+                                <td class="price-cell">178 ₽</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Сметана 20%</div>
+                                    <div class="qty">1 шт</div>
+                                </td>
+                                <td class="price-cell best">89 ₽</td>
+                                <td class="price-cell">95 ₽</td>
+                                <td class="price-cell">79 ₽</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Яйца С1</div>
+                                    <div class="qty">10 шт</div>
+                                </td>
+                                <td class="price-cell best">99 ₽</td>
+                                <td class="price-cell">109 ₽</td>
+                                <td class="price-cell">89 ₽</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Батон нарезной</div>
+                                    <div class="qty">1 шт</div>
+                                </td>
+                                <td class="price-cell">45 ₽</td>
+                                <td class="price-cell">52 ₽</td>
+                                <td class="price-cell best">39 ₽</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Картофель</div>
+                                    <div class="qty">2 кг</div>
+                                </td>
+                                <td class="price-cell">138 ₽</td>
+                                <td class="price-cell">158 ₽</td>
+                                <td class="price-cell best">118 ₽</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Лук репчатый</div>
+                                    <div class="qty">0.5 кг</div>
+                                </td>
+                                <td class="price-cell">25 ₽</td>
+                                <td class="price-cell">29 ₽</td>
+                                <td class="price-cell best">19 ₽</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Огурцы</div>
+                                    <div class="qty">0.5 кг</div>
+                                </td>
+                                <td class="price-cell">80 ₽</td>
+                                <td class="price-cell best">75 ₽</td>
+                                <td class="price-cell na">—</td>
+                            </tr>
+                            <tr>
+                                <td class="item-cell">
+                                    <div class="name">Колбаса Докторская</div>
+                                    <div class="qty">400 г</div>
+                                </td>
+                                <td class="price-cell">289 ₽</td>
+                                <td class="price-cell">299 ₽</td>
+                                <td class="price-cell best">279 ₽</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="summary-section">
+                    <div class="summary-row">
+                        <span class="label">Самокат (8 товаров)</span>
+                        <span class="value">1,247 ₽</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="label">Яндекс.Лавка (8 товаров)</span>
+                        <span class="value">1,312 ₽</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="label">Kuper (7 товаров)</span>
+                        <span class="value">1,189 ₽</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span class="label">Лучшая полная корзина</span>
+                        <span class="value best">Самокат 1,247 ₽</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

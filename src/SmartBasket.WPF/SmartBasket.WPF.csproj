@@ -4,10 +4,15 @@
     <ProjectReference Include="..\SmartBasket.Core\SmartBasket.Core.csproj" />
     <ProjectReference Include="..\SmartBasket.Data\SmartBasket.Data.csproj" />
     <ProjectReference Include="..\SmartBasket.Services\SmartBasket.Services.csproj" />
+    <!-- AiWebSniffer for store parsers -->
+    <ProjectReference Include="D:\AI\ai-web-sniffer-02\src\AiWebSniffer.Core\AiWebSniffer.Core.csproj" />
+    <ProjectReference Include="D:\AI\ai-web-sniffer-02\src\AiWebSniffer.Parsers\AiWebSniffer.Parsers.csproj" />
+    <ProjectReference Include="D:\AI\ai-web-sniffer-02\src\AiWebSniffer.WebView2\AiWebSniffer.WebView2.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
     <PackageReference Include="HandyControl" Version="3.5.1" />
     <PackageReference Include="MdXaml" Version="1.27.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.*">
@@ -50,6 +55,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="prompt_tool_error.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="prompt_shopping_system.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="prompt_shopping_initial.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="user_labels.txt">

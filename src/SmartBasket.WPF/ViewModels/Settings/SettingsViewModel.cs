@@ -594,6 +594,45 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void CloneAiProvider()
+    {
+        if (SelectedAiProvider == null) return;
+
+        // Создаём копию с новым ключом
+        var cloned = new AiProviderViewModel
+        {
+            Provider = SelectedAiProvider.Provider,
+            Model = SelectedAiProvider.Model,
+            BaseUrl = SelectedAiProvider.BaseUrl,
+            Temperature = SelectedAiProvider.Temperature,
+            TimeoutSeconds = SelectedAiProvider.TimeoutSeconds,
+            MaxTokens = SelectedAiProvider.MaxTokens,
+            ApiKey = SelectedAiProvider.ApiKey,
+            FolderId = SelectedAiProvider.FolderId,
+            AgentId = SelectedAiProvider.AgentId
+        };
+
+        // Генерируем уникальный ключ
+        var baseKey = SelectedAiProvider.Key;
+        var newKey = baseKey + "_copy";
+        int counter = 2;
+        while (AiProviders.Any(p => p.Key == newKey))
+        {
+            newKey = $"{baseKey}_copy{counter}";
+            counter++;
+        }
+        cloned.Key = newKey;
+
+        AiProviders.Add(cloned);
+        SelectedAiProvider = cloned;
+        HasUnsavedChanges = true;
+        UpdateAvailableProviderKeys();
+        BuildCategoryTree();
+
+        _log?.Invoke($"[Settings] Провайдер клонирован: {baseKey} → {newKey}");
+    }
+
+    [RelayCommand]
     private async Task TestAiProvider()
     {
         if (SelectedAiProvider == null) return;

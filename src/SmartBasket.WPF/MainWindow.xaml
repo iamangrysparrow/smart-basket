@@ -28,17 +28,56 @@
                 BorderThickness="0,0,0,1"
                 Height="{DynamicResource ToolbarHeight}">
             <DockPanel Margin="16,0">
-                <!-- Logo (Left) -->
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,24,0">
-                    <Border Background="{DynamicResource AccentBrush}"
-                            CornerRadius="6" Width="24" Height="24" Margin="0,0,8,0">
-                        <TextBlock Text="🛒" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <TextBlock Text="Smart Basket"
-                               Style="{StaticResource SubtitleText}"
-                               Foreground="{DynamicResource AccentBrush}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+                <!-- Logo as dropdown Menu (Left) -->
+                <Menu Style="{StaticResource AppMenuStyle}" DockPanel.Dock="Left" Margin="0,0,16,0">
+                    <MenuItem Style="{StaticResource AppMenuHeaderStyle}">
+                        <MenuItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconCart}"
+                                      Fill="{DynamicResource AccentBrush}"
+                                      Width="16" Height="16" Stretch="Uniform"
+                                      VerticalAlignment="Center"/>
+                                <TextBlock Text="Smart Basket"
+                                           FontWeight="SemiBold"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"/>
+                                <Path Data="{StaticResource IconArrowDown}"
+                                      Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                      Width="10" Height="10" Stretch="Uniform"
+                                      Margin="6,0,0,0"
+                                      VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </MenuItem.Header>
+
+                        <!-- Modules -->
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="🛒  Закупки"
+                                  Click="OpenShopping_Click"/>
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="💬  AI Чат"
+                                  Click="OpenAiChat_Click"/>
+
+                        <Separator Style="{StaticResource AppMenuSeparatorStyle}"/>
+
+                        <!-- Receipt Actions -->
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="📥  Собрать чеки"
+                                  Command="{Binding CollectReceiptsCommand}"
+                                  IsEnabled="{Binding IsNotProcessing}"/>
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="🗑️  Удалить выбранный чек"
+                                  Click="DeleteSelectedReceipt_Click"/>
+
+                        <Separator Style="{StaticResource AppMenuSeparatorStyle}"/>
+
+                        <!-- Help -->
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="❓  О программе"
+                                  Click="ShowAbout_Click"/>
+                    </MenuItem>
+                </Menu>
 
                 <!-- Tabs (Left, after logo) -->
                 <StackPanel x:Name="TabButtons" Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Stretch">
@@ -53,6 +92,33 @@
                                  Content="Продукты"
                                  Checked="TabProducts_Checked"
                                  GroupName="MainTabs"/>
+
+                    <!-- Shopping Tab (появляется динамически) -->
+                    <StackPanel x:Name="ShoppingTabPanel" Orientation="Horizontal" Visibility="Collapsed" VerticalAlignment="Stretch">
+                        <RadioButton x:Name="TabShopping"
+                                     Style="{StaticResource TabButton}"
+                                     Checked="TabShopping_Checked"
+                                     GroupName="MainTabs"
+                                     Padding="12,0,4,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconCart}"
+                                      Fill="{DynamicResource ForegroundPrimaryBrush}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      Margin="0,0,6,0"/>
+                                <TextBlock Text="Закупки" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        <Button Style="{StaticResource ToolbarIconButton}"
+                                Click="CloseShopping_Click"
+                                ToolTip="Закрыть модуль закупок"
+                                VerticalAlignment="Center"
+                                Padding="4"
+                                Margin="-4,0,0,0">
+                            <Path Data="{StaticResource IconClose}"
+                                  Fill="{DynamicResource ForegroundSecondaryBrush}"
+                                  Width="8" Height="8" Stretch="Uniform"/>
+                        </Button>
+                    </StackPanel>
 
                     <!-- AI Chat Tab (появляется динамически) -->
                     <StackPanel x:Name="AiChatTabPanel" Orientation="Horizontal" Visibility="Collapsed" VerticalAlignment="Stretch">
@@ -84,72 +150,24 @@
 
                 <!-- Actions (Right) -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                    <!-- AI Chat Button -->
-                    <Button Style="{StaticResource SecondaryButton}"
-                            Click="OpenAiChat_Click"
-                            ToolTip="AI консультант"
-                            Padding="12,6"
-                            Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource IconAiChat}"
-                                  Fill="{DynamicResource AccentBrush}"
-                                  Width="14" Height="14" Stretch="Uniform"
-                                  Margin="0,0,6,0"/>
-                            <TextBlock Text="AI Chat"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Collect Button (Primary) -->
-                    <Button Style="{StaticResource PrimaryButton}"
-                            Command="{Binding CollectReceiptsCommand}"
-                            IsEnabled="{Binding IsNotProcessing}"
-                            ToolTip="Collect receipts from all sources (Ctrl+F)"
-                            Padding="12,6">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="✓" Margin="0,0,6,0"/>
-                            <TextBlock Text="Collect"/>
-                        </StackPanel>
-                    </Button>
-
                     <!-- Cancel Button (visible only when processing) -->
                     <Button Style="{StaticResource DangerButton}"
                             Command="{Binding CancelOperationCommand}"
                             Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}}"
-                            ToolTip="Cancel operation"
-                            Margin="8,0,0,0"
+                            ToolTip="Отменить операцию"
                             Padding="12,6">
-                        <TextBlock Text="Cancel"/>
+                        <TextBlock Text="Отмена"/>
                     </Button>
 
-                    <!-- Divider -->
-                    <Border Width="1" Height="24" Background="{DynamicResource BorderDefaultBrush}" Margin="12,0"/>
-
-                    <!-- DB Actions (Ghost buttons) -->
-                    <Button Style="{StaticResource ToolbarIconButton}"
-                            Command="{Binding InitializeDatabaseCommand}"
-                            IsEnabled="{Binding IsNotProcessing}"
-                            ToolTip="Initialize database">
-                        <Path Data="{StaticResource IconDatabase}"
-                              Fill="{DynamicResource ForegroundSecondaryBrush}"
-                              Width="16" Height="16" Stretch="Uniform"/>
-                    </Button>
-
-                    <Button Style="{StaticResource ToolbarIconButton}"
-                            Command="{Binding ResetDatabaseCommand}"
-                            IsEnabled="{Binding IsNotProcessing}"
-                            ToolTip="Reset database (destructive!)">
-                        <Path Data="{StaticResource IconTrash}"
-                              Fill="{DynamicResource ErrorBrush}"
-                              Width="16" Height="16" Stretch="Uniform"/>
-                    </Button>
-
-                    <!-- Divider -->
-                    <Border Width="1" Height="24" Background="{DynamicResource BorderDefaultBrush}" Margin="8,0"/>
+                    <!-- Divider (visible only when processing) -->
+                    <Border Width="1" Height="24" Background="{DynamicResource BorderDefaultBrush}"
+                            Margin="8,0"
+                            Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}}"/>
 
                     <!-- Logs Toggle -->
                     <Button Style="{StaticResource ToolbarIconButton}"
                             Click="ToggleLogPanel_Click"
-                            ToolTip="Toggle log panel">
+                            ToolTip="Панель логов">
                         <Path Data="{StaticResource IconLog}"
                               Fill="{DynamicResource ForegroundSecondaryBrush}"
                               Width="16" Height="16" Stretch="Uniform"/>
@@ -158,7 +176,7 @@
                     <!-- Settings -->
                     <Button Style="{StaticResource ToolbarIconButton}"
                             Click="OpenSettingsWindow_Click"
-                            ToolTip="Settings">
+                            ToolTip="Настройки">
                         <Path Data="{StaticResource IconSettings}"
                               Fill="{DynamicResource ForegroundSecondaryBrush}"
                               Width="16" Height="16" Stretch="Uniform"/>
@@ -168,7 +186,7 @@
                     <Button x:Name="ThemeToggleButton"
                             Style="{StaticResource ToolbarIconButton}"
                             Click="ToggleTheme_Click"
-                            ToolTip="Toggle light/dark theme">
+                            ToolTip="Сменить тему">
                         <Path x:Name="ThemeIcon"
                               Data="{StaticResource IconMoon}"
                               Fill="{DynamicResource WarningBrush}"

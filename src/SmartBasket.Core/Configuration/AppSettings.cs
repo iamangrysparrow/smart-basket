@@ -1,9 +1,12 @@
+using SmartBasket.Core.Shopping;
+
 namespace SmartBasket.Core.Configuration;
 
 public class AppSettings
 {
     public string Theme { get; set; } = "Light";
     public DatabaseSettings Database { get; set; } = new();
+    public ShoppingSettings Shopping { get; set; } = new();
 
     // === Новая модульная конфигурация ===
 

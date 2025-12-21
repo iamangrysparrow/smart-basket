@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Basket — Заказ оформлен</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --bg-hover: #3e3e42;
+            --border: #3e3e42;
+            --text-primary: #cccccc;
+            --text-secondary: #858585;
+            --text-muted: #6e6e6e;
+            --accent: #0e639c;
+            --accent-hover: #1177bb;
+            --success: #4ec9b0;
+            --warning: #dcdcaa;
+            --error: #f14c4c;
+            --samokat: #ff6b35;
+            --radius: 4px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans 3', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .success-container {
+            max-width: 560px;
+            width: 100%;
+            padding: 24px;
+        }
+
+        .success-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .success-header {
+            background: linear-gradient(135deg, rgba(78, 201, 176, 0.15), rgba(78, 201, 176, 0.05));
+            padding: 32px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 32px;
+            color: var(--bg-primary);
+        }
+
+        .success-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .success-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .order-details {
+            padding: 24px;
+        }
+
+        .order-section {
+            margin-bottom: 24px;
+        }
+
+        .order-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        /* Store link card */
+        .store-link {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+
+        .store-link:hover {
+            border-color: var(--samokat);
+            background: rgba(255, 107, 53, 0.1);
+        }
+
+        .store-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: white;
+            background: var(--samokat);
+        }
+
+        .store-info {
+            flex: 1;
+        }
+
+        .store-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .store-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .store-price {
+            text-align: right;
+        }
+
+        .price-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .price-items {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .link-arrow {
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        /* Items summary */
+        .items-summary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+
+        .items-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .item-tag {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .item-tag .qty {
+            color: var(--text-muted);
+            margin-left: 4px;
+        }
+
+        /* Tips */
+        .tips-section {
+            padding: 16px;
+            background: rgba(220, 220, 170, 0.1);
+            border-top: 1px solid var(--border);
+        }
+
+        .tip {
+            display: flex;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .tip-icon {
+            color: var(--warning);
+        }
+
+        /* Actions */
+        .actions {
+            padding: 16px 24px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .action-btn.primary {
+            background: var(--success);
+            border: none;
+            color: var(--bg-primary);
+        }
+
+        .action-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .action-btn.secondary {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .action-btn.secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Timeline */
+        .timeline {
+            margin-top: 8px;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+
+        .timeline-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+
+        .timeline-dot.done {
+            background: var(--success);
+        }
+
+        .timeline-dot.current {
+            background: var(--warning);
+            box-shadow: 0 0 0 3px rgba(220, 220, 170, 0.3);
+        }
+
+        .timeline-content {
+            flex: 1;
+        }
+
+        .timeline-title {
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .timeline-title.dimmed {
+            color: var(--text-muted);
+        }
+
+        .timeline-time {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="success-card">
+            <div class="success-header">
+                <div class="success-icon">✓</div>
+                <h1 class="success-title">Корзина собрана!</h1>
+                <p class="success-subtitle">Осталось только оплатить заказ на сайте магазина</p>
+            </div>
+
+            <div class="order-details">
+                <div class="order-section">
+                    <div class="section-label">Перейти к оплате</div>
+                    <a href="https://samokat.ru/cart" class="store-link" target="_blank">
+                        <div class="store-icon">С</div>
+                        <div class="store-info">
+                            <div class="store-name">Самокат</div>
+                            <div class="store-meta">Корзина готова к оформлению</div>
+                        </div>
+                        <div class="store-price">
+                            <div class="price-value">1,247 ₽</div>
+                            <div class="price-items">8 товаров</div>
+                        </div>
+                        <div class="link-arrow">→</div>
+                    </a>
+                </div>
+
+                <div class="order-section">
+                    <div class="section-label">Что в корзине</div>
+                    <div class="items-summary">
+                        <div class="items-list">
+                            <span class="item-tag">Молоко 2.5%<span class="qty">×2</span></span>
+                            <span class="item-tag">Сметана 20%</span>
+                            <span class="item-tag">Яйца С1</span>
+                            <span class="item-tag">Батон нарезной</span>
+                            <span class="item-tag">Картофель<span class="qty">2 кг</span></span>
+                            <span class="item-tag">Лук<span class="qty">0.5 кг</span></span>
+                            <span class="item-tag">Огурцы<span class="qty">0.5 кг</span></span>
+                            <span class="item-tag">Колбаса Докторская</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="order-section">
+                    <div class="section-label">Статус</div>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-dot done"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Список сформирован</div>
+                                <div class="timeline-time">12:30</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot done"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Товары найдены в магазинах</div>
+                                <div class="timeline-time">12:35</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot done"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Корзина собрана в Самокате</div>
+                                <div class="timeline-time">12:36</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot current"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Ожидание оплаты</div>
+                                <div class="timeline-time">сейчас</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title dimmed">Доставка</div>
+                                <div class="timeline-time">15-30 мин после оплаты</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips-section">
+                <div class="tip">
+                    <span class="tip-icon">💡</span>
+                    <span>После оплаты чек автоматически появится в Smart Basket для анализа следующих покупок</span>
+                </div>
+            </div>
+
+            <div class="actions">
+                <a href="https://samokat.ru/cart" class="action-btn primary" target="_blank">
+                    Оплатить в Самокате →
+                </a>
+                <button class="action-btn secondary">
+                    Новая корзина
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

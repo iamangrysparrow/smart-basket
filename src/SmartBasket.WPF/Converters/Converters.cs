@@ -56,6 +56,27 @@ public class IntToVisibilityConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts int to Visibility (int == 0 = Visible, otherwise = Collapsed)
+/// Inverse of IntToVisibilityConverter - shows content when count is zero
+/// </summary>
+public class ZeroToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int intValue)
+        {
+            return intValue == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        return Visibility.Visible;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Inverts boolean value (true = false, false = true)
 /// </summary>
 public class InverseBoolConverter : IValueConverter

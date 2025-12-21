@@ -15,6 +15,9 @@ public static class ToolServiceExtensions
         services.AddTransient<IToolHandler, DescribeDataHandler>();
         services.AddTransient<IToolHandler, QueryHandler>();
 
+        // Shopping модуль
+        services.AddTransient<IToolHandler, UpdateBasketHandler>();
+
         // Утилиты
         services.AddTransient<IToolHandler, GetCurrentDateHandler>();
         services.AddTransient<IToolHandler, GetCurrentDateTimeHandler>();

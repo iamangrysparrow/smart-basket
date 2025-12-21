@@ -3,6 +3,9 @@
   <ItemGroup>
     <ProjectReference Include="..\SmartBasket.Core\SmartBasket.Core.csproj" />
     <ProjectReference Include="..\SmartBasket.Data\SmartBasket.Data.csproj" />
+    <!-- AiWebSniffer for store parsers -->
+    <ProjectReference Include="D:\AI\ai-web-sniffer-02\src\AiWebSniffer.Core\AiWebSniffer.Core.csproj" />
+    <ProjectReference Include="D:\AI\ai-web-sniffer-02\src\AiWebSniffer.Parsers\AiWebSniffer.Parsers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

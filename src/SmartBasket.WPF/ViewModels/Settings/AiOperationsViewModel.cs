@@ -20,6 +20,7 @@ public partial class AiOperationsViewModel : ObservableObject
         ProductExtraction = config.ProductExtraction ?? string.Empty;
         Classification = config.Classification ?? string.Empty;
         Labels = config.Labels ?? string.Empty;
+        Shopping = config.Shopping ?? string.Empty;
 
         // Копируем промпты
         foreach (var kvp in config.Prompts)
@@ -42,6 +43,12 @@ public partial class AiOperationsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _labels = string.Empty;
+
+    /// <summary>
+    /// Модуль закупок (формирование списка покупок)
+    /// </summary>
+    [ObservableProperty]
+    private string _shopping = string.Empty;
 
     /// <summary>
     /// Получить кастомный промпт для операции и провайдера
@@ -86,7 +93,8 @@ public partial class AiOperationsViewModel : ObservableObject
         {
             ProductExtraction = string.IsNullOrWhiteSpace(ProductExtraction) ? null : ProductExtraction,
             Classification = string.IsNullOrWhiteSpace(Classification) ? null : Classification,
-            Labels = string.IsNullOrWhiteSpace(Labels) ? null : Labels
+            Labels = string.IsNullOrWhiteSpace(Labels) ? null : Labels,
+            Shopping = string.IsNullOrWhiteSpace(Shopping) ? null : Shopping
         };
 
         // Копируем промпты
