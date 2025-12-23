@@ -39,6 +39,16 @@ public interface IShoppingSessionService
     /// </summary>
     IReadOnlyDictionary<string, StoreRuntimeConfig> GetStoreConfigs();
 
+    /// <summary>
+    /// Проверить статус авторизации во всех магазинах
+    /// </summary>
+    /// <param name="webViewContext">Контекст WebView2 для парсеров</param>
+    /// <param name="ct">Токен отмены</param>
+    /// <returns>Словарь: StoreId -> IsAuthenticated</returns>
+    Task<Dictionary<string, bool>> CheckStoreAuthStatusAsync(
+        IWebViewContext webViewContext,
+        CancellationToken ct = default);
+
     #region Этап 1: Формирование черновика
 
     /// <summary>

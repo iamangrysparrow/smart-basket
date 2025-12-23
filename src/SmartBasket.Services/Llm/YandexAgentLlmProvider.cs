@@ -1344,6 +1344,16 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             }
         }
 
+        // Если не нашли code block, пробуем inline JSON формат
+        if (result.Count == 0)
+        {
+            var inlineToolCalls = TryParseInlineJsonToolCalls(text);
+            if (inlineToolCalls.Count > 0)
+            {
+                result.AddRange(inlineToolCalls);
+            }
+        }
+
         return result;
     }
 
@@ -1418,6 +1428,77 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
         catch (Exception ex)
         {
             _logger.LogWarning("[YandexAgent] Error parsing markdown code block tool calls: {Error}", ex.Message);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Парсит tool calls из inline JSON в тексте (без code blocks)
+    /// Формат: {"name": "update_basket", "parameters": {"operations": [...]}}
+    /// или {"name": "update_basket", "description": "...", "parameters": {"operations": [...]}}
+    /// </summary>
+    private List<LlmToolCall> TryParseInlineJsonToolCalls(string text)
+    {
+        var result = new List<LlmToolCall>();
+
+        try
+        {
+            // Ищем JSON-подобные структуры, начинающиеся с {"name":
+            var namePattern = new System.Text.RegularExpressions.Regex(
+                @"\{""name""\s*:\s*""([^""]+)""",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            var matches = namePattern.Matches(text);
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                var startIndex = match.Index;
+                var toolName = match.Groups[1].Value;
+
+                // Извлекаем полный JSON объект с балансировкой скобок
+                var jsonText = ExtractBalancedJson(text[startIndex..]);
+                if (string.IsNullOrEmpty(jsonText))
+                    continue;
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(jsonText);
+                    var root = doc.RootElement;
+
+                    string? arguments = null;
+
+                    // Ищем arguments или parameters
+                    if (root.TryGetProperty("arguments", out var argsProp))
+                    {
+                        arguments = argsProp.GetRawText();
+                    }
+                    else if (root.TryGetProperty("parameters", out var paramsProp))
+                    {
+                        arguments = paramsProp.GetRawText();
+                    }
+
+                    if (!string.IsNullOrEmpty(arguments))
+                    {
+                        result.Add(new LlmToolCall
+                        {
+                            Id = Guid.NewGuid().ToString("N")[..8],
+                            Name = toolName,
+                            Arguments = arguments,
+                            IsParsedFromText = true
+                        });
+
+                        _logger.LogInformation("[YandexAgent] Parsed tool call from inline JSON: {Name}", toolName);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogDebug("[YandexAgent] Invalid inline JSON: {Error}", ex.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("[YandexAgent] Error parsing inline JSON tool calls: {Error}", ex.Message);
         }
 
         return result;

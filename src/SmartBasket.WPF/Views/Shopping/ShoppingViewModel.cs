@@ -5,9 +5,11 @@ using AiWebSniffer.Core.Interfaces;
 using AiWebSniffer.WebView2;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Wpf;
 using SmartBasket.Core.Shopping;
+using SmartBasket.Data;
 using SmartBasket.Services.Chat;
 using SmartBasket.Services.Shopping;
 
@@ -20,6 +22,7 @@ public partial class ShoppingViewModel : ObservableObject
 {
     private readonly IShoppingSessionService _sessionService;
     private readonly IShoppingChatService _shoppingChatService;
+    private readonly IDbContextFactory<SmartBasketDbContext> _dbContextFactory;
     private readonly ILogger<ShoppingViewModel> _logger;
     private readonly object _itemsLock = new();
     private readonly object _messagesLock = new();
@@ -32,10 +35,12 @@ public partial class ShoppingViewModel : ObservableObject
     public ShoppingViewModel(
         IShoppingSessionService sessionService,
         IShoppingChatService shoppingChatService,
+        IDbContextFactory<SmartBasketDbContext> dbContextFactory,
         ILogger<ShoppingViewModel> logger)
     {
         _sessionService = sessionService;
         _shoppingChatService = shoppingChatService;
+        _dbContextFactory = dbContextFactory;
         _logger = logger;
 
         // Подписка на события сервиса
@@ -50,6 +55,9 @@ public partial class ShoppingViewModel : ObservableObject
     private readonly object _progressLock = new();
     private readonly object _logLock = new();
 
+    private readonly object _receiptsLock = new();
+    private readonly object _storeAuthLock = new();
+
     /// <summary>
     /// Включить синхронизацию коллекций для thread-safe доступа
     /// </summary>
@@ -60,6 +68,8 @@ public partial class ShoppingViewModel : ObservableObject
         BindingOperations.EnableCollectionSynchronization(GroupedItems, _itemsLock);
         BindingOperations.EnableCollectionSynchronization(StoreProgress, _progressLock);
         BindingOperations.EnableCollectionSynchronization(PlanningLog, _logLock);
+        BindingOperations.EnableCollectionSynchronization(RecentReceipts, _receiptsLock);
+        BindingOperations.EnableCollectionSynchronization(StoreAuthStatuses, _storeAuthLock);
     }
 
     /// <summary>
@@ -204,14 +214,109 @@ public partial class ShoppingViewModel : ObservableObject
     [ObservableProperty]
     private decimal _orderTotal;
 
+    // Welcome screen statistics
+
+    /// <summary>
+    /// Расходы за месяц
+    /// </summary>
+    [ObservableProperty]
+    private decimal _monthlyExpenses;
+
+    /// <summary>
+    /// Процент изменения расходов по сравнению с прошлым месяцем
+    /// </summary>
+    [ObservableProperty]
+    private int _monthlyExpensesChange;
+
+    /// <summary>
+    /// Расходы за прошлый месяц (для сравнения)
+    /// </summary>
+    [ObservableProperty]
+    private decimal _lastMonthExpenses;
+
+    /// <summary>
+    /// Средний чек
+    /// </summary>
+    [ObservableProperty]
+    private decimal _averageReceipt;
+
+    /// <summary>
+    /// Процент изменения среднего чека
+    /// </summary>
+    [ObservableProperty]
+    private int _averageReceiptChange;
+
+    /// <summary>
+    /// Количество покупок за месяц
+    /// </summary>
+    [ObservableProperty]
+    private int _purchasesCount;
+
+    /// <summary>
+    /// Последние чеки для отображения
+    /// </summary>
+    public ObservableCollection<RecentReceiptItem> RecentReceipts { get; } = new();
+
+    /// <summary>
+    /// Статусы авторизации в магазинах
+    /// </summary>
+    public ObservableCollection<StoreAuthStatus> StoreAuthStatuses { get; } = new();
+
+    /// <summary>
+    /// Есть ли хотя бы один авторизованный магазин
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanStartSession))]
+    [NotifyCanExecuteChangedFor(nameof(StartSessionCommand))]
+    private bool _hasAnyAuthenticatedStore;
+
+    /// <summary>
+    /// Идёт проверка авторизации
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanStartSession))]
+    [NotifyCanExecuteChangedFor(nameof(StartSessionCommand))]
+    private bool _isCheckingAuth;
+
+    /// <summary>
+    /// Идёт инициализация (загрузка статистики + проверка авторизации)
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWelcome))]
+    private bool _isInitializing = true;
+
+    /// <summary>
+    /// Текст текущего этапа инициализации
+    /// </summary>
+    [ObservableProperty]
+    private string _initializingText = "Инициализация...";
+
+    /// <summary>
+    /// Показывать оверлей авторизации (полноэкранный WebView)
+    /// </summary>
+    [ObservableProperty]
+    private bool _showAuthOverlay;
+
+    /// <summary>
+    /// Магазин, в котором идёт авторизация
+    /// </summary>
+    [ObservableProperty]
+    private StoreAuthStatus? _authenticatingStore;
+
+    /// <summary>
+    /// URL магазина для авторизации
+    /// </summary>
+    [ObservableProperty]
+    private string? _authStoreUrl;
+
     #endregion
 
     #region Computed Properties
 
     /// <summary>
-    /// Показывать экран приветствия (нет сессии)
+    /// Показывать экран приветствия (нет сессии и инициализация завершена)
     /// </summary>
-    public bool ShowWelcome => !HasSession;
+    public bool ShowWelcome => !HasSession && !IsInitializing;
 
     /// <summary>
     /// Показывать экран формирования списка
@@ -249,6 +354,11 @@ public partial class ShoppingViewModel : ObservableObject
     public bool CanSend => !IsProcessing && !string.IsNullOrWhiteSpace(UserInput);
 
     /// <summary>
+    /// Можно ли начать сессию (есть хотя бы один авторизованный магазин)
+    /// </summary>
+    public bool CanStartSession => HasAnyAuthenticatedStore && !IsCheckingAuth;
+
+    /// <summary>
     /// Можно ли начать планирование
     /// </summary>
     public bool CanStartPlanning => DraftItems.Count > 0 && State == ShoppingSessionState.Drafting && !IsProcessing && WebViewReady;
@@ -271,9 +381,399 @@ public partial class ShoppingViewModel : ObservableObject
     #region Commands
 
     /// <summary>
-    /// Начать новую сессию закупок
+    /// Инициализировать экран приветствия (загрузить статистику, статусы магазинов)
     /// </summary>
     [RelayCommand]
+    private async Task InitializeWelcomeScreenAsync()
+    {
+        if (_webViewContext == null)
+        {
+            _logger.LogWarning("[ShoppingViewModel] WebView not ready, cannot initialize welcome screen");
+            return;
+        }
+
+        _logger.LogInformation("[ShoppingViewModel] Initializing welcome screen");
+
+        IsInitializing = true;
+        InitializingText = "Инициализация...";
+
+        try
+        {
+            // Инициализируем магазины (из конфигурации)
+            InitializeStoreStatuses();
+
+            // Загружаем статистику из БД
+            InitializingText = "Загрузка статистики...";
+            await LoadStatisticsAsync();
+
+            // Проверяем авторизацию во всех магазинах (с прогрессом)
+            await CheckStoreAuthWithProgressAsync();
+        }
+        finally
+        {
+            IsInitializing = false;
+        }
+    }
+
+    /// <summary>
+    /// Проверка авторизации с отображением прогресса
+    /// </summary>
+    private async Task CheckStoreAuthWithProgressAsync()
+    {
+        if (_webViewContext == null) return;
+
+        _logger.LogInformation("[ShoppingViewModel] Checking store auth status with progress");
+        IsCheckingAuth = true;
+
+        try
+        {
+            var stores = StoreAuthStatuses.ToList();
+
+            // Отмечаем все магазины как "проверяется"
+            foreach (var store in stores)
+            {
+                store.IsChecking = true;
+            }
+
+            InitializingText = "Проверка авторизации в магазинах...";
+
+            // Проверяем авторизацию ОДИН раз для всех магазинов
+            Dictionary<string, bool> authStatuses;
+            try
+            {
+                authStatuses = await _sessionService.CheckStoreAuthStatusAsync(_webViewContext);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[ShoppingViewModel] Failed to check auth status");
+                // При ошибке отмечаем все как неавторизованные
+                foreach (var store in stores)
+                {
+                    store.IsChecking = false;
+                    store.IsAuthenticated = false;
+                }
+                HasAnyAuthenticatedStore = false;
+                return;
+            }
+
+            // Обновляем статусы на основе результатов
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var store in stores)
+                {
+                    if (authStatuses.TryGetValue(store.StoreId, out var isAuth))
+                    {
+                        store.IsAuthenticated = isAuth;
+                    }
+                    store.IsChecking = false;
+                }
+            });
+
+            HasAnyAuthenticatedStore = StoreAuthStatuses.Any(s => s.IsAuthenticated);
+            _logger.LogInformation("[ShoppingViewModel] Auth check complete. Any authenticated: {HasAuth}",
+                HasAnyAuthenticatedStore);
+        }
+        finally
+        {
+            IsCheckingAuth = false;
+        }
+    }
+
+    /// <summary>
+    /// Инициализировать статусы магазинов из конфигурации
+    /// </summary>
+    private void InitializeStoreStatuses()
+    {
+        var storeConfigs = _sessionService.GetStoreConfigs();
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            StoreAuthStatuses.Clear();
+            foreach (var config in storeConfigs.Values.OrderBy(c => c.Priority))
+            {
+                StoreAuthStatuses.Add(new StoreAuthStatus
+                {
+                    StoreId = config.StoreId,
+                    StoreName = config.StoreName,
+                    Color = config.Color ?? "#7C4DFF",
+                    IsAuthenticated = false,
+                    IsChecking = true
+                });
+            }
+        });
+    }
+
+    /// <summary>
+    /// Загрузить статистику из БД
+    /// </summary>
+    private async Task LoadStatisticsAsync()
+    {
+        _logger.LogDebug("[ShoppingViewModel] Loading statistics from DB");
+
+        try
+        {
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+
+            // Определяем периоды (UTC для PostgreSQL!)
+            var now = DateTime.UtcNow;
+            var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var lastMonthStart = currentMonthStart.AddMonths(-1);
+            var lastMonthEnd = currentMonthStart.AddDays(-1);
+
+            // Расходы за текущий месяц
+            var currentMonthReceipts = await db.Receipts
+                .Where(r => r.ReceiptDate >= currentMonthStart && r.Total.HasValue)
+                .ToListAsync();
+
+            var currentMonthTotal = currentMonthReceipts.Sum(r => r.Total ?? 0);
+            var currentMonthCount = currentMonthReceipts.Count;
+
+            // Расходы за прошлый месяц
+            var lastMonthReceipts = await db.Receipts
+                .Where(r => r.ReceiptDate >= lastMonthStart && r.ReceiptDate <= lastMonthEnd && r.Total.HasValue)
+                .ToListAsync();
+
+            var lastMonthTotal = lastMonthReceipts.Sum(r => r.Total ?? 0);
+            var lastMonthCount = lastMonthReceipts.Count;
+
+            // Вычисляем изменение расходов
+            int expensesChange = 0;
+            if (lastMonthTotal > 0)
+            {
+                expensesChange = (int)Math.Round((currentMonthTotal - lastMonthTotal) / lastMonthTotal * 100);
+            }
+
+            // Средний чек
+            var currentAvg = currentMonthCount > 0 ? currentMonthTotal / currentMonthCount : 0;
+            var lastAvg = lastMonthCount > 0 ? lastMonthTotal / lastMonthCount : 0;
+
+            int avgChange = 0;
+            if (lastAvg > 0)
+            {
+                avgChange = (int)Math.Round((currentAvg - lastAvg) / lastAvg * 100);
+            }
+
+            // Обновляем свойства
+            MonthlyExpenses = currentMonthTotal;
+            LastMonthExpenses = lastMonthTotal;
+            MonthlyExpensesChange = expensesChange;
+            AverageReceipt = currentAvg;
+            AverageReceiptChange = avgChange;
+            PurchasesCount = currentMonthCount;
+
+            // Последние 5 чеков
+            var recentReceipts = await db.Receipts
+                .Where(r => r.Total.HasValue)
+                .OrderByDescending(r => r.ReceiptDate)
+                .Take(5)
+                .Select(r => new { r.Shop, r.ReceiptDate, r.Total })
+                .ToListAsync();
+
+            // Цвета магазинов
+            var shopColors = GetShopColors();
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                RecentReceipts.Clear();
+                foreach (var receipt in recentReceipts)
+                {
+                    var color = shopColors.TryGetValue(NormalizeShopName(receipt.Shop), out var c)
+                        ? c
+                        : "#7C4DFF"; // default accent color
+
+                    RecentReceipts.Add(new RecentReceiptItem
+                    {
+                        Shop = receipt.Shop,
+                        Date = receipt.ReceiptDate,
+                        Total = receipt.Total ?? 0,
+                        Color = color
+                    });
+                }
+            });
+
+            _logger.LogInformation(
+                "[ShoppingViewModel] Statistics loaded: {MonthTotal:N0}₽ ({Count} receipts), avg {Avg:N0}₽",
+                currentMonthTotal, currentMonthCount, currentAvg);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ShoppingViewModel] Failed to load statistics");
+        }
+    }
+
+    /// <summary>
+    /// Получить цвета магазинов из конфигурации
+    /// </summary>
+    private Dictionary<string, string> GetShopColors()
+    {
+        var storeConfigs = _sessionService.GetStoreConfigs();
+        var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var config in storeConfigs.Values)
+        {
+            if (!string.IsNullOrEmpty(config.Color))
+            {
+                colors[config.StoreId] = config.Color;
+                colors[config.StoreName] = config.Color;
+            }
+        }
+
+        // Fallback colors for common shops
+        if (!colors.ContainsKey("samokat")) colors["samokat"] = "#FF3366";
+        if (!colors.ContainsKey("lavka")) colors["lavka"] = "#FFCC00";
+        if (!colors.ContainsKey("kuper")) colors["kuper"] = "#FF6B00";
+        if (!colors.ContainsKey("Самокат")) colors["Самокат"] = "#FF3366";
+        if (!colors.ContainsKey("Яндекс.Лавка")) colors["Яндекс.Лавка"] = "#FFCC00";
+        if (!colors.ContainsKey("Kuper")) colors["Kuper"] = "#FF6B00";
+
+        return colors;
+    }
+
+    /// <summary>
+    /// Нормализовать название магазина для сопоставления с цветами
+    /// </summary>
+    private static string NormalizeShopName(string shop)
+    {
+        if (string.IsNullOrEmpty(shop)) return shop;
+
+        var lower = shop.ToLowerInvariant();
+        if (lower.Contains("самокат") || lower.Contains("samokat")) return "Самокат";
+        if (lower.Contains("лавка") || lower.Contains("lavka") || lower.Contains("yandex")) return "Яндекс.Лавка";
+        if (lower.Contains("kuper") || lower.Contains("ашан") || lower.Contains("ashan")) return "Kuper";
+        if (lower.Contains("vprok") || lower.Contains("впрок") || lower.Contains("perekrestok") || lower.Contains("перекрёсток")) return "Vprok";
+
+        return shop;
+    }
+
+    /// <summary>
+    /// Начать авторизацию в магазине (открыть WebView)
+    /// </summary>
+    [RelayCommand]
+    private void LoginToStore(StoreAuthStatus store)
+    {
+        if (store == null) return;
+
+        _logger.LogInformation("[ShoppingViewModel] Opening login for store: {Store}", store.StoreId);
+
+        // Получаем URL магазина из конфигурации
+        var storeConfigs = _sessionService.GetStoreConfigs();
+        if (storeConfigs.TryGetValue(store.StoreId, out var config))
+        {
+            AuthenticatingStore = store;
+            AuthStoreUrl = config.BaseUrl;
+            ShowAuthOverlay = true;
+
+            _logger.LogDebug("[ShoppingViewModel] Auth URL: {Url}", AuthStoreUrl);
+        }
+        else
+        {
+            _logger.LogWarning("[ShoppingViewModel] Store config not found: {Store}", store.StoreId);
+        }
+    }
+
+    /// <summary>
+    /// Завершить авторизацию (закрыть WebView и перепроверить)
+    /// </summary>
+    [RelayCommand]
+    private async Task FinishLoginAsync()
+    {
+        _logger.LogInformation("[ShoppingViewModel] Finishing login for store: {Store}", AuthenticatingStore?.StoreId);
+
+        var storeToCheck = AuthenticatingStore;
+
+        // Закрываем оверлей
+        ShowAuthOverlay = false;
+        AuthenticatingStore = null;
+        AuthStoreUrl = null;
+
+        // Перепроверяем авторизацию
+        if (storeToCheck != null && _webViewContext != null)
+        {
+            storeToCheck.IsChecking = true;
+
+            try
+            {
+                var authStatuses = await _sessionService.CheckStoreAuthStatusAsync(_webViewContext);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (authStatuses.TryGetValue(storeToCheck.StoreId, out var isAuth))
+                    {
+                        storeToCheck.IsAuthenticated = isAuth;
+                        _logger.LogInformation("[ShoppingViewModel] Store {Store} auth status: {IsAuth}",
+                            storeToCheck.StoreId, isAuth);
+                    }
+
+                    storeToCheck.IsChecking = false;
+                    HasAnyAuthenticatedStore = StoreAuthStatuses.Any(s => s.IsAuthenticated);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[ShoppingViewModel] Failed to check auth after login");
+                storeToCheck.IsChecking = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Проверить авторизацию во всех магазинах
+    /// </summary>
+    [RelayCommand]
+    private async Task CheckStoreAuthAsync()
+    {
+        if (_webViewContext == null)
+        {
+            _logger.LogWarning("[ShoppingViewModel] WebView not ready, cannot check auth");
+            return;
+        }
+
+        _logger.LogInformation("[ShoppingViewModel] Checking store auth status");
+        IsCheckingAuth = true;
+
+        try
+        {
+            var authStatuses = await _sessionService.CheckStoreAuthStatusAsync(_webViewContext);
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var store in StoreAuthStatuses)
+                {
+                    store.IsChecking = false;
+                    if (authStatuses.TryGetValue(store.StoreId, out var isAuth))
+                    {
+                        store.IsAuthenticated = isAuth;
+                    }
+                }
+
+                HasAnyAuthenticatedStore = StoreAuthStatuses.Any(s => s.IsAuthenticated);
+                _logger.LogInformation("[ShoppingViewModel] Auth check complete. Any authenticated: {HasAuth}",
+                    HasAnyAuthenticatedStore);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ShoppingViewModel] Failed to check store auth");
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var store in StoreAuthStatuses)
+                {
+                    store.IsChecking = false;
+                    store.IsAuthenticated = false;
+                }
+                HasAnyAuthenticatedStore = false;
+            });
+        }
+        finally
+        {
+            IsCheckingAuth = false;
+        }
+    }
+
+    /// <summary>
+    /// Начать новую сессию закупок
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanStartSession))]
     private async Task StartSessionAsync()
     {
         _logger.LogInformation("[ShoppingViewModel] Starting new shopping session");
@@ -402,18 +902,13 @@ public partial class ShoppingViewModel : ObservableObject
                 {
                     case ChatProgressType.TextDelta:
                         // Добавляем текст к последнему сообщению
-                        assistantMessage.Content += p.Text;
-                        // Force UI update
-                        var idx = Messages.IndexOf(assistantMessage);
-                        if (idx >= 0)
-                        {
-                            Messages[idx] = assistantMessage;
-                        }
+                        // ShoppingChatMessage теперь реализует INotifyPropertyChanged,
+                        // поэтому UI автоматически обновится
+                        assistantMessage.Text += p.Text;
                         break;
 
                     case ChatProgressType.ToolCall:
                         _logger.LogDebug("[ShoppingViewModel] Tool call: {Tool}({Args})", p.ToolName, p.ToolArgs);
-                        // Можно показать индикатор вызова инструмента
                         break;
 
                     case ChatProgressType.ToolResult:
@@ -433,16 +928,17 @@ public partial class ShoppingViewModel : ObservableObject
         {
             _logger.LogWarning("[ShoppingViewModel] Chat failed: {Error}", response.ErrorMessage);
             // Обновляем сообщение с ошибкой если был пустой ответ
-            if (string.IsNullOrEmpty(assistantMessage.Content))
+            if (string.IsNullOrEmpty(assistantMessage.Text))
             {
-                assistantMessage.Content = $"Ошибка: {response.ErrorMessage}";
+                assistantMessage.Text = $"Ошибка: {response.ErrorMessage}";
                 assistantMessage.IsError = true;
-                var idx = Messages.IndexOf(assistantMessage);
-                if (idx >= 0)
-                {
-                    Messages[idx] = assistantMessage;
-                }
             }
+        }
+        else if (string.IsNullOrEmpty(assistantMessage.Text) && !string.IsNullOrEmpty(response.Content))
+        {
+            // Если streaming не сработал, но ответ есть — показываем его
+            _logger.LogDebug("[ShoppingViewModel] No streaming text, using final response");
+            assistantMessage.Text = response.Content;
         }
     }
 
@@ -1089,10 +1585,30 @@ public partial class ShoppingViewModel : ObservableObject
 /// <summary>
 /// Сообщение в чате Shopping
 /// </summary>
-public class ShoppingChatMessage
+public class ShoppingChatMessage : ObservableObject
 {
-    public ChatRole Role { get; set; }
-    public string Text { get; set; } = string.Empty;
+    private ChatRole _role;
+    private string _text = string.Empty;
+    private DateTime _timestamp;
+    private bool _isError;
+
+    public ChatRole Role
+    {
+        get => _role;
+        set => SetProperty(ref _role, value);
+    }
+
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            if (SetProperty(ref _text, value))
+            {
+                OnPropertyChanged(nameof(Content));
+            }
+        }
+    }
 
     /// <summary>
     /// Alias for Text (for compatibility with ChatProgress)
@@ -1103,8 +1619,17 @@ public class ShoppingChatMessage
         set => Text = value;
     }
 
-    public DateTime Timestamp { get; set; }
-    public bool IsError { get; set; }
+    public DateTime Timestamp
+    {
+        get => _timestamp;
+        set => SetProperty(ref _timestamp, value);
+    }
+
+    public bool IsError
+    {
+        get => _isError;
+        set => SetProperty(ref _isError, value);
+    }
 
     public bool IsUser => Role == ChatRole.User;
     public bool IsAssistant => Role == ChatRole.Assistant;
@@ -1273,4 +1798,84 @@ public class BasketItemViewModel
     public decimal Price { get; set; }
     public int Quantity { get; set; }
     public decimal LineTotal { get; set; }
+}
+
+/// <summary>
+/// Последний чек для отображения на экране приветствия
+/// </summary>
+public class RecentReceiptItem
+{
+    public string Shop { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public decimal Total { get; set; }
+    public string Color { get; set; } = "#7C4DFF";
+
+    public string DateText
+    {
+        get
+        {
+            var today = DateTime.Today;
+            if (Date.Date == today)
+                return $"Сегодня, {Date:HH:mm}";
+            if (Date.Date == today.AddDays(-1))
+                return $"Вчера, {Date:HH:mm}";
+            return Date.ToString("d MMM, HH:mm");
+        }
+    }
+}
+
+/// <summary>
+/// Статус авторизации в магазине
+/// </summary>
+public class StoreAuthStatus : ObservableObject
+{
+    private string _storeId = string.Empty;
+    private string _storeName = string.Empty;
+    private bool _isAuthenticated;
+    private string _color = "#7C4DFF";
+    private bool _isChecking;
+
+    public string StoreId
+    {
+        get => _storeId;
+        set => SetProperty(ref _storeId, value);
+    }
+
+    public string StoreName
+    {
+        get => _storeName;
+        set => SetProperty(ref _storeName, value);
+    }
+
+    public bool IsAuthenticated
+    {
+        get => _isAuthenticated;
+        set
+        {
+            if (SetProperty(ref _isAuthenticated, value))
+            {
+                OnPropertyChanged(nameof(StatusText));
+            }
+        }
+    }
+
+    public string Color
+    {
+        get => _color;
+        set => SetProperty(ref _color, value);
+    }
+
+    public bool IsChecking
+    {
+        get => _isChecking;
+        set
+        {
+            if (SetProperty(ref _isChecking, value))
+            {
+                OnPropertyChanged(nameof(StatusText));
+            }
+        }
+    }
+
+    public string StatusText => IsChecking ? "Проверка..." : (IsAuthenticated ? "Авторизован" : "Требуется вход");
 }

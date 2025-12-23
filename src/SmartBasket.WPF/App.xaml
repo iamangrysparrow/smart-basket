@@ -68,6 +68,7 @@
             <converters:NullableBoolToVisibilityConverter x:Key="NullableBoolToVis"/>
             <converters:BoolToExpandIconConverter x:Key="BoolToExpandIcon"/>
             <converters:ViewModeToTextConverter x:Key="ViewModeToText"/>
+            <converters:AllFalseToVisibilityConverter x:Key="AllFalseToVis"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

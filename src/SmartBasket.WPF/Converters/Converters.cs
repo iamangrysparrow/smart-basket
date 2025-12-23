@@ -356,6 +356,25 @@ public class HeightPercentageConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts multiple booleans to Visibility: Visible when ALL are false, Collapsed otherwise
+/// Used for "show when no other conditions are met" scenarios
+/// </summary>
+public class AllFalseToVisibilityConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        // Visible only if ALL values are false
+        var allFalse = values.All(v => v is bool b && !b);
+        return allFalse ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Converts three booleans (IsProductsMode, IsCategoriesMode, IsLabelsMode) to panel header text
 /// </summary>
 public class ViewModeToTextConverter : IMultiValueConverter

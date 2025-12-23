@@ -123,6 +123,37 @@ public class ShoppingSessionService : IShoppingSessionService
     /// </summary>
     public IReadOnlyDictionary<string, StoreRuntimeConfig> GetStoreConfigs() => _storeConfigs;
 
+    /// <summary>
+    /// Проверить статус авторизации во всех магазинах
+    /// </summary>
+    public async Task<Dictionary<string, bool>> CheckStoreAuthStatusAsync(
+        IWebViewContext webViewContext,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("[ShoppingSession] Checking auth status for {Count} stores", _parsers.Count);
+
+        var result = new Dictionary<string, bool>();
+
+        foreach (var (storeId, parser) in _parsers)
+        {
+            try
+            {
+                _logger.LogDebug("[ShoppingSession] Checking auth for {Store}", storeId);
+                var isAuthenticated = await parser.CheckAuthAsync(webViewContext, ct);
+                result[storeId] = isAuthenticated;
+                _logger.LogInformation("[ShoppingSession] {Store} auth status: {Status}",
+                    storeId, isAuthenticated ? "Авторизован" : "Требуется вход");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[ShoppingSession] Failed to check auth for {Store}", storeId);
+                result[storeId] = false;
+            }
+        }
+
+        return result;
+    }
+
     #region Этап 1: Формирование черновика
 
     public Task<ShoppingSession> StartNewSessionAsync(CancellationToken ct = default)

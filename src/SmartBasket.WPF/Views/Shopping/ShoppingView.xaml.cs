@@ -51,6 +51,12 @@ public partial class ShoppingView : UserControl
             viewModel.SetWebView(ParserWebView);
 
             System.Diagnostics.Debug.WriteLine("[ShoppingView] WebView2 initialized successfully");
+
+            // Initialize welcome screen after WebView is ready
+            if (viewModel.InitializeWelcomeScreenCommand.CanExecute(null))
+            {
+                await viewModel.InitializeWelcomeScreenCommand.ExecuteAsync(null);
+            }
         }
         catch (Exception ex)
         {

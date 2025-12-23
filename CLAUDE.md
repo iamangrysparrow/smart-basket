@@ -148,6 +148,22 @@ public async Task ProcessAsync() => Task.CompletedTask;
 <Setter Property="Background" Value="{StaticResource BackgroundLayer1Brush}"/>
 ```
 
+### 🔴 КРИТИЧЕСКИ ВАЖНО: DateTime и PostgreSQL
+
+**PostgreSQL требует `timestamp with time zone` → все DateTime должны быть UTC!**
+
+```csharp
+// ❌ НЕПРАВИЛЬНО — вызовет ошибку "Cannot write DateTime with Kind=Unspecified"
+var date = new DateTime(2024, 1, 1);
+var now = DateTime.Now;
+
+// ✅ ПРАВИЛЬНО — всегда указывай DateTimeKind.Utc
+var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+var now = DateTime.UtcNow;
+```
+
+**Это касается ЛЮБЫХ запросов к БД с фильтрацией по датам!**
+
 ### 🔴 КРИТИЧЕСКИ ВАЖНО: Промпты в файлах, не в коде!
 
 **ЗАПРЕЩЕНО хардкодить промпты в C# коде:**

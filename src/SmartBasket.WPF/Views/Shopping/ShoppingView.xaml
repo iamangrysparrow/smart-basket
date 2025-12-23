@@ -189,36 +189,459 @@
     </UserControl.Resources>
 
     <Grid>
-        <!-- Welcome screen (no session) -->
-        <Border x:Name="WelcomePanel"
-                Visibility="{Binding ShowWelcome, Converter={StaticResource BoolToVis}}"
-                Background="{DynamicResource BackgroundBaseBrush}">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="400">
-                <Path Data="{StaticResource IconCart}"
-                      Fill="{DynamicResource AccentBrush}"
-                      Width="64" Height="64" Stretch="Uniform"
-                      HorizontalAlignment="Center"
-                      Margin="0,0,0,24"/>
-
-                <TextBlock Text="Еженедельные закупки"
-                           Style="{StaticResource TitleText}"
+        <!-- Loading screen (during initialization) -->
+        <Grid x:Name="LoadingPanel"
+              Visibility="{Binding IsInitializing, Converter={StaticResource BoolToVis}}"
+              Background="{DynamicResource BackgroundBaseBrush}">
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        MaxWidth="400">
+                <!-- Logo/Icon -->
+                <TextBlock Text="🛒"
+                           FontSize="64"
                            HorizontalAlignment="Center"
-                           Margin="0,0,0,8"/>
-
-                <TextBlock Text="Сформируйте список покупок с помощью AI-помощника. Он проанализирует ваши чеки и предложит товары на неделю."
-                           Style="{StaticResource BodyText}"
-                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
-                           TextWrapping="Wrap"
-                           TextAlignment="Center"
+                           Opacity="0.6"
                            Margin="0,0,0,24"/>
 
-                <Button Style="{StaticResource PrimaryButton}"
-                        Content="Начать"
-                        Command="{Binding StartSessionCommand}"
-                        HorizontalAlignment="Center"
-                        Padding="32,12"/>
+                <!-- Title -->
+                <TextBlock Text="Smart Basket"
+                           Style="{StaticResource TitleText}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,32"/>
+
+                <!-- Progress indicator -->
+                <ProgressBar IsIndeterminate="True"
+                             Height="4"
+                             Margin="0,0,0,16"/>
+
+                <!-- Status text -->
+                <TextBlock Text="{Binding InitializingText}"
+                           Style="{StaticResource BodyText}"
+                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                           HorizontalAlignment="Center"/>
             </StackPanel>
-        </Border>
+        </Grid>
+
+        <!-- Welcome screen (no session) - two column layout -->
+        <Grid x:Name="WelcomePanel"
+              Visibility="{Binding ShowWelcome, Converter={StaticResource BoolToVis}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="340"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Main panel -->
+            <Grid Grid.Column="0"
+                  Background="{DynamicResource BackgroundBaseBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BackgroundLayer1Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconCart}"
+                              Fill="{DynamicResource AccentBrush}"
+                              Width="20" Height="20" Stretch="Uniform"/>
+                        <TextBlock Text="Еженедельные закупки"
+                                   Style="{StaticResource SubtitleText}"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Empty state - centered content -->
+                <StackPanel Grid.Row="1"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            MaxWidth="400"
+                            Margin="48">
+                    <!-- Icon -->
+                    <TextBlock Text="🛍️"
+                               FontSize="64"
+                               HorizontalAlignment="Center"
+                               Opacity="0.6"
+                               Margin="0,0,0,24"/>
+
+                    <!-- Title -->
+                    <TextBlock Text="Готовы к закупкам?"
+                               Style="{StaticResource TitleText}"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,8"/>
+
+                    <!-- Description -->
+                    <TextBlock Text="AI проанализирует ваши последние чеки и предложит список товаров. Вы сможете скорректировать его в чате, а затем мы найдём лучшие цены в магазинах."
+                               Style="{StaticResource BodyText}"
+                               Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               LineHeight="22"
+                               Margin="0,0,0,32"/>
+
+                    <!-- Start button -->
+                    <Button Style="{StaticResource SuccessButton}"
+                            Command="{Binding StartSessionCommand}"
+                            HorizontalAlignment="Center"
+                            Padding="28,14"
+                            FontSize="15"
+                            FontWeight="SemiBold">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✨" Margin="0,0,8,0"/>
+                            <TextBlock Text="Сформировать корзину"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Auth warning (if no stores authenticated) -->
+                    <Border Background="{DynamicResource WarningLightBrush}"
+                            BorderBrush="{DynamicResource WarningBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12,8"
+                            Margin="0,16,0,0"
+                            Visibility="{Binding HasAnyAuthenticatedStore, Converter={StaticResource InverseBoolToVis}}">
+                        <TextBlock Text="⚠️ Для работы необходимо авторизоваться хотя бы в одном магазине (см. панель справа)"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource WarningBrush}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"/>
+                    </Border>
+
+                    <!-- Divider -->
+                    <Grid Margin="0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Height="1" Background="{DynamicResource BorderDefaultBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="или"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                   Margin="16,0"/>
+                        <Border Grid.Column="2" Height="1" Background="{DynamicResource BorderDefaultBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Quick actions -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Padding="20,12"
+                                Margin="0,0,12,0"
+                                IsEnabled="False"
+                                ToolTip="В разработке">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📋" Margin="0,0,6,0"/>
+                                <TextBlock Text="Загрузить список"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Padding="20,12"
+                                IsEnabled="False"
+                                ToolTip="В разработке">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔄" Margin="0,0,6,0"/>
+                                <TextBlock Text="Повторить прошлый"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- Right: Stats panel -->
+            <Grid Grid.Column="1"
+                  Background="{DynamicResource BackgroundLayer1Brush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Stats header -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BackgroundLayer2Brush}"
+                        BorderBrush="{DynamicResource BorderDefaultBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📊" Margin="0,0,8,0"/>
+                        <TextBlock Text="Статистика"
+                                   Style="{StaticResource SubtitleText}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Stats content -->
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="16">
+                    <StackPanel>
+                        <!-- Monthly expenses card -->
+                        <Border Background="{DynamicResource BackgroundLayer2Brush}"
+                                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="16"
+                                Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="РАСХОДЫ ЗА МЕСЯЦ"
+                                           Style="{StaticResource CaptionText}"
+                                           Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding MonthlyExpenses, StringFormat='{}{0:N0} ₽'}"
+                                               Style="{StaticResource TitleText}"
+                                               FontSize="24"
+                                               FontWeight="SemiBold"/>
+                                    <Border Margin="8,0,0,0"
+                                            Padding="6,2"
+                                            CornerRadius="4"
+                                            Background="{DynamicResource ErrorLightBrush}"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Foreground="{DynamicResource ErrorBrush}" FontSize="12">
+                                            <Run Text="↑"/><Run Text="{Binding MonthlyExpensesChange, StringFormat=' {0}%'}"/>
+                                        </TextBlock>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="{Binding LastMonthExpenses, StringFormat='vs {0:N0} ₽ в прошлом месяце'}"
+                                           Style="{StaticResource CaptionText}"
+                                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                           FontSize="12"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Average receipt card -->
+                        <Border Background="{DynamicResource BackgroundLayer2Brush}"
+                                BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="16"
+                                Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="СРЕДНИЙ ЧЕК"
+                                           Style="{StaticResource CaptionText}"
+                                           Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding AverageReceipt, StringFormat='{}{0:N0} ₽'}"
+                                               Style="{StaticResource TitleText}"
+                                               FontSize="24"
+                                               FontWeight="SemiBold"/>
+                                    <Border Margin="8,0,0,0"
+                                            Padding="6,2"
+                                            CornerRadius="4"
+                                            Background="{DynamicResource SuccessLightBrush}"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Foreground="{DynamicResource SuccessBrush}" FontSize="12">
+                                            <Run Text="↓"/><Run Text="{Binding AverageReceiptChange, StringFormat=' {0}%'}"/>
+                                        </TextBlock>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="{Binding PurchasesCount, StringFormat='{}{0} покупок за месяц'}"
+                                           Style="{StaticResource CaptionText}"
+                                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                           FontSize="12"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Recent receipts section -->
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="Последние чеки"
+                                       Style="{StaticResource CaptionText}"
+                                       Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Margin="4,0,0,12"/>
+
+                            <ItemsControl ItemsSource="{Binding RecentReceipts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="10,10"
+                                                CornerRadius="4"
+                                                Margin="0,0,0,2"
+                                                Cursor="Hand">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Color indicator -->
+                                                <Border Grid.Column="0"
+                                                        Width="32" Height="32"
+                                                        Background="{DynamicResource BackgroundBaseBrush}"
+                                                        CornerRadius="4"
+                                                        Margin="0,0,12,0">
+                                                    <Ellipse Width="12" Height="12"
+                                                             Fill="{Binding Color}"/>
+                                                </Border>
+
+                                                <!-- Shop and date -->
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Shop}"
+                                                               Style="{StaticResource BodyText}"
+                                                               FontWeight="Medium"
+                                                               FontSize="13"/>
+                                                    <TextBlock Text="{Binding DateText}"
+                                                               Style="{StaticResource CaptionText}"
+                                                               Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                                               FontSize="11"/>
+                                                </StackPanel>
+
+                                                <!-- Amount -->
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Total, StringFormat='{}{0:N0} ₽'}"
+                                                           Style="{StaticResource BodyText}"
+                                                           Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                                           FontSize="13"
+                                                           FontWeight="Medium"
+                                                           VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Stores section -->
+                        <Border BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                BorderThickness="0,1,0,0"
+                                Margin="0,16,0,0"
+                                Padding="0,16,0,0">
+                            <StackPanel>
+                                <Grid Margin="4,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="Магазины"
+                                               Style="{StaticResource CaptionText}"
+                                               Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource LinkButton}"
+                                            Content="Обновить"
+                                            Command="{Binding CheckStoreAuthCommand}"
+                                            FontSize="11"
+                                            Visibility="{Binding IsCheckingAuth, Converter={StaticResource InverseBoolToVis}}"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="Проверка..."
+                                               Style="{StaticResource CaptionText}"
+                                               Foreground="{DynamicResource ForegroundTertiaryBrush}"
+                                               FontSize="11"
+                                               Visibility="{Binding IsCheckingAuth, Converter={StaticResource BoolToVis}}"/>
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding StoreAuthStatuses}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status dot -->
+                                                <Ellipse Grid.Column="0"
+                                                         Width="8" Height="8"
+                                                         Margin="4,0,10,0"
+                                                         VerticalAlignment="Center">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
+                                                            <Setter Property="Fill" Value="{DynamicResource ForegroundTertiaryBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAuthenticated}" Value="True">
+                                                                    <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsChecking}" Value="True">
+                                                                    <Setter Property="Fill" Value="{DynamicResource WarningBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
+
+                                                <!-- Store name -->
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding StoreName}"
+                                                           Style="{StaticResource BodyText}"
+                                                           FontSize="13"
+                                                           VerticalAlignment="Center"/>
+
+                                                <!-- Status badge (authenticated) -->
+                                                <Border Grid.Column="2"
+                                                        Padding="6,2"
+                                                        CornerRadius="4"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource SuccessLightBrush}"
+                                                        Visibility="{Binding IsAuthenticated, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="Авторизован"
+                                                               FontSize="10"
+                                                               Foreground="{DynamicResource SuccessBrush}"/>
+                                                </Border>
+
+                                                <!-- Checking status -->
+                                                <Border Grid.Column="2"
+                                                        Padding="6,2"
+                                                        CornerRadius="4"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource WarningLightBrush}"
+                                                        Visibility="{Binding IsChecking, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="Проверка..."
+                                                               FontSize="10"
+                                                               Foreground="{DynamicResource WarningBrush}"/>
+                                                </Border>
+
+                                                <!-- Login button (not authenticated) -->
+                                                <Button Grid.Column="2"
+                                                        Style="{StaticResource LinkButton}"
+                                                        Content="Войти"
+                                                        FontSize="11"
+                                                        Padding="6,2"
+                                                        Command="{Binding DataContext.LoginToStoreCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}">
+                                                    <Button.Visibility>
+                                                        <MultiBinding Converter="{StaticResource AllFalseToVis}">
+                                                            <Binding Path="IsAuthenticated"/>
+                                                            <Binding Path="IsChecking"/>
+                                                        </MultiBinding>
+                                                    </Button.Visibility>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
 
         <!-- Drafting screen (active session) -->
         <Grid x:Name="DraftingPanel"
@@ -978,6 +1401,82 @@
                            TextWrapping="Wrap"
                            Margin="0,16,0,0"/>
             </StackPanel>
+        </Grid>
+
+        <!-- Auth overlay (full-screen WebView for store login) -->
+        <Grid x:Name="AuthOverlay"
+              Visibility="{Binding ShowAuthOverlay, Converter={StaticResource BoolToVis}}"
+              Background="{DynamicResource BackgroundBaseBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Store name -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Path Data="{StaticResource IconLock}"
+                              Fill="{DynamicResource AccentBrush}"
+                              Width="20" Height="20" Stretch="Uniform"/>
+                        <TextBlock Style="{StaticResource SubtitleText}"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center">
+                            <Run Text="Авторизация в"/>
+                            <Run Text="{Binding AuthenticatingStore.StoreName, FallbackValue='магазине'}" FontWeight="SemiBold"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Finish button -->
+                    <Button Grid.Column="1"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding FinishLoginCommand}"
+                            Padding="24,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconCheck}"
+                                  Fill="{DynamicResource TextOnAccentBrush}"
+                                  Width="14" Height="14" Stretch="Uniform"
+                                  VerticalAlignment="Center"/>
+                            <TextBlock Text="Готово"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- WebView for login -->
+            <wv2:WebView2 Grid.Row="1"
+                          x:Name="AuthWebView"
+                          Source="{Binding AuthStoreUrl, TargetNullValue='about:blank', FallbackValue='about:blank'}"/>
+
+            <!-- Hint at bottom -->
+            <Border Grid.Row="1"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Center"
+                    Background="{DynamicResource BackgroundLayer1Brush}"
+                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8,8,0,0"
+                    Padding="16,8"
+                    Margin="0,0,0,0">
+                <TextBlock Style="{StaticResource CaptionText}"
+                           Foreground="{DynamicResource ForegroundSecondaryBrush}">
+                    <Run Text="💡"/>
+                    <Run Text="Войдите в аккаунт магазина, затем нажмите"/>
+                    <Run Text="«Готово»" FontWeight="SemiBold"/>
+                </TextBlock>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>
