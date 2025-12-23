@@ -79,18 +79,75 @@ public partial class ShoppingView : UserControl
     {
         if (e.Key == Key.Enter)
         {
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            // AcceptsReturn=True, поэтому:
+            // - Enter = новая строка (по умолчанию)
+            // - Ctrl+Enter = отправить сообщение
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
-                // Shift+Enter = new line - but we have AcceptsReturn=False, so ignore
-                return;
+                // Ctrl+Enter = send message
+                if (DataContext is ShoppingViewModel viewModel && viewModel.SendMessageCommand.CanExecute(null))
+                {
+                    viewModel.SendMessageCommand.Execute(null);
+                    e.Handled = true;
+                }
             }
+            // Enter без модификатора = новая строка, не обрабатываем
+        }
+    }
 
-            // Enter = send message
-            if (DataContext is ShoppingViewModel viewModel && viewModel.SendMessageCommand.CanExecute(null))
+    /// <summary>
+    /// Copy message text to clipboard
+    /// </summary>
+    private void CopyMessageText_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string text } && !string.IsNullOrEmpty(text))
+        {
+            try
             {
-                viewModel.SendMessageCommand.Execute(null);
-                e.Handled = true;
+                Clipboard.SetText(text);
             }
+            catch
+            {
+                // Ignore clipboard errors
+            }
+        }
+    }
+
+    /// <summary>
+    /// Пробрасывает MouseWheel из вложенных контролов в главный ScrollViewer.
+    /// Это нужно чтобы прокрутка мышкой работала когда курсор над MarkdownScrollViewer
+    /// или другими вложенными ScrollViewer-ами.
+    /// </summary>
+    private void OnChildPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // Если вложенный ScrollViewer не может скроллить дальше, передаём событие родителю
+        if (sender is ScrollViewer scrollViewer)
+        {
+            var atTop = scrollViewer.VerticalOffset <= 0 && e.Delta > 0;
+            var atBottom = scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight && e.Delta < 0;
+
+            if (atTop || atBottom || scrollViewer.ScrollableHeight <= 0)
+            {
+                // Пробрасываем событие в родительский ScrollViewer
+                e.Handled = true;
+                var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+                {
+                    RoutedEvent = MouseWheelEvent,
+                    Source = sender
+                };
+                MessagesScrollViewer.RaiseEvent(eventArg);
+            }
+        }
+        else
+        {
+            // Для MarkdownScrollViewer и других контролов просто пробрасываем всегда
+            e.Handled = true;
+            var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+            {
+                RoutedEvent = MouseWheelEvent,
+                Source = sender
+            };
+            MessagesScrollViewer.RaiseEvent(eventArg);
         }
     }
 }

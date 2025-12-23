@@ -832,6 +832,16 @@ public partial class ShoppingViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Отменить текущий запрос к AI
+    /// </summary>
+    [RelayCommand]
+    private void CancelChat()
+    {
+        _logger.LogDebug("[ShoppingViewModel] Cancelling chat request");
+        _chatCts?.Cancel();
+    }
+
+    /// <summary>
     /// Отправить сообщение в чат
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSend))]
@@ -891,54 +901,186 @@ public partial class ShoppingViewModel : ObservableObject
             Timestamp = DateTime.Now
         };
 
+        ShoppingResponsePart? currentFinalAnswer = null;
+
         // Добавляем пустое сообщение для streaming
-        Application.Current.Dispatcher.Invoke(() => Messages.Add(assistantMessage));
+        await Application.Current.Dispatcher.InvokeAsync(() => Messages.Add(assistantMessage));
 
-        var progress = new Progress<ChatProgress>(p =>
+        // Создаём Progress без захвата SynchronizationContext чтобы не блокировать UI
+        // Используем DispatcherProgress который явно вызывает InvokeAsync с низким приоритетом
+        var progress = new DispatcherProgress<ChatProgress>(Application.Current.Dispatcher, p =>
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            switch (p.Type)
             {
-                switch (p.Type)
-                {
-                    case ChatProgressType.TextDelta:
-                        // Добавляем текст к последнему сообщению
-                        // ShoppingChatMessage теперь реализует INotifyPropertyChanged,
-                        // поэтому UI автоматически обновится
-                        assistantMessage.Text += p.Text;
-                        break;
+                case ChatProgressType.TextDelta:
+                    // Добавляем текст к FinalAnswer части
+                    if (currentFinalAnswer == null)
+                    {
+                        currentFinalAnswer = new ShoppingResponsePart { IsToolCall = false };
+                        assistantMessage.Parts.Add(currentFinalAnswer);
+                    }
+                    currentFinalAnswer.Text += p.Text;
+                    // Также обновляем Text для обратной совместимости
+                    assistantMessage.Text += p.Text;
+                    break;
 
-                    case ChatProgressType.ToolCall:
-                        _logger.LogDebug("[ShoppingViewModel] Tool call: {Tool}({Args})", p.ToolName, p.ToolArgs);
-                        break;
+                case ChatProgressType.ToolCall:
+                    _logger.LogDebug("[ShoppingViewModel] Tool call: {Tool}({Args})", p.ToolName, p.ToolArgs);
 
-                    case ChatProgressType.ToolResult:
-                        _logger.LogDebug("[ShoppingViewModel] Tool result: {Tool} success={Success}", p.ToolName, p.ToolSuccess);
-                        break;
+                    // Если до tool call был текст, содержащий JSON с tool call - очищаем его
+                    // YandexGPT иногда дублирует tool call в виде JSON в тексте
+                    if (currentFinalAnswer != null)
+                    {
+                        var cleanedText = CleanToolCallJsonFromText(currentFinalAnswer.Text, p.ToolName);
+                        if (string.IsNullOrWhiteSpace(cleanedText))
+                        {
+                            // Текст был только JSON tool call - удаляем эту часть
+                            assistantMessage.Parts.Remove(currentFinalAnswer);
+                        }
+                        else
+                        {
+                            currentFinalAnswer.Text = cleanedText;
+                        }
+                    }
 
-                    case ChatProgressType.Complete:
-                        _logger.LogDebug("[ShoppingViewModel] Chat complete");
-                        break;
-                }
-            });
+                    // Создаём новую часть для tool call
+                    var toolPart = new ShoppingResponsePart
+                    {
+                        IsToolCall = true,
+                        ToolName = p.ToolName,
+                        ToolArgs = p.ToolArgs
+                    };
+                    assistantMessage.Parts.Add(toolPart);
+                    // Сбрасываем текущий FinalAnswer - после tool call может быть новый текст
+                    currentFinalAnswer = null;
+                    break;
+
+                case ChatProgressType.ToolResult:
+                    _logger.LogDebug("[ShoppingViewModel] Tool result: {Tool} success={Success}", p.ToolName, p.ToolSuccess);
+                    // Ищем последний tool call с таким именем без результата
+                    var lastToolCall = assistantMessage.Parts
+                        .LastOrDefault(x => x.IsToolCall && x.ToolName == p.ToolName && x.ToolResult == null);
+                    if (lastToolCall != null)
+                    {
+                        lastToolCall.ToolResult = p.ToolResult;
+                        lastToolCall.ToolSuccess = p.ToolSuccess;
+                    }
+                    break;
+
+                case ChatProgressType.Complete:
+                    _logger.LogDebug("[ShoppingViewModel] Chat complete");
+                    // Очищаем пустые FinalAnswer части и tool call JSON из финального текста
+                    CleanupEmptyParts(assistantMessage);
+                    break;
+            }
         });
 
-        var response = await _shoppingChatService.SendAsync(message, progress, cancellationToken);
+        var response = await _shoppingChatService.SendAsync(message, progress, cancellationToken).ConfigureAwait(false);
 
         if (!response.Success)
         {
             _logger.LogWarning("[ShoppingViewModel] Chat failed: {Error}", response.ErrorMessage);
-            // Обновляем сообщение с ошибкой если был пустой ответ
-            if (string.IsNullOrEmpty(assistantMessage.Text))
+            // Обновляем сообщение с ошибкой если не было streaming данных
+            // Используем !progress.HasReported вместо Parts.Count == 0 из-за race condition
+            if (string.IsNullOrEmpty(assistantMessage.Text) && !progress.HasReported)
             {
-                assistantMessage.Text = $"Ошибка: {response.ErrorMessage}";
+                var errorPart = new ShoppingResponsePart
+                {
+                    IsToolCall = false,
+                    Text = $"Ошибка: {response.ErrorMessage}"
+                };
+                await Application.Current.Dispatcher.InvokeAsync(() => assistantMessage.Parts.Add(errorPart));
+                assistantMessage.Text = errorPart.Text;
                 assistantMessage.IsError = true;
             }
         }
-        else if (string.IsNullOrEmpty(assistantMessage.Text) && !string.IsNullOrEmpty(response.Content))
+        else if (!progress.HasReported && !string.IsNullOrEmpty(response.Content))
         {
-            // Если streaming не сработал, но ответ есть — показываем его
-            _logger.LogDebug("[ShoppingViewModel] No streaming text, using final response");
+            // Если streaming не сработал (ни один Report не был вызван), но ответ есть — показываем его
+            // Используем progress.HasReported вместо Parts.Count == 0, т.к. Parts заполняется асинхронно
+            // через Dispatcher и может быть пустым из-за race condition
+            _logger.LogDebug("[ShoppingViewModel] No streaming reports, using final response");
+            var finalPart = new ShoppingResponsePart
+            {
+                IsToolCall = false,
+                Text = response.Content
+            };
+            await Application.Current.Dispatcher.InvokeAsync(() => assistantMessage.Parts.Add(finalPart));
             assistantMessage.Text = response.Content;
+        }
+    }
+
+    /// <summary>
+    /// Очищает текст от JSON tool call блоков
+    /// </summary>
+    private static string CleanToolCallJsonFromText(string text, string? toolName)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        // Паттерны для JSON tool call в тексте от YandexGPT
+        // Например: ```json\n{"name": "query", ...}\n```
+        // Или просто: {"name": "query", ...}
+
+        var result = text;
+
+        // Удаляем markdown code blocks с JSON
+        result = System.Text.RegularExpressions.Regex.Replace(
+            result,
+            @"```json\s*\{[^}]*""name""\s*:\s*""[^""]*""[^`]*```",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // Удаляем standalone JSON объекты с "name" (tool calls)
+        result = System.Text.RegularExpressions.Regex.Replace(
+            result,
+            @"\{\s*""name""\s*:\s*""[^""]*""\s*,\s*""arguments""\s*:\s*\{[^}]*\}\s*\}",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // Если указано имя инструмента - удаляем конкретные упоминания
+        if (!string.IsNullOrEmpty(toolName))
+        {
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                $@"\{{\s*""name""\s*:\s*""{System.Text.RegularExpressions.Regex.Escape(toolName)}""[^}}]*\}}",
+                "",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+        }
+
+        return result.Trim();
+    }
+
+    /// <summary>
+    /// Очищает пустые FinalAnswer части и финальный текст от JSON tool calls
+    /// </summary>
+    private void CleanupEmptyParts(ShoppingChatMessage message)
+    {
+        // Удаляем пустые FinalAnswer части
+        var emptyParts = message.Parts
+            .Where(p => !p.IsToolCall && string.IsNullOrWhiteSpace(p.Text))
+            .ToList();
+        foreach (var part in emptyParts)
+        {
+            message.Parts.Remove(part);
+        }
+
+        // Очищаем текст в оставшихся FinalAnswer частях от tool call JSON
+        foreach (var part in message.Parts.Where(p => !p.IsToolCall))
+        {
+            var cleanedText = CleanToolCallJsonFromText(part.Text, null);
+            if (cleanedText != part.Text)
+            {
+                part.Text = cleanedText;
+            }
+        }
+
+        // Удаляем части, которые стали пустыми после очистки
+        emptyParts = message.Parts
+            .Where(p => !p.IsToolCall && string.IsNullOrWhiteSpace(p.Text))
+            .ToList();
+        foreach (var part in emptyParts)
+        {
+            message.Parts.Remove(part);
         }
     }
 
@@ -1631,9 +1773,81 @@ public class ShoppingChatMessage : ObservableObject
         set => SetProperty(ref _isError, value);
     }
 
+    /// <summary>
+    /// Части ответа ассистента (tool calls, final answer)
+    /// </summary>
+    public ObservableCollection<ShoppingResponsePart> Parts { get; } = new();
+
     public bool IsUser => Role == ChatRole.User;
     public bool IsAssistant => Role == ChatRole.Assistant;
     public bool IsSystem => Role == ChatRole.System;
+}
+
+/// <summary>
+/// Часть ответа в Shopping чате (tool call или финальный ответ)
+/// </summary>
+public class ShoppingResponsePart : ObservableObject
+{
+    private string _text = string.Empty;
+    private string? _toolResult;
+    private bool? _toolSuccess;
+    private bool _isExpanded;
+
+    /// <summary>
+    /// Тип части: ToolCall или FinalAnswer
+    /// </summary>
+    public bool IsToolCall { get; init; }
+
+    /// <summary>
+    /// Название инструмента (для ToolCall)
+    /// </summary>
+    public string? ToolName { get; init; }
+
+    /// <summary>
+    /// Аргументы инструмента (для ToolCall)
+    /// </summary>
+    public string? ToolArgs { get; init; }
+
+    /// <summary>
+    /// Результат выполнения инструмента
+    /// </summary>
+    public string? ToolResult
+    {
+        get => _toolResult;
+        set => SetProperty(ref _toolResult, value);
+    }
+
+    /// <summary>
+    /// Успешно ли выполнен инструмент
+    /// </summary>
+    public bool? ToolSuccess
+    {
+        get => _toolSuccess;
+        set => SetProperty(ref _toolSuccess, value);
+    }
+
+    /// <summary>
+    /// Текст (для FinalAnswer)
+    /// </summary>
+    public string Text
+    {
+        get => _text;
+        set => SetProperty(ref _text, value);
+    }
+
+    /// <summary>
+    /// Развёрнута ли часть в UI
+    /// </summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
+    }
+
+    /// <summary>
+    /// Для UI - является ли FinalAnswer
+    /// </summary>
+    public bool IsFinalAnswer => !IsToolCall;
 }
 
 /// <summary>
@@ -1644,6 +1858,41 @@ public enum ChatRole
     User,
     Assistant,
     System
+}
+
+/// <summary>
+/// IProgress реализация которая не захватывает SynchronizationContext
+/// и явно вызывает callback через Dispatcher с низким приоритетом
+/// </summary>
+public class DispatcherProgress<T> : IProgress<T>
+{
+    private readonly System.Windows.Threading.Dispatcher _dispatcher;
+    private readonly Action<T> _handler;
+    private readonly Action? _onReport;
+
+    /// <summary>
+    /// Флаг, указывающий что был хотя бы один вызов Report.
+    /// Устанавливается СИНХРОННО в момент вызова Report, до InvokeAsync.
+    /// </summary>
+    public bool HasReported { get; private set; }
+
+    public DispatcherProgress(System.Windows.Threading.Dispatcher dispatcher, Action<T> handler, Action? onReport = null)
+    {
+        _dispatcher = dispatcher;
+        _handler = handler;
+        _onReport = onReport;
+    }
+
+    public void Report(T value)
+    {
+        // Устанавливаем флаг СИНХРОННО - до InvokeAsync
+        // Это решает race condition: флаг будет установлен к моменту проверки после await SendAsync
+        HasReported = true;
+        _onReport?.Invoke();
+
+        // Используем Background приоритет чтобы UI оставался отзывчивым
+        _dispatcher.InvokeAsync(() => _handler(value), System.Windows.Threading.DispatcherPriority.Background);
+    }
 }
 
 /// <summary>

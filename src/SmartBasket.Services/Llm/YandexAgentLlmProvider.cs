@@ -166,7 +166,8 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 Stream = true  // Включаем streaming
             };
 
-            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
+            // Compact JSON для экономии токенов на входе
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.Compact);
 
             // Логирование в формате ARCHITECTURE-AI.md
             progress?.Report($"[YandexAgent] === PROMPT START ===");
@@ -442,6 +443,21 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 reasoningOptions = new ReasoningOptionsDto { Mode = "ENABLED_HIDDEN" };
             }
 
+            // Определяем max_output_tokens
+            // При включённом reasoning модель тратит токены на "размышления"
+            // Увеличиваем лимит чтобы хватило и на reasoning и на ответ с tool calls
+            // По умолчанию используем значение из конфига, или 16384 при reasoning, или 4096 без reasoning
+            int? maxOutputTokens = null;
+            if (_config.MaxTokens > 0)
+            {
+                maxOutputTokens = _config.MaxTokens;
+            }
+            else if (reasoningEffort != null)
+            {
+                // При reasoning нужно больше токенов для "размышлений" + ответа
+                maxOutputTokens = 16384;
+            }
+
             // REST Assistant API формат запроса
             var request = new RestAssistantChatRequest
             {
@@ -451,10 +467,12 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 PreviousResponseId = _lastResponseId,
                 Tools = yandexTools,
                 ReasoningEffort = reasoningEffort,
-                ReasoningOptions = reasoningOptions
+                ReasoningOptions = reasoningOptions,
+                MaxOutputTokens = maxOutputTokens
             };
 
-            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
+            // Compact JSON для экономии токенов на входе (tools могут быть объёмными)
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.Compact);
 
             // Подсчёт размера контекста для диагностики
             var contextChars = messageList.Sum(m => m.Content?.Length ?? 0);
@@ -468,6 +486,10 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             _logger.LogInformation("[YandexAgent Chat] Input items: {Count} (total history: {TotalCount}), Tools: {ToolsCount}",
                 inputItemsCount, messageList.Count, yandexTools?.Count ?? 0);
             _logger.LogInformation("[YandexAgent Chat] Timeout: {Timeout}s", timeoutSeconds);
+            if (maxOutputTokens.HasValue)
+            {
+                _logger.LogInformation("[YandexAgent Chat] MaxOutputTokens: {MaxTokens}", maxOutputTokens.Value);
+            }
             if (!string.IsNullOrEmpty(reasoningEffort))
             {
                 _logger.LogInformation("[YandexAgent Chat] ReasoningEffort: {ReasoningEffort}, ReasoningOptions.Mode: {Mode}",
@@ -1158,6 +1180,15 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
         [JsonPropertyName("reasoning_options")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public ReasoningOptionsDto? ReasoningOptions { get; set; }
+
+        /// <summary>
+        /// Максимальное количество токенов в ответе модели.
+        /// Важно при использовании reasoning mode, т.к. "размышления" тоже расходуют токены.
+        /// По умолчанию API может иметь низкий лимит, что приводит к обрезанию tool calls.
+        /// </summary>
+        [JsonPropertyName("max_output_tokens")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? MaxOutputTokens { get; set; }
     }
 
     /// <summary>

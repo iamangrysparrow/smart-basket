@@ -219,6 +219,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Temperature" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
@@ -232,7 +233,25 @@
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Max Tokens" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                         <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MaxTokens, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-                                 Style="{StaticResource TextInput}" Width="60"/>
+                                 Style="{StaticResource TextInput}" Width="60" Margin="0,0,0,6"/>
+
+                        <!-- Reasoning settings (YandexAgent only) -->
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Рассуждения" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                                   Visibility="{Binding ShowReasoning, Converter={StaticResource BoolToVis}}"/>
+                        <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="4" Orientation="Horizontal"
+                                    Visibility="{Binding ShowReasoning, Converter={StaticResource BoolToVis}}">
+                            <CheckBox IsChecked="{Binding IsReasoningEnabled}"
+                                      VerticalAlignment="Center"
+                                      ToolTip="Включить режим рассуждений (reasoning mode)"/>
+                            <ComboBox ItemsSource="{Binding ReasoningEffortOptions}"
+                                      SelectedItem="{Binding ReasoningEffort}"
+                                      IsEnabled="{Binding IsReasoningEnabled}"
+                                      MinWidth="80"
+                                      FontSize="12"
+                                      Padding="4,3"
+                                      Margin="8,0,0,0"
+                                      ToolTip="Уровень рассуждений: Low (быстро), Medium (баланс), High (тщательно)"/>
+                        </StackPanel>
                     </Grid>
 
                     <!-- Action Buttons -->

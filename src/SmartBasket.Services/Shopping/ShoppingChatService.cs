@@ -138,7 +138,7 @@ public class ShoppingChatService : IShoppingChatService
         // Получаем только нужные инструменты для Shopping модуля
         var allTools = _tools.GetToolDefinitions();
         var shoppingTools = allTools
-            .Where(t => t.Name is "update_basket" or "query" or "describe_data")
+            .Where(t => t.Name is "update_basket" or "query" or "describe_data" or "get_current_datetime")
             .ToList();
 
         _logger.LogDebug("[ShoppingChatService] Tools: {Tools}",
@@ -160,7 +160,14 @@ public class ShoppingChatService : IShoppingChatService
                     // Фильтруем служебные сообщения провайдера
                     if (IsServiceMessage(delta)) return;
 
-                    var cleanDelta = delta?.TrimStart();
+                    // Провайдер отправляет текстовые дельты с маркером "  " (два пробела в начале)
+                    // Убираем только этот маркер, сохраняя реальные пробелы в тексте
+                    var cleanDelta = delta;
+                    if (delta != null && delta.StartsWith("  "))
+                    {
+                        cleanDelta = delta.Substring(2); // Убираем только маркер (2 пробела)
+                    }
+
                     if (!string.IsNullOrEmpty(cleanDelta))
                     {
                         progress.Report(new ChatProgress(ChatProgressType.TextDelta, Text: cleanDelta));

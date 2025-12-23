@@ -23,6 +23,8 @@ public partial class AiProviderViewModel : ObservableObject
         ApiKey = config.ApiKey ?? string.Empty;
         FolderId = config.FolderId ?? string.Empty;
         AgentId = config.AgentId ?? string.Empty;
+        ReasoningMode = config.ReasoningMode;
+        ReasoningEffort = config.ReasoningEffort;
     }
 
     private string _originalKey = string.Empty;
@@ -84,6 +86,12 @@ public partial class AiProviderViewModel : ObservableObject
     [ObservableProperty]
     private string _agentId = string.Empty;
 
+    [ObservableProperty]
+    private ReasoningMode _reasoningMode = ReasoningMode.Disabled;
+
+    [ObservableProperty]
+    private ReasoningEffort _reasoningEffort = ReasoningEffort.Medium;
+
     // Helper properties for UI visibility
     public bool IsOllama => Provider == AiProviderType.Ollama;
     public bool IsYandexGpt => Provider == AiProviderType.YandexGPT;
@@ -95,6 +103,26 @@ public partial class AiProviderViewModel : ObservableObject
     public bool ShowFolderId => IsYandexGpt || IsYandexAgent;
     public bool ShowAgentId => IsYandexAgent;
     public bool ShowModel => !IsYandexAgent;
+    public bool ShowReasoning => IsYandexAgent;
+
+    /// <summary>
+    /// Включён ли режим рассуждений (для биндинга чекбокса)
+    /// </summary>
+    public bool IsReasoningEnabled
+    {
+        get => ReasoningMode == ReasoningMode.EnabledHidden;
+        set
+        {
+            ReasoningMode = value ? ReasoningMode.EnabledHidden : ReasoningMode.Disabled;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Доступные уровни рассуждений
+    /// </summary>
+    public static IReadOnlyList<ReasoningEffort> ReasoningEffortOptions { get; } =
+        [ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High];
 
     public bool IsNew => string.IsNullOrEmpty(_originalKey);
 
@@ -125,7 +153,9 @@ public partial class AiProviderViewModel : ObservableObject
             MaxTokens = MaxTokens,
             ApiKey = string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey,
             FolderId = string.IsNullOrWhiteSpace(FolderId) ? null : FolderId,
-            AgentId = string.IsNullOrWhiteSpace(AgentId) ? null : AgentId
+            AgentId = string.IsNullOrWhiteSpace(AgentId) ? null : AgentId,
+            ReasoningMode = ReasoningMode,
+            ReasoningEffort = ReasoningEffort
         };
     }
 }
