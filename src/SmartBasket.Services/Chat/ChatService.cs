@@ -321,10 +321,11 @@ public class ChatService : IChatService
             // Вызов LLM с адаптером для progress
             // Провайдер использует IProgress<string> для streaming текста
             // Мы конвертируем в типизированный ChatProgress
-            // Фильтруем служебные сообщения от провайдера
+            // ВАЖНО: используем ThreadSafeProgress вместо Progress<T>
+            // Progress<T> захватывает SynchronizationContext и блокирует UI при ожидании await
             var llmStopwatch = Stopwatch.StartNew();
             var streamingProgress = progress != null
-                ? new Progress<string>(delta =>
+                ? new ThreadSafeProgress<string>(delta =>
                 {
                     // Фильтруем служебные сообщения от провайдеров
                     if (IsServiceMessage(delta)) return;

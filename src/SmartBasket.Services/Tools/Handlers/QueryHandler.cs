@@ -29,13 +29,17 @@ public class QueryHandler : IToolHandler
         },
         ["ReceiptItems"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            "Id", "ReceiptId", "ItemId", "Quantity", "Price", "Amount", "CreatedAt", "UpdatedAt"
+            "Id", "ReceiptId", "ItemId", "Quantity", "QuantityUnitId", "BaseUnitQuantity", "Price", "Amount", "CreatedAt", "UpdatedAt"
         },
         ["Items"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            "Id", "Name", "ProductId", "UnitOfMeasure", "UnitQuantity", "Shop", "CreatedAt", "UpdatedAt"
+            "Id", "Name", "ProductId", "UnitId", "UnitQuantity", "BaseUnitQuantity", "Shop", "CreatedAt", "UpdatedAt"
         },
         ["Products"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id", "Name", "BaseUnitId", "CategoryId", "CreatedAt", "UpdatedAt"
+        },
+        ["ProductCategories"] = new(StringComparer.OrdinalIgnoreCase)
         {
             "Id", "Name", "ParentId", "CreatedAt", "UpdatedAt"
         },
@@ -50,6 +54,10 @@ public class QueryHandler : IToolHandler
         ["ProductLabels"] = new(StringComparer.OrdinalIgnoreCase)
         {
             "ProductId", "LabelId"
+        },
+        ["UnitOfMeasures"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id", "Name", "BaseUnitId", "Coefficient", "IsBase"
         }
     };
 
@@ -355,16 +363,37 @@ public class QueryHandler : IToolHandler
         // SELECT columns (используем SelectRaw для избежания двойного экранирования)
         var hasSelections = false;
 
-        if (args.Columns != null && args.Columns.Count > 0)
+        // Парсим inline агрегаты из columns (например "SUM(Column) AS Alias")
+        // и переносим их в aggregates
+        var inlineAggregates = new List<AggregateColumn>();
+        var regularColumns = new List<string>();
+
+        if (args.Columns != null)
         {
-            var validColumns = args.Columns
+            foreach (var col in args.Columns)
+            {
+                var parsed = TryParseInlineAggregate(col);
+                if (parsed != null)
+                {
+                    inlineAggregates.Add(parsed);
+                }
+                else
+                {
+                    regularColumns.Add(col);
+                }
+            }
+        }
+
+        // Обычные колонки
+        if (regularColumns.Count > 0)
+        {
+            var validColumns = regularColumns
                 .Select(c => ValidateAndQuoteColumn(c, tableName))
                 .Where(c => c != null)
                 .ToArray();
 
             if (validColumns.Length > 0)
             {
-                // SelectRaw для каждой колонки
                 foreach (var col in validColumns)
                 {
                     query = query.SelectRaw(col!);
@@ -373,10 +402,15 @@ public class QueryHandler : IToolHandler
             }
         }
 
-        // Aggregates
-        if (args.Aggregates != null)
+        // Объединяем агрегаты: из args.Aggregates + inline из columns
+        var allAggregates = (args.Aggregates ?? new List<AggregateColumn>())
+            .Concat(inlineAggregates)
+            .ToList();
+
+        // Aggregates (из args.Aggregates + inline из columns)
+        if (allAggregates.Count > 0)
         {
-            foreach (var agg in args.Aggregates)
+            foreach (var agg in allAggregates)
             {
                 if (!AllowedAggregateFunctions.Contains(agg.Function))
                     continue;
@@ -470,10 +504,10 @@ public class QueryHandler : IToolHandler
         {
             foreach (var order in args.OrderBy)
             {
-                // ORDER BY может быть по алиасу агрегата или по колонке
-                var isAggregate = args.Aggregates?.Any(a =>
+                // ORDER BY может быть по алиасу агрегата (из args.Aggregates или inline) или по колонке
+                var isAggregate = allAggregates.Any(a =>
                     !string.IsNullOrEmpty(a.Alias) &&
-                    a.Alias.Equals(order.Column, StringComparison.OrdinalIgnoreCase)) ?? false;
+                    a.Alias.Equals(order.Column, StringComparison.OrdinalIgnoreCase));
 
                 if (isAggregate)
                 {
@@ -521,9 +555,13 @@ public class QueryHandler : IToolHandler
             "receipt_items" => "ReceiptItems",
             "items" => "Items",
             "products" => "Products",
+            "product_categories" => "ProductCategories",
+            "productcategories" => "ProductCategories",
             "labels" => "Labels",
             "item_labels" => "ItemLabels",
             "product_labels" => "ProductLabels",
+            "unit_of_measures" => "UnitOfMeasures",
+            "unitofmeasures" => "UnitOfMeasures",
             _ => null
         };
 
@@ -582,6 +620,36 @@ public class QueryHandler : IToolHandler
         return normalizedTable != null
             ? $"{normalizedTable}.{normalizedColumn}"
             : normalizedColumn;
+    }
+
+    /// <summary>
+    /// Пытается распарсить inline агрегат из columns
+    /// Поддерживаемые форматы:
+    /// - "SUM(Column) AS Alias"
+    /// - "SUM(Table.Column) AS Alias"
+    /// - "COUNT(*) AS Alias"
+    /// </summary>
+    private static AggregateColumn? TryParseInlineAggregate(string column)
+    {
+        if (string.IsNullOrWhiteSpace(column))
+            return null;
+
+        // Regex для парсинга: FUNC(column) AS alias
+        // Группы: 1=функция, 2=колонка, 3=алиас
+        var match = System.Text.RegularExpressions.Regex.Match(
+            column.Trim(),
+            @"^(COUNT|SUM|AVG|MIN|MAX)\s*\(\s*([^)]+)\s*\)\s+AS\s+(\w+)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (!match.Success)
+            return null;
+
+        return new AggregateColumn
+        {
+            Function = match.Groups[1].Value.ToUpper(),
+            Column = match.Groups[2].Value.Trim(),
+            Alias = match.Groups[3].Value
+        };
     }
 
     /// <summary>

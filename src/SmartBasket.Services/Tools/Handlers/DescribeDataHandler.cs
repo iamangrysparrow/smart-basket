@@ -64,7 +64,7 @@ public class DescribeDataHandler : IToolHandler
     {
         return new
         {
-            note = "Все имена таблиц и колонок в PascalCase",
+            note = "Все имена таблиц и колонок в PascalCase. Иерархия: ProductCategories → Products → Items → ReceiptItems",
             tables = new[]
             {
                 new
@@ -93,7 +93,9 @@ public class DescribeDataHandler : IToolHandler
                         new { name = "Id", type = "uuid", description = "PK" },
                         new { name = "ReceiptId", type = "uuid", description = "FK → Receipts.Id" },
                         new { name = "ItemId", type = "uuid", description = "FK → Items.Id" },
-                        new { name = "Quantity", type = "decimal", description = "Количество" },
+                        new { name = "Quantity", type = "decimal", description = "Количество в чеке" },
+                        new { name = "QuantityUnitId", type = "string", description = "FK → UnitOfMeasures.Id, единица количества: шт, кг, л" },
+                        new { name = "BaseUnitQuantity", type = "decimal", description = "Количество в базовых ЕИ продукта" },
                         new { name = "Price", type = "decimal", description = "Цена за единицу" },
                         new { name = "Amount", type = "decimal", description = "Сумма позиции" },
                         new { name = "CreatedAt", type = "timestamp", description = "Дата создания записи" },
@@ -103,15 +105,16 @@ public class DescribeDataHandler : IToolHandler
                 new
                 {
                     name = "Items",
-                    description = "Справочник уникальных товаров",
+                    description = "Справочник уникальных товаров из чеков (например: 'Молоко Parmalat 2.5% 1л')",
                     columns = new[]
                     {
                         new { name = "Id", type = "uuid", description = "PK" },
-                        new { name = "Name", type = "string", description = "Название товара" },
-                        new { name = "ProductId", type = "uuid", description = "FK → Products.Id (категория)" },
+                        new { name = "Name", type = "string", description = "Название товара из чека" },
+                        new { name = "ProductId", type = "uuid", description = "FK → Products.Id (группа товаров)" },
                         new { name = "Shop", type = "string", description = "Магазин" },
-                        new { name = "UnitOfMeasure", type = "string", description = "Единица: шт, кг, л" },
-                        new { name = "UnitQuantity", type = "decimal", description = "Количество в единице" },
+                        new { name = "UnitId", type = "string", description = "FK → UnitOfMeasures.Id, единица товара: г, мл, кг, л, шт" },
+                        new { name = "UnitQuantity", type = "decimal", description = "Количество в единице (700 для 700г, 930 для 930мл)" },
+                        new { name = "BaseUnitQuantity", type = "decimal", description = "Количество в базовой ЕИ (0.7 для 700г→кг, 0.93 для 930мл→л)" },
                         new { name = "CreatedAt", type = "timestamp", description = "Дата создания записи" },
                         new { name = "UpdatedAt", type = "timestamp", description = "Дата обновления" }
                     }
@@ -119,12 +122,26 @@ public class DescribeDataHandler : IToolHandler
                 new
                 {
                     name = "Products",
-                    description = "Категории товаров (иерархия)",
+                    description = "Группы товаров (плоский справочник, например: 'Молоко', 'Свинина', 'Гречка')",
+                    columns = new[]
+                    {
+                        new { name = "Id", type = "uuid", description = "PK" },
+                        new { name = "Name", type = "string", description = "Название группы товаров" },
+                        new { name = "BaseUnitId", type = "string", description = "FK → UnitOfMeasures.Id, базовая ЕИ продукта: кг, л, шт, м, м²" },
+                        new { name = "CategoryId", type = "uuid?", description = "FK → ProductCategories.Id (категория), null = без категории" },
+                        new { name = "CreatedAt", type = "timestamp", description = "Дата создания записи" },
+                        new { name = "UpdatedAt", type = "timestamp", description = "Дата обновления" }
+                    }
+                },
+                new
+                {
+                    name = "ProductCategories",
+                    description = "Категории продуктов (иерархический справочник, например: 'Молочные продукты' → 'Молоко')",
                     columns = new[]
                     {
                         new { name = "Id", type = "uuid", description = "PK" },
                         new { name = "Name", type = "string", description = "Название категории" },
-                        new { name = "ParentId", type = "uuid?", description = "FK → Products.Id (родитель), null = корень" },
+                        new { name = "ParentId", type = "uuid?", description = "FK → ProductCategories.Id (родитель), null = корневая категория" },
                         new { name = "CreatedAt", type = "timestamp", description = "Дата создания записи" },
                         new { name = "UpdatedAt", type = "timestamp", description = "Дата обновления" }
                     }
@@ -132,7 +149,7 @@ public class DescribeDataHandler : IToolHandler
                 new
                 {
                     name = "Labels",
-                    description = "Пользовательские метки",
+                    description = "Пользовательские метки для товаров и продуктов",
                     columns = new[]
                     {
                         new { name = "Id", type = "uuid", description = "PK" },
@@ -155,28 +172,54 @@ public class DescribeDataHandler : IToolHandler
                 new
                 {
                     name = "ProductLabels",
-                    description = "Связь категорий с метками (M:N)",
+                    description = "Связь продуктов с метками (M:N)",
                     columns = new[]
                     {
                         new { name = "ProductId", type = "uuid", description = "FK → Products.Id" },
                         new { name = "LabelId", type = "uuid", description = "FK → Labels.Id" }
+                    }
+                },
+                new
+                {
+                    name = "UnitOfMeasures",
+                    description = "Справочник единиц измерения",
+                    columns = new[]
+                    {
+                        new { name = "Id", type = "string", description = "PK, код ЕИ: г, кг, мл, л, шт, мм, см, м, см², м²" },
+                        new { name = "Name", type = "string", description = "Полное название: грамм, килограмм и т.д." },
+                        new { name = "BaseUnitId", type = "string", description = "FK → UnitOfMeasures.Id, базовая ЕИ" },
+                        new { name = "Coefficient", type = "decimal", description = "Коэффициент конвертации в базовую ЕИ (0.001 для г→кг)" },
+                        new { name = "IsBase", type = "bool", description = "True если это базовая ЕИ (кг, л, шт, м, м²)" }
                     }
                 }
             },
             relationships = new[]
             {
                 "Receipts.Id ← ReceiptItems.ReceiptId (1:N) — чек содержит позиции",
-                "Items.Id ← ReceiptItems.ItemId (1:N) — товар в позициях",
-                "Products.Id ← Items.ProductId (1:N) — категория товара",
-                "Products.Id ← Products.ParentId (self-reference) — иерархия категорий",
+                "Items.Id ← ReceiptItems.ItemId (1:N) — товар встречается в позициях чеков",
+                "Products.Id ← Items.ProductId (1:N) — продукт группирует товары",
+                "ProductCategories.Id ← Products.CategoryId (1:N) — категория содержит продукты",
+                "ProductCategories.Id ← ProductCategories.ParentId (self-reference) — иерархия категорий",
                 "Items ↔ Labels через ItemLabels (M:N) — метки товаров",
-                "Products ↔ Labels через ProductLabels (M:N) — метки категорий"
+                "Products ↔ Labels через ProductLabels (M:N) — метки продуктов",
+                "UnitOfMeasures.Id ← Products.BaseUnitId (1:N) — базовая ЕИ продукта",
+                "UnitOfMeasures.Id ← Items.UnitId (1:N) — ЕИ товара",
+                "UnitOfMeasures.Id ← ReceiptItems.QuantityUnitId (1:N) — ЕИ количества в чеке"
+            },
+            hierarchy_explanation = new
+            {
+                level1 = "ProductCategories — иерархические категории ('Молочные продукты', 'Мясо')",
+                level2 = "Products — группы товаров внутри категорий ('Молоко', 'Сметана', 'Свинина')",
+                level3 = "Items — конкретные товары из чеков ('Молоко Parmalat 2.5% 1л', 'Молоко Домик в деревне 3.2%')",
+                level4 = "ReceiptItems — позиции в чеках с ценой и количеством"
             },
             join_examples = new[]
             {
                 "Товары с суммами: ReceiptItems JOIN Items ON Items.Id = ReceiptItems.ItemId",
                 "Чеки с товарами: Receipts JOIN ReceiptItems ON Receipts.Id = ReceiptItems.ReceiptId",
-                "Товары по категориям: Items JOIN Products ON Products.Id = Items.ProductId"
+                "Товары по продуктам: Items JOIN Products ON Products.Id = Items.ProductId",
+                "Продукты по категориям: Products JOIN ProductCategories ON ProductCategories.Id = Products.CategoryId",
+                "Полная цепочка: ReceiptItems → Items → Products → ProductCategories"
             }
         };
     }
@@ -186,6 +229,7 @@ public class DescribeDataHandler : IToolHandler
         var totalReceipts = await _db.Receipts.CountAsync(ct);
         var totalItems = await _db.Items.CountAsync(ct);
         var totalProducts = await _db.Products.CountAsync(ct);
+        var totalCategories = await _db.ProductCategories.CountAsync(ct);
         var totalLabels = await _db.Labels.CountAsync(ct);
 
         string dateRange = "нет данных";
@@ -201,6 +245,7 @@ public class DescribeDataHandler : IToolHandler
             total_receipts = totalReceipts,
             total_items = totalItems,
             total_products = totalProducts,
+            total_categories = totalCategories,
             total_labels = totalLabels,
             date_range = dateRange
         };

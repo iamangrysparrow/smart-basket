@@ -4,6 +4,27 @@ using SmartBasket.Services.Llm;
 namespace SmartBasket.Services.Chat;
 
 /// <summary>
+/// Thread-safe progress reporter that does NOT capture SynchronizationContext.
+/// Uses Action directly instead of posting to captured context.
+/// ВАЖНО: используйте этот класс вместо Progress{T} в async методах,
+/// чтобы избежать блокировки UI при ожидании await.
+/// </summary>
+public class ThreadSafeProgress<T> : IProgress<T>
+{
+    private readonly Action<T> _handler;
+
+    public ThreadSafeProgress(Action<T> handler)
+    {
+        _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    }
+
+    public void Report(T value)
+    {
+        _handler(value);
+    }
+}
+
+/// <summary>
 /// Результат отправки сообщения в чат
 /// </summary>
 public record ChatResponse(

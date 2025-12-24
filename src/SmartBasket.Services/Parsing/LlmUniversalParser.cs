@@ -189,10 +189,10 @@ public class LlmUniversalParser : IReceiptTextParser
                         {
                             Name = item.Name ?? "Unknown",
                             Quantity = item.Quantity ?? 1,
-                            Unit = item.Unit,
+                            QuantityUnit = item.QuantityUnit,
                             Price = item.Price,
                             Amount = item.Amount,
-                            UnitOfMeasure = item.UnitOfMeasure,
+                            Unit = item.Unit,
                             UnitQuantity = item.UnitQuantity
                         });
                     }
@@ -303,12 +303,14 @@ JSON:
     {
         public string? Name { get; set; }
         public decimal? Quantity { get; set; }
-        public string? Unit { get; set; }
+
+        [JsonPropertyName("quantity_unit")]
+        public string? QuantityUnit { get; set; }
+
         public decimal? Price { get; set; }
         public decimal? Amount { get; set; }
 
-        [JsonPropertyName("unit_of_measure")]
-        public string? UnitOfMeasure { get; set; }
+        public string? Unit { get; set; }
 
         [JsonPropertyName("unit_quantity")]
         public decimal? UnitQuantity { get; set; }

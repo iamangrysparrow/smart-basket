@@ -41,6 +41,7 @@ public class ProductExtractionService : IProductExtractionService
     public async Task<ProductExtractionResult> ExtractAsync(
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string>? existingProducts = null,
+        IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -75,7 +76,7 @@ public class ProductExtractionService : IProductExtractionService
                 progress?.Report($"  [Extract] Existing products provided: {existingProducts.Count}");
             }
 
-            var prompt = BuildPrompt(itemNames, existingProducts, progress);
+            var prompt = BuildPrompt(itemNames, existingProducts, unitOfMeasures, progress);
             progress?.Report($"  [Extract] Prompt ready: {prompt.Length} chars");
             progress?.Report($"  [Extract] === PROMPT START ===");
             progress?.Report(prompt);
@@ -140,6 +141,7 @@ public class ProductExtractionService : IProductExtractionService
     private string BuildPrompt(
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string>? existingProducts,
+        IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures,
         IProgress<string>? progress = null)
     {
         var itemsList = string.Join("\n", itemNames.Select((item, idx) => $"{idx + 1}. {item}"));
@@ -147,13 +149,17 @@ public class ProductExtractionService : IProductExtractionService
             ? string.Join("\n", existingProducts.Select(p => $"- {p}"))
             : "(нет существующих продуктов)";
 
+        // Формируем справочник единиц измерения
+        var unitsList = BuildUnitsReference(unitOfMeasures);
+
         // Priority 1: Custom prompt (from settings)
         if (!string.IsNullOrWhiteSpace(_customPrompt))
         {
             progress?.Report($"  [Extract] Using custom prompt ({_customPrompt.Length} chars)");
             return _customPrompt
                 .Replace("{{ITEMS}}", itemsList)
-                .Replace("{{PRODUCTS}}", productsList);
+                .Replace("{{PRODUCTS}}", productsList)
+                .Replace("{{UNITS}}", unitsList);
         }
 
         // Priority 2: Template from file
@@ -175,13 +181,14 @@ public class ProductExtractionService : IProductExtractionService
         {
             return _promptTemplate
                 .Replace("{{ITEMS}}", itemsList)
-                .Replace("{{PRODUCTS}}", productsList);
+                .Replace("{{PRODUCTS}}", productsList)
+                .Replace("{{UNITS}}", unitsList);
         }
 
         // Priority 3: Default prompt (fallback)
-        return $@"Выдели продукты из товаров.
+        return $@"Выдели продукты из товаров и определи базовую единицу измерения.
 
-Правила:
+Правила выделения продукта:
 - Удали бренды, торговые марки, производителей
 - Удали вес, объём, количество штук (700 г, 930 мл, 5 шт)
 - Удали маркировки (БЗМЖ, С0, Халяль)
@@ -189,15 +196,54 @@ public class ProductExtractionService : IProductExtractionService
 - Сохрани жирность для молочных продуктов (10%, 2.5%)
 - Сохрани вкусовые добавки
 
-Список существующих продуктов (используй их при совпадении):
+Справочник единиц измерения:
+{unitsList}
+
+Правила определения base_unit:
+- Для весовых продуктов (овощи, фрукты, мясо, крупы): кг
+- Для жидкостей (молоко, соки, напитки, масло): л
+- Для штучных товаров (яйца, хлеб, выпечка): шт
+- Для тканей, верёвок: м
+- Для плитки, напольных покрытий: м²
+
+Список существующих продуктов (используй при совпадении):
 {productsList}
 
 ТОВАРЫ:
 {itemsList}
 
 ФОРМАТ ОТВЕТА (строго JSON):
-{{""items"":[{{""name"":""Полное название товара"",""product"":""Выделенный продукт""}}]}}
+{{""items"":[{{""name"":""название товара"",""product"":""продукт"",""base_unit"":""кг""}}]}}
 
 Выдели продукты:";
+    }
+
+    private static string BuildUnitsReference(IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures)
+    {
+        if (unitOfMeasures == null || unitOfMeasures.Count == 0)
+        {
+            return @"Базовые единицы: кг (вес), л (объём), шт (штуки), м (длина), м² (площадь)";
+        }
+
+        var baseUnits = unitOfMeasures.Where(u => u.IsBase).ToList();
+        var derivedUnits = unitOfMeasures.Where(u => !u.IsBase).ToList();
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Базовые единицы (используй для base_unit):");
+        foreach (var unit in baseUnits)
+        {
+            sb.AppendLine($"  - {unit.Id} ({unit.Name})");
+        }
+
+        if (derivedUnits.Count > 0)
+        {
+            sb.AppendLine("Производные единицы (НЕ использовать для base_unit):");
+            foreach (var unit in derivedUnits)
+            {
+                sb.AppendLine($"  - {unit.Id} → {unit.BaseUnitId}");
+            }
+        }
+
+        return sb.ToString();
     }
 }

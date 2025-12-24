@@ -165,17 +165,17 @@ public class InstamartReceiptParser : IReceiptTextParser
             // Ищем цену и сумму ниже
             var (price, amount) = FindPriceAndAmount(lines, i, quantity);
 
-            // Определяем характеристику товара (UnitOfMeasure, UnitQuantity)
-            var (unitOfMeasure, unitQuantity) = DetermineItemCharacteristics(lines, i, quantity, unit);
+            // Определяем характеристику товара (Unit, UnitQuantity)
+            var (itemUnit, unitQuantity) = DetermineItemCharacteristics(lines, i, quantity, unit);
 
             items.Add(new ParsedReceiptItem
             {
                 Name = name,
                 Quantity = quantity,
-                Unit = unit,
+                QuantityUnit = unit,  // единица количества в чеке (шт, кг)
                 Price = price,
                 Amount = amount,
-                UnitOfMeasure = unitOfMeasure,
+                Unit = itemUnit,      // единица товара (г, мл, кг, л)
                 UnitQuantity = unitQuantity
             });
         }

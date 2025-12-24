@@ -7,6 +7,7 @@ using SmartBasket.Services.Llm;
 using SmartBasket.Services.Parsing;
 using SmartBasket.Services.Products;
 using SmartBasket.Services.Sources;
+using SmartBasket.Services.Units;
 
 namespace SmartBasket.Services;
 
@@ -67,6 +68,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
     private readonly IProductClassificationService _classificationService;
     private readonly ILabelAssignmentService _labelAssignmentService;
     private readonly ILabelService _labelService;
+    private readonly IUnitConversionService _unitConversionService;
     private readonly SmartBasketDbContext _dbContext;
     private readonly AppSettings _settings;
     private readonly ILogger<ReceiptCollectionService> _logger;
@@ -78,6 +80,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         IProductClassificationService classificationService,
         ILabelAssignmentService labelAssignmentService,
         ILabelService labelService,
+        IUnitConversionService unitConversionService,
         SmartBasketDbContext dbContext,
         AppSettings settings,
         ILogger<ReceiptCollectionService> logger)
@@ -88,6 +91,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         _classificationService = classificationService ?? throw new ArgumentNullException(nameof(classificationService));
         _labelAssignmentService = labelAssignmentService ?? throw new ArgumentNullException(nameof(labelAssignmentService));
         _labelService = labelService ?? throw new ArgumentNullException(nameof(labelService));
+        _unitConversionService = unitConversionService ?? throw new ArgumentNullException(nameof(unitConversionService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -179,26 +183,63 @@ public class ReceiptCollectionService : IReceiptCollectionService
                         // Stage 1: Выделение продуктов из названий товаров
                         var itemNames = parsed.Items.Select(i => i.Name).ToList();
 
-                        // Загрузить существующие продукты для передачи в extraction
-                        var existingProductNames = await _dbContext.Products
-                            .Select(p => p.Name)
+                        // Найти уже существующие Items в БД (они уже связаны с Products)
+                        var existingItemNames = await _dbContext.Items
+                            .Where(i => itemNames.Contains(i.Name))
+                            .Select(i => i.Name)
                             .ToListAsync(cancellationToken);
 
+                        // Отфильтровать только НОВЫЕ товары для extraction
+                        var newItemNames = itemNames
+                            .Except(existingItemNames, StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
                         ProductExtractionResult extraction;
-                        try
+
+                        if (newItemNames.Count > 0)
                         {
-                            progress?.Report($"  [Stage 1] Extracting products from {itemNames.Count} items...");
-                            extraction = await _extractionService.ExtractAsync(
-                                itemNames, existingProductNames, progress, cancellationToken);
+                            // Загрузить существующие продукты для передачи в extraction
+                            var existingProductNames = await _dbContext.Products
+                                .Select(p => p.Name)
+                                .ToListAsync(cancellationToken);
+
+                            // Загрузить справочник единиц измерения для передачи в extraction
+                            var unitOfMeasures = await _dbContext.UnitOfMeasures
+                                .Select(u => new UnitOfMeasureInfo
+                                {
+                                    Id = u.Id,
+                                    Name = u.Name,
+                                    BaseUnitId = u.BaseUnitId,
+                                    IsBase = u.IsBase
+                                })
+                                .ToListAsync(cancellationToken);
+
+                            try
+                            {
+                                progress?.Report($"  [Stage 1] Extracting products from {newItemNames.Count} NEW items (skipping {existingItemNames.Count} existing)...");
+                                extraction = await _extractionService.ExtractAsync(
+                                    newItemNames, existingProductNames, unitOfMeasures, progress, cancellationToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Product extraction failed, using item names as products");
+                                extraction = new ProductExtractionResult
+                                {
+                                    IsSuccess = false,
+                                    Message = ex.Message,
+                                    Items = newItemNames.Select(n => new ExtractedItem { Name = n, Product = n }).ToList()
+                                };
+                            }
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            _logger.LogWarning(ex, "Product extraction failed, using item names as products");
+                            // Все товары уже известны — extraction не нужен
+                            progress?.Report($"  [Stage 1] All {itemNames.Count} items already exist, skipping extraction");
                             extraction = new ProductExtractionResult
                             {
-                                IsSuccess = false,
-                                Message = ex.Message,
-                                Items = itemNames.Select(n => new ExtractedItem { Name = n, Product = n }).ToList()
+                                IsSuccess = true,
+                                Message = "All items already exist",
+                                Items = new List<ExtractedItem>()
                             };
                         }
 
@@ -362,15 +403,14 @@ public class ReceiptCollectionService : IReceiptCollectionService
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
-        // Создать lookup для extraction: itemName → productName
-        var extractionLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < parsed.Items.Count && i < extraction.Items.Count; i++)
+        // Создать lookup для extraction: itemName → ExtractedItem (полная информация)
+        // ВАЖНО: сопоставляем по имени товара из extraction.Items[].Name, а не по индексу!
+        var extractionLookup = new Dictionary<string, ExtractedItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var extractedItem in extraction.Items)
         {
-            var originalName = parsed.Items[i].Name;
-            var productName = extraction.Items[i].Product;
-            if (!string.IsNullOrWhiteSpace(originalName) && !extractionLookup.ContainsKey(originalName))
+            if (!string.IsNullOrWhiteSpace(extractedItem.Name) && !extractionLookup.ContainsKey(extractedItem.Name))
             {
-                extractionLookup[originalName] = productName;
+                extractionLookup[extractedItem.Name] = extractedItem;
             }
         }
 
@@ -378,19 +418,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         var existingProducts = await _dbContext.Products
             .ToDictionaryAsync(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        // Обеспечить наличие дефолтного продукта "Не категоризировано"
-        var uncategorizedProduct = await _dbContext.Products
-            .FirstOrDefaultAsync(p => p.Name == "Не категоризировано", cancellationToken);
-
-        if (uncategorizedProduct == null)
-        {
-            uncategorizedProduct = new Product { Name = "Не категоризировано" };
-            _dbContext.Products.Add(uncategorizedProduct);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        existingProducts.TryAdd("Не категоризировано", uncategorizedProduct);
-
-        // Нормализованный lookup для поиска (ё → е)
+        // Нормализованный lookup для поиска (ё → е, lowercase)
         var normalizedLookup = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in existingProducts.Values)
         {
@@ -412,63 +440,104 @@ public class ReceiptCollectionService : IReceiptCollectionService
 
             var itemName = parsedItem.Name.Trim();
 
-            // Найти название продукта из extraction
-            string? productName = null;
-            if (extractionLookup.TryGetValue(itemName, out var pn))
-            {
-                productName = pn?.Trim();
-            }
+            // Сначала проверим, существует ли уже Item в БД
+            var existingItem = await _dbContext.Items
+                .Include(i => i.Product)
+                .FirstOrDefaultAsync(i => i.Name == itemName, cancellationToken);
 
-            // Если productName пустой - использовать "Не категоризировано"
-            if (string.IsNullOrWhiteSpace(productName))
-            {
-                productName = "Не категоризировано";
-            }
+            Product? product;
+            Item item;
 
-            // Найти Product (с учётом нормализации)
-            Product? product = null;
-            var normalizedProductName = NormalizeName(productName);
-
-            if (existingProducts.TryGetValue(productName, out product) ||
-                normalizedLookup.TryGetValue(productName, out product) ||
-                normalizedLookup.TryGetValue(normalizedProductName, out product))
+            if (existingItem != null)
             {
-                // Найден существующий
+                // Item уже существует — используем его существующий Product
+                item = existingItem;
+                product = existingItem.Product!;
             }
             else
             {
-                // Создаём новый Product (без категории - категоризация будет позже)
-                product = new Product { Name = productName };
-                _dbContext.Products.Add(product);
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                existingProducts[productName] = product;
-                normalizedLookup[productName] = product;
-                normalizedLookup[normalizedProductName] = product;
-                progress?.Report($"  [Product] Created: {productName}");
-            }
+                // Новый Item — нужно найти или создать Product
 
-            // Найти или создать Item
-            var item = await _dbContext.Items
-                .FirstOrDefaultAsync(i => i.Name == itemName, cancellationToken);
+                // Найти информацию о продукте из extraction
+                ExtractedItem? extractedItem = null;
+                string productName;
+                string baseUnitId = "шт"; // По умолчанию
 
-            if (item == null)
-            {
+                if (extractionLookup.TryGetValue(itemName, out extractedItem) &&
+                    !string.IsNullOrWhiteSpace(extractedItem.Product))
+                {
+                    productName = extractedItem.Product.Trim();
+                    baseUnitId = await _unitConversionService.NormalizeUnitAsync(extractedItem.BaseUnit);
+                }
+                else
+                {
+                    // Если продукт не выделен - используем само название товара как продукт
+                    productName = itemName;
+                }
+
+                // Нормализуем название продукта к Title Case для единообразия
+                var normalizedProductName = NormalizeName(productName);
+
+                // Найти Product (с учётом нормализации)
+                product = null;
+
+                if (existingProducts.TryGetValue(normalizedProductName, out product) ||
+                    normalizedLookup.TryGetValue(normalizedProductName, out product))
+                {
+                    // Найден существующий
+                }
+                else
+                {
+                    // Создаём новый Product с нормализованным именем
+                    product = new Product
+                    {
+                        Name = normalizedProductName,
+                        BaseUnitId = baseUnitId
+                    };
+                    _dbContext.Products.Add(product);
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    existingProducts[normalizedProductName] = product;
+                    normalizedLookup[normalizedProductName] = product;
+                    progress?.Report($"  [Product] Created: {normalizedProductName} ({baseUnitId})");
+                }
+
+                // Создаём новый Item
+                var itemUnitId = await _unitConversionService.NormalizeUnitAsync(parsedItem.Unit);
+                var itemUnitQuantity = parsedItem.UnitQuantity ?? 1;
+                var itemBaseUnitQuantity = await _unitConversionService.ConvertToBaseUnitAsync(
+                    itemUnitQuantity, itemUnitId);
+
                 item = new Item
                 {
                     Name = itemName,
                     ProductId = product.Id,
-                    UnitOfMeasure = parsedItem.UnitOfMeasure ?? parsedItem.Unit ?? "шт",
-                    UnitQuantity = parsedItem.UnitQuantity ?? 1,
+                    UnitId = itemUnitId,
+                    UnitQuantity = itemUnitQuantity,
+                    BaseUnitQuantity = itemBaseUnitQuantity,
                     Shop = parsed.Shop ?? "Unknown"
                 };
                 _dbContext.Items.Add(item);
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 newItems.Add(item);
             }
-            else if (item.ProductId != product.Id)
+
+            // Нормализуем единицу количества в чеке
+            var quantityUnitId = await _unitConversionService.NormalizeUnitAsync(parsedItem.QuantityUnit);
+
+            // Вычисляем BaseUnitQuantity для ReceiptItem
+            // Если QuantityUnit == "шт", то BaseUnitQuantity = Quantity × Item.BaseUnitQuantity
+            // Если QuantityUnit == "кг"/"л", то BaseUnitQuantity = Quantity (уже в базовых единицах)
+            decimal receiptBaseUnitQuantity;
+            if (quantityUnitId == "шт")
             {
-                // Обновить связь с продуктом если изменилась
-                item.ProductId = product.Id;
+                // Штучный товар: умножаем на количество единиц товара в базовых
+                receiptBaseUnitQuantity = parsedItem.Quantity * item.BaseUnitQuantity;
+            }
+            else
+            {
+                // Весовой/объёмный товар: конвертируем в базовые единицы
+                receiptBaseUnitQuantity = await _unitConversionService.ConvertToBaseUnitAsync(
+                    parsedItem.Quantity, quantityUnitId);
             }
 
             // Создать ReceiptItem
@@ -477,6 +546,8 @@ public class ReceiptCollectionService : IReceiptCollectionService
                 ReceiptId = receipt.Id,
                 ItemId = item.Id,
                 Quantity = parsedItem.Quantity,
+                QuantityUnitId = quantityUnitId,
+                BaseUnitQuantity = receiptBaseUnitQuantity,
                 Price = parsedItem.Price,
                 Amount = parsedItem.Amount ?? (parsedItem.Price * parsedItem.Quantity)
             };
@@ -523,7 +594,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
             return new BatchItemInput
             {
                 ItemName = item.Name,
-                ProductName = product?.Name ?? "Не категоризировано"
+                ProductName = product?.Name ?? item.Name
             };
         }).ToList();
 
@@ -590,11 +661,29 @@ public class ReceiptCollectionService : IReceiptCollectionService
     }
 
     /// <summary>
-    /// Нормализует имя для сравнения: заменяет ё на е
+    /// Нормализует имя продукта для единообразия:
+    /// - Приводит к Title Case (первая буква каждого слова заглавная)
+    /// - Заменяет ё на е
     /// </summary>
     private static string NormalizeName(string name)
     {
-        return name.Replace('ё', 'е').Replace('Ё', 'Е');
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        // Заменяем ё на е
+        name = name.Replace('ё', 'е').Replace('Ё', 'Е');
+
+        // Title Case: первая буква каждого слова заглавная, остальные строчные
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < words.Length; i++)
+        {
+            if (words[i].Length > 0)
+            {
+                words[i] = char.ToUpperInvariant(words[i][0]) +
+                           (words[i].Length > 1 ? words[i][1..].ToLowerInvariant() : "");
+            }
+        }
+        return string.Join(" ", words);
     }
 
     /// <summary>

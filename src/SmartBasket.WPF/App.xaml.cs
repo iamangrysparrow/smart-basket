@@ -20,6 +20,7 @@ using SmartBasket.Services.Sources;
 using SmartBasket.Services.Tools;
 using SmartBasket.Services.Chat;
 using SmartBasket.Services.Shopping;
+using SmartBasket.Services.Units;
 using SmartBasket.WPF.Logging;
 using SmartBasket.WPF.Services;
 using SmartBasket.WPF.Themes;
@@ -144,6 +145,9 @@ public partial class App : Application
 
         // Sources
         services.AddSingleton<IReceiptSourceFactory, ReceiptSourceFactory>();
+
+        // Unit conversion service
+        services.AddTransient<IUnitConversionService, UnitConversionService>();
 
         // Orchestration - Transient to get fresh DbContext each time
         services.AddTransient<IReceiptCollectionService, ReceiptCollectionService>();

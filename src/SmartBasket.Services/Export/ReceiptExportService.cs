@@ -102,7 +102,7 @@ public class ReceiptExportService : IReceiptExportService
         {
             Name = item.Item?.Name ?? "Unknown",
             Quantity = item.Quantity,
-            Unit = item.Item?.UnitOfMeasure ?? "шт",
+            Unit = item.Item?.UnitId ?? "шт",
             PricePerUnit = item.Price ?? 0,
             TotalPrice = item.Amount ?? 0
         };

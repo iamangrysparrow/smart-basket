@@ -17,14 +17,19 @@ public class Item : BaseEntity
     public required string Name { get; set; }
 
     /// <summary>
-    /// Единица измерения: "шт", "кг", "л", "г", "мл"
+    /// Единица измерения товара (г, кг, мл, л, шт)
     /// </summary>
-    public string? UnitOfMeasure { get; set; }
+    public string UnitId { get; set; } = "шт";
 
     /// <summary>
-    /// Количество в единице (например, 0.5 для "500мл", 1 для "1л")
+    /// Количество в единице измерения (700 для "700 г", 930 для "930 мл")
     /// </summary>
-    public decimal? UnitQuantity { get; set; }
+    public decimal UnitQuantity { get; set; } = 1;
+
+    /// <summary>
+    /// Количество в базовой ЕИ продукта (0.7 для 700г→кг, 0.93 для 930мл→л)
+    /// </summary>
+    public decimal BaseUnitQuantity { get; set; } = 1;
 
     /// <summary>
     /// Магазин, из которого товар впервые появился (для фильтрации)
@@ -33,6 +38,7 @@ public class Item : BaseEntity
 
     // Navigation properties
     public Product? Product { get; set; }
+    public UnitOfMeasure? Unit { get; set; }
     public ICollection<ReceiptItem> ReceiptItems { get; set; } = new List<ReceiptItem>();
     public ICollection<ItemLabel> ItemLabels { get; set; } = new List<ItemLabel>();
 }

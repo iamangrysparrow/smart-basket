@@ -9,6 +9,7 @@ public class SmartBasketDbContext : DbContext
     {
     }
 
+    public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Item> Items => Set<Item>();
@@ -22,6 +23,35 @@ public class SmartBasketDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // UnitOfMeasure (справочник единиц измерения)
+        modelBuilder.Entity<UnitOfMeasure>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(10);
+            entity.Property(e => e.Name).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.BaseUnitId).HasMaxLength(10).IsRequired();
+            entity.Property(e => e.Coefficient).HasPrecision(18, 6);
+
+            entity.HasOne(e => e.BaseUnit)
+                  .WithMany()
+                  .HasForeignKey(e => e.BaseUnitId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Seed данных
+            entity.HasData(
+                new UnitOfMeasure { Id = "г", Name = "грамм", BaseUnitId = "кг", Coefficient = 0.001m, IsBase = false },
+                new UnitOfMeasure { Id = "кг", Name = "килограмм", BaseUnitId = "кг", Coefficient = 1m, IsBase = true },
+                new UnitOfMeasure { Id = "мл", Name = "миллилитр", BaseUnitId = "л", Coefficient = 0.001m, IsBase = false },
+                new UnitOfMeasure { Id = "л", Name = "литр", BaseUnitId = "л", Coefficient = 1m, IsBase = true },
+                new UnitOfMeasure { Id = "шт", Name = "штука", BaseUnitId = "шт", Coefficient = 1m, IsBase = true },
+                new UnitOfMeasure { Id = "мм", Name = "миллиметр", BaseUnitId = "м", Coefficient = 0.001m, IsBase = false },
+                new UnitOfMeasure { Id = "см", Name = "сантиметр", BaseUnitId = "м", Coefficient = 0.01m, IsBase = false },
+                new UnitOfMeasure { Id = "м", Name = "метр", BaseUnitId = "м", Coefficient = 1m, IsBase = true },
+                new UnitOfMeasure { Id = "см²", Name = "кв. сантиметр", BaseUnitId = "м²", Coefficient = 0.0001m, IsBase = false },
+                new UnitOfMeasure { Id = "м²", Name = "кв. метр", BaseUnitId = "м²", Coefficient = 1m, IsBase = true }
+            );
+        });
 
         // ProductCategory (иерархический справочник категорий)
         modelBuilder.Entity<ProductCategory>(entity =>
@@ -43,6 +73,7 @@ public class SmartBasketDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.BaseUnitId).HasMaxLength(10).HasDefaultValue("шт");
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.CategoryId);
 
@@ -51,6 +82,12 @@ public class SmartBasketDbContext : DbContext
                   .WithMany(c => c.Products)
                   .HasForeignKey(e => e.CategoryId)
                   .OnDelete(DeleteBehavior.SetNull);
+
+            // Связь с базовой единицей измерения
+            entity.HasOne(e => e.BaseUnit)
+                  .WithMany()
+                  .HasForeignKey(e => e.BaseUnitId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Item (справочник товаров)
@@ -58,8 +95,9 @@ public class SmartBasketDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.UnitOfMeasure).HasMaxLength(50);
+            entity.Property(e => e.UnitId).HasMaxLength(10).HasDefaultValue("шт");
             entity.Property(e => e.UnitQuantity).HasPrecision(10, 3);
+            entity.Property(e => e.BaseUnitQuantity).HasPrecision(10, 4);
             entity.Property(e => e.Shop).HasMaxLength(255);
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.ProductId);
@@ -69,6 +107,12 @@ public class SmartBasketDbContext : DbContext
                   .WithMany(p => p.Items)
                   .HasForeignKey(e => e.ProductId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // Связь с единицей измерения
+            entity.HasOne(e => e.Unit)
+                  .WithMany()
+                  .HasForeignKey(e => e.UnitId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Receipt (чек)
@@ -90,6 +134,8 @@ public class SmartBasketDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Quantity).HasPrecision(10, 3);
+            entity.Property(e => e.QuantityUnitId).HasMaxLength(10).HasDefaultValue("шт");
+            entity.Property(e => e.BaseUnitQuantity).HasPrecision(10, 4);
             entity.Property(e => e.Price).HasPrecision(10, 2);
             entity.Property(e => e.Amount).HasPrecision(10, 2);
             entity.HasIndex(e => e.ItemId);
@@ -104,6 +150,12 @@ public class SmartBasketDbContext : DbContext
                   .WithMany(r => r.Items)
                   .HasForeignKey(e => e.ReceiptId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // Связь с единицей измерения количества
+            entity.HasOne(e => e.QuantityUnit)
+                  .WithMany()
+                  .HasForeignKey(e => e.QuantityUnitId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Label (метки)

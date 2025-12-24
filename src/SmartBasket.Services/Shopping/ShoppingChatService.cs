@@ -154,8 +154,11 @@ public class ShoppingChatService : IShoppingChatService
             var messages = BuildMessagesWithSystem();
 
             // Progress adapter для streaming
+            // ВАЖНО: используем ThreadSafeProgress вместо Progress<T>
+            // Progress<T> захватывает SynchronizationContext и блокирует UI при ожидании await
+            bool hadStreamingText = false; // Флаг: был ли текст через streaming
             var streamingProgress = progress != null
-                ? new Progress<string>(delta =>
+                ? new ThreadSafeProgress<string>(delta =>
                 {
                     // Фильтруем служебные сообщения провайдера
                     if (IsServiceMessage(delta)) return;
@@ -170,6 +173,7 @@ public class ShoppingChatService : IShoppingChatService
 
                     if (!string.IsNullOrEmpty(cleanDelta))
                     {
+                        hadStreamingText = true; // Отмечаем что был текст через streaming
                         progress.Report(new ChatProgress(ChatProgressType.TextDelta, Text: cleanDelta));
                     }
                 })
@@ -212,7 +216,8 @@ public class ShoppingChatService : IShoppingChatService
             _logger.LogDebug("[ShoppingChatService] Processing {Count} tool call(s)", result.ToolCalls!.Count);
 
             // Если модель вернула текст вместе с tool calls (рассуждения) — отправляем через TextDelta
-            if (!string.IsNullOrEmpty(result.Response))
+            // НО только если текст НЕ был уже отправлен через streaming (избегаем дублирования)
+            if (!string.IsNullOrEmpty(result.Response) && !hadStreamingText)
             {
                 progress?.Report(new ChatProgress(ChatProgressType.TextDelta, Text: result.Response));
             }
@@ -384,14 +389,18 @@ public class ShoppingChatService : IShoppingChatService
     }
 
     /// <summary>
-    /// Проверяет, является ли сообщение служебным
+    /// Проверяет, является ли сообщение служебным (debug/log сообщением провайдера)
+    /// ВАЖНО: НЕ фильтруем пробелы и переводы строк - они важны для форматирования текста!
     /// </summary>
     private static bool IsServiceMessage(string? message)
     {
+        // Пустые сообщения фильтруем
         if (string.IsNullOrEmpty(message)) return true;
 
+        // НЕ фильтруем whitespace-only сообщения (переводы строк, пробелы)
+        // Они важны для форматирования markdown текста
         var trimmed = message.Trim();
-        if (string.IsNullOrEmpty(trimmed)) return true;
+        if (string.IsNullOrEmpty(trimmed)) return false; // Было: return true - это удаляло \n
 
         return trimmed.StartsWith("[YandexGPT") ||
                trimmed.StartsWith("[YandexAgent") ||

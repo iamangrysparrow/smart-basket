@@ -267,9 +267,9 @@ public class ProductClassificationService : IProductClassificationService
 
         try
         {
-            // 1. Загрузить некатегоризированные продукты
+            // 1. Загрузить некатегоризированные продукты (без категории)
             var uncategorizedProducts = await _dbContext.Products
-                .Where(p => p.CategoryId == null || p.Name == "Не категоризировано")
+                .Where(p => p.CategoryId == null)
                 .ToListAsync(cancellationToken);
 
             if (uncategorizedProducts.Count == 0)
@@ -282,20 +282,10 @@ public class ProductClassificationService : IProductClassificationService
 
             progress?.Report($"  [Classify] Found {uncategorizedProducts.Count} uncategorized products");
 
-            // Фильтруем "Не категоризировано" из списка на классификацию
             var productsToClassify = uncategorizedProducts
-                .Where(p => p.Name != "Не категоризировано")
                 .Select(p => p.Name)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            if (productsToClassify.Count == 0)
-            {
-                result.IsSuccess = true;
-                result.Message = "Only 'Не категоризировано' products found";
-                progress?.Report("  [Classify] Only 'Не категоризировано' products, skipping");
-                return result;
-            }
 
             // 2. Загрузить существующие категории
             var existingCategories = await GetExistingCategoriesAsync(cancellationToken);
@@ -320,9 +310,9 @@ public class ProductClassificationService : IProductClassificationService
 
             // 5. Проверить оставшиеся некатегоризированные
             result.ProductsRemaining = await _dbContext.Products
-                .CountAsync(p => p.CategoryId == null && p.Name != "Не категоризировано", cancellationToken);
+                .CountAsync(p => p.CategoryId == null, cancellationToken);
 
-            // 6. Удалить пустые категории (созданные в этой сессии + "Не категоризировано")
+            // 6. Удалить пустые категории (созданные в этой сессии)
             result.CategoriesDeleted = await DeleteEmptyCategoriesAsync(progress, cancellationToken);
 
             result.IsSuccess = true;
@@ -437,11 +427,15 @@ public class ProductClassificationService : IProductClassificationService
         progress?.Report($"  [Classify] Products to update: {productsToUpdate.Count}");
         progress?.Report($"  [Classify] Categories in lookup: {string.Join(", ", categoryLookup.Keys)}");
 
-        // Загрузить продукты из БД - используем список вместо словаря чтобы избежать проблем с дубликатами
+        // Загрузить продукты из БД - используем нормализованные имена (lowercase) для поиска
         var allProducts = await _dbContext.Products.ToListAsync(cancellationToken);
         var productLookup = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in allProducts)
         {
+            // Добавляем по нормализованному имени
+            var normalizedName = NormalizeProductName(p.Name);
+            productLookup.TryAdd(normalizedName, p);
+            // Также добавляем по оригинальному имени для обратной совместимости
             productLookup.TryAdd(p.Name, p);
         }
 
@@ -449,13 +443,17 @@ public class ProductClassificationService : IProductClassificationService
 
         foreach (var productInfo in productsToUpdate)
         {
-            progress?.Report($"  [Classify] Processing: '{productInfo.Name}' -> parent='{productInfo.Parent}'");
+            // Нормализуем имя продукта для поиска
+            var normalizedProductName = NormalizeProductName(productInfo.Name);
+            progress?.Report($"  [Classify] Processing: '{productInfo.Name}' (normalized: '{normalizedProductName}') -> parent='{productInfo.Parent}'");
 
-            if (!productLookup.TryGetValue(productInfo.Name, out var product))
+            if (!productLookup.TryGetValue(normalizedProductName, out var product))
             {
                 progress?.Report($"  [Classify] ERROR: Product not found in DB: '{productInfo.Name}'");
                 // Попробуем найти похожие
-                var similar = productLookup.Keys.Where(k => k.Contains(productInfo.Name.Split(' ')[0], StringComparison.OrdinalIgnoreCase)).Take(3);
+                var similar = productLookup.Keys
+                    .Where(k => k.Contains(normalizedProductName.Split(' ')[0], StringComparison.OrdinalIgnoreCase))
+                    .Take(3);
                 if (similar.Any())
                 {
                     progress?.Report($"  [Classify]   Similar products: {string.Join(", ", similar)}");
@@ -471,7 +469,7 @@ public class ProductClassificationService : IProductClassificationService
 
             var oldCategoryId = product.CategoryId;
             product.CategoryId = category.Id;
-            progress?.Report($"  [Classify] OK: {productInfo.Name} -> {productInfo.Parent} (old: {oldCategoryId}, new: {category.Id})");
+            progress?.Report($"  [Classify] OK: {normalizedProductName} -> {productInfo.Parent} (old: {oldCategoryId}, new: {category.Id})");
         }
 
         var changedCount = _dbContext.ChangeTracker.Entries<Product>().Count(e => e.State == EntityState.Modified);
@@ -502,7 +500,7 @@ public class ProductClassificationService : IProductClassificationService
         {
             // "Без категории" - продукты без CategoryId
             return await _dbContext.Products
-                .Where(p => p.CategoryId == null && p.Name != "Не категоризировано")
+                .Where(p => p.CategoryId == null)
                 .Select(p => p.Name)
                 .ToListAsync(cancellationToken);
         }
@@ -597,7 +595,7 @@ public class ProductClassificationService : IProductClassificationService
 
             // 6. Проверить оставшиеся некатегоризированные
             result.ProductsRemaining = await _dbContext.Products
-                .CountAsync(p => p.CategoryId == null && p.Name != "Не категоризировано", cancellationToken);
+                .CountAsync(p => p.CategoryId == null, cancellationToken);
 
             // 7. Удалить пустые категории
             result.CategoriesDeleted = await DeleteEmptyCategoriesAsync(progress, cancellationToken);
@@ -642,26 +640,13 @@ public class ProductClassificationService : IProductClassificationService
     }
 
     /// <summary>
-    /// Удалить пустые категории (созданные в этой сессии) и продукт "Не категоризировано"
+    /// Удалить пустые категории (созданные в этой сессии)
     /// </summary>
     private async Task<int> DeleteEmptyCategoriesAsync(
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         var deleted = 0;
-
-        // Удалить "Не категоризировано" если нет привязанных Items
-        var uncategorizedProduct = await _dbContext.Products
-            .Include(p => p.Items)
-            .FirstOrDefaultAsync(p => p.Name == "Не категоризировано", cancellationToken);
-
-        if (uncategorizedProduct != null && (uncategorizedProduct.Items == null || uncategorizedProduct.Items.Count == 0))
-        {
-            _dbContext.Products.Remove(uncategorizedProduct);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            progress?.Report("  [Classify] Deleted empty product 'Не категоризировано'");
-            deleted++;
-        }
 
         // Удалить пустые категории созданные в этой сессии
         // Сортируем по глубине (сначала листья)
@@ -700,5 +685,31 @@ public class ProductClassificationService : IProductClassificationService
         } while (deletedAny && createdCategories.Count > 0);
 
         return deleted;
+    }
+
+    /// <summary>
+    /// Нормализует имя продукта для единообразия:
+    /// - Приводит к Title Case (первая буква каждого слова заглавная)
+    /// - Заменяет ё на е
+    /// </summary>
+    private static string NormalizeProductName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        // Заменяем ё на е
+        name = name.Replace('ё', 'е').Replace('Ё', 'Е');
+
+        // Title Case: первая буква каждого слова заглавная, остальные строчные
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < words.Length; i++)
+        {
+            if (words[i].Length > 0)
+            {
+                words[i] = char.ToUpperInvariant(words[i][0]) +
+                           (words[i].Length > 1 ? words[i][1..].ToLowerInvariant() : "");
+            }
+        }
+        return string.Join(" ", words);
     }
 }

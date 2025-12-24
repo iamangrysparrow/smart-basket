@@ -72,6 +72,18 @@
 
                         <Separator Style="{StaticResource AppMenuSeparatorStyle}"/>
 
+                        <!-- Database Actions -->
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="🗄️  Инициализировать БД"
+                                  Command="{Binding InitializeDatabaseCommand}"
+                                  IsEnabled="{Binding IsNotProcessing}"/>
+                        <MenuItem Style="{StaticResource AppMenuItemStyle}"
+                                  Header="💥  Удалить БД"
+                                  Command="{Binding ResetDatabaseCommand}"
+                                  IsEnabled="{Binding IsNotProcessing}"/>
+
+                        <Separator Style="{StaticResource AppMenuSeparatorStyle}"/>
+
                         <!-- Help -->
                         <MenuItem Style="{StaticResource AppMenuItemStyle}"
                                   Header="❓  О программе"

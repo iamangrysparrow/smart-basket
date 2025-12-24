@@ -782,27 +782,39 @@ public partial class ShoppingViewModel : ObservableObject
 
         try
         {
-            // Проверяем доступность YandexAgent
-            var (isAvailable, availabilityMessage) = await _shoppingChatService.CheckAvailabilityAsync();
+            // Проверяем доступность YandexAgent в background потоке чтобы не блокировать UI
+            var (isAvailable, availabilityMessage) = await Task.Run(() => _shoppingChatService.CheckAvailabilityAsync());
             if (!isAvailable)
             {
                 _logger.LogWarning("[ShoppingViewModel] YandexAgent not available: {Message}", availabilityMessage);
                 AddSystemMessage($"⚠️ AI недоступен: {availabilityMessage}\n\nВы можете добавлять товары вручную.");
             }
 
-            var session = await _sessionService.StartNewSessionAsync();
+            var session = await Task.Run(() => _sessionService.StartNewSessionAsync());
             HasSession = true;
             State = session.State;
 
             _logger.LogInformation("[ShoppingViewModel] Session started: {SessionId}", session.Id);
 
-            // Начинаем conversation в ShoppingChatService
+            // Начинаем conversation в ShoppingChatService (в background потоке)
             if (isAvailable)
             {
                 try
                 {
-                    await _shoppingChatService.StartConversationAsync(session);
+                    await Task.Run(() => _shoppingChatService.StartConversationAsync(session));
                     _logger.LogInformation("[ShoppingViewModel] Chat conversation started");
+
+                    // Отправляем скрытое сообщение чтобы модель приветствовала пользователя
+                    // Само сообщение не показывается в UI, только ответ модели
+                    _chatCts?.Cancel();
+                    _chatCts = new CancellationTokenSource();
+                    await SendHiddenMessageAsync(
+                        "Представься и приветствуй пользователя. Кратко расскажи о своих возможностях и пригласи начать работу.",
+                        _chatCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogDebug("[ShoppingViewModel] Initial greeting cancelled");
                 }
                 catch (Exception ex)
                 {
@@ -810,15 +822,6 @@ public partial class ShoppingViewModel : ObservableObject
                     AddSystemMessage($"⚠️ Не удалось запустить AI чат: {ex.Message}");
                 }
             }
-
-            // Добавляем приветственное сообщение
-            AddAssistantMessage(
-                "Привет! Я помогу сформировать список покупок.\n\n" +
-                "Напиши что нужно купить, например:\n" +
-                "• \"Молоко, хлеб, яйца\"\n" +
-                "• \"2 кг яблок и 1 л кефира\"\n" +
-                "• \"Продукты на неделю\"\n\n" +
-                "Или я могу проанализировать твои чеки и предложить список на основе прошлых покупок.");
         }
         catch (Exception ex)
         {
@@ -975,7 +978,12 @@ public partial class ShoppingViewModel : ObservableObject
             }
         });
 
-        var response = await _shoppingChatService.SendAsync(message, progress, cancellationToken).ConfigureAwait(false);
+        // ВАЖНО: выполняем SendAsync через Task.Run чтобы перенести всю синхронную работу
+        // (сериализация JSON, подготовка сообщений, логирование) в background поток.
+        // Без этого UI замирает на время подготовки запроса к AI.
+        var response = await Task.Run(
+            () => _shoppingChatService.SendAsync(message, progress, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
 
         if (!response.Success)
         {
@@ -1000,6 +1008,72 @@ public partial class ShoppingViewModel : ObservableObject
             // Используем progress.HasReported вместо Parts.Count == 0, т.к. Parts заполняется асинхронно
             // через Dispatcher и может быть пустым из-за race condition
             _logger.LogDebug("[ShoppingViewModel] No streaming reports, using final response");
+            var finalPart = new ShoppingResponsePart
+            {
+                IsToolCall = false,
+                Text = response.Content
+            };
+            await Application.Current.Dispatcher.InvokeAsync(() => assistantMessage.Parts.Add(finalPart));
+            assistantMessage.Text = response.Content;
+        }
+    }
+
+    /// <summary>
+    /// Отправить скрытое сообщение модели (не показывается в UI, только ответ)
+    /// Используется для инициации диалога, когда нужно чтобы модель приветствовала пользователя
+    /// </summary>
+    private async Task SendHiddenMessageAsync(string message, CancellationToken cancellationToken)
+    {
+        _logger.LogDebug("[ShoppingViewModel] Sending hidden message: {Message}", message);
+
+        var assistantMessage = new ShoppingChatMessage
+        {
+            Role = ChatRole.Assistant,
+            Content = "",
+            Timestamp = DateTime.Now
+        };
+
+        ShoppingResponsePart? currentFinalAnswer = null;
+
+        // Добавляем пустое сообщение для streaming (ответ модели будет виден)
+        await Application.Current.Dispatcher.InvokeAsync(() => Messages.Add(assistantMessage));
+
+        var progress = new DispatcherProgress<ChatProgress>(Application.Current.Dispatcher, p =>
+        {
+            switch (p.Type)
+            {
+                case ChatProgressType.TextDelta:
+                    if (currentFinalAnswer == null)
+                    {
+                        currentFinalAnswer = new ShoppingResponsePart { IsToolCall = false };
+                        assistantMessage.Parts.Add(currentFinalAnswer);
+                    }
+                    currentFinalAnswer.Text += p.Text;
+                    assistantMessage.Text += p.Text;
+                    break;
+
+                case ChatProgressType.Complete:
+                    CleanupEmptyParts(assistantMessage);
+                    break;
+            }
+        });
+
+        // Отправляем сообщение модели в background потоке
+        var response = await Task.Run(
+            () => _shoppingChatService.SendAsync(message, progress, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        if (!response.Success)
+        {
+            _logger.LogWarning("[ShoppingViewModel] Hidden message failed: {Error}", response.ErrorMessage);
+            // Удаляем пустое сообщение если ошибка
+            if (string.IsNullOrEmpty(assistantMessage.Text) && !progress.HasReported)
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() => Messages.Remove(assistantMessage));
+            }
+        }
+        else if (!progress.HasReported && !string.IsNullOrEmpty(response.Content))
+        {
             var finalPart = new ShoppingResponsePart
             {
                 IsToolCall = false,
@@ -1499,17 +1573,23 @@ public partial class ShoppingViewModel : ObservableObject
 
     private void OnSessionChanged(object? sender, ShoppingSession session)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        // Используем InvokeAsync с приоритетом Background чтобы не блокировать UI
+        // и чтобы обновления происходили в том же порядке что и streaming текст
+        Application.Current.Dispatcher.InvokeAsync(() =>
         {
             State = session.State;
             HasSession = true;
             _logger.LogDebug("[ShoppingViewModel] Session changed: State={State}", session.State);
-        });
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private void OnItemAdded(object? sender, DraftItem item)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        // Используем InvokeAsync с приоритетом Background чтобы корзина обновлялась
+        // в том же порядке что и streaming текст (FIFO очередь одного приоритета)
+        // Это обеспечивает правильный порядок: сначала текст, потом корзина
+        // потому что Report(TextDelta) вызывается ДО вызова tool (update_basket)
+        Application.Current.Dispatcher.InvokeAsync(() =>
         {
             lock (_itemsLock)
             {
@@ -1519,12 +1599,12 @@ public partial class ShoppingViewModel : ObservableObject
             }
             StartPlanningCommand.NotifyCanExecuteChanged();
             _logger.LogDebug("[ShoppingViewModel] Item added: {Name}", item.Name);
-        });
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private void OnItemRemoved(object? sender, DraftItem item)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current.Dispatcher.InvokeAsync(() =>
         {
             lock (_itemsLock)
             {
@@ -1538,12 +1618,12 @@ public partial class ShoppingViewModel : ObservableObject
             }
             StartPlanningCommand.NotifyCanExecuteChanged();
             _logger.LogDebug("[ShoppingViewModel] Item removed: {Name}", item.Name);
-        });
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private void OnItemUpdated(object? sender, DraftItem item)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current.Dispatcher.InvokeAsync(() =>
         {
             lock (_itemsLock)
             {
@@ -1557,7 +1637,7 @@ public partial class ShoppingViewModel : ObservableObject
                 }
             }
             _logger.LogDebug("[ShoppingViewModel] Item updated: {Name} -> {Qty} {Unit}", item.Name, item.Quantity, item.Unit);
-        });
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     #endregion
@@ -1862,13 +1942,16 @@ public enum ChatRole
 
 /// <summary>
 /// IProgress реализация которая не захватывает SynchronizationContext
-/// и явно вызывает callback через Dispatcher с низким приоритетом
+/// и батчит текстовые обновления для плавного отображения без задержек
 /// </summary>
 public class DispatcherProgress<T> : IProgress<T>
 {
     private readonly System.Windows.Threading.Dispatcher _dispatcher;
     private readonly Action<T> _handler;
     private readonly Action? _onReport;
+    private readonly object _lock = new();
+    private readonly System.Text.StringBuilder _textBuffer = new();
+    private bool _updateScheduled;
 
     /// <summary>
     /// Флаг, указывающий что был хотя бы один вызов Report.
@@ -1885,13 +1968,67 @@ public class DispatcherProgress<T> : IProgress<T>
 
     public void Report(T value)
     {
-        // Устанавливаем флаг СИНХРОННО - до InvokeAsync
-        // Это решает race condition: флаг будет установлен к моменту проверки после await SendAsync
+        // Устанавливаем флаг СИНХРОННО
         HasReported = true;
         _onReport?.Invoke();
 
-        // Используем Background приоритет чтобы UI оставался отзывчивым
-        _dispatcher.InvokeAsync(() => _handler(value), System.Windows.Threading.DispatcherPriority.Background);
+        // Для ChatProgress с TextDelta используем батчинг
+        if (value is ChatProgress chatProgress && chatProgress.Type == ChatProgressType.TextDelta)
+        {
+            lock (_lock)
+            {
+                // Накапливаем текст в буфере
+                _textBuffer.Append(chatProgress.Text);
+
+                if (!_updateScheduled)
+                {
+                    _updateScheduled = true;
+                    // Планируем flush буфера на UI поток с приоритетом Render
+                    _dispatcher.InvokeAsync(() =>
+                    {
+                        string textToFlush;
+                        lock (_lock)
+                        {
+                            textToFlush = _textBuffer.ToString();
+                            _textBuffer.Clear();
+                            _updateScheduled = false;
+                        }
+
+                        if (!string.IsNullOrEmpty(textToFlush))
+                        {
+                            // Создаём ChatProgress с накопленным текстом
+                            var batchedProgress = new ChatProgress(ChatProgressType.TextDelta) { Text = textToFlush };
+                            _handler((T)(object)batchedProgress);
+                        }
+                    }, System.Windows.Threading.DispatcherPriority.Render);
+                }
+            }
+        }
+        else
+        {
+            // Для остальных типов (ToolCall, ToolResult, Complete) сначала flush буфера
+            string? pendingText = null;
+            lock (_lock)
+            {
+                if (_textBuffer.Length > 0)
+                {
+                    pendingText = _textBuffer.ToString();
+                    _textBuffer.Clear();
+                }
+            }
+
+            _dispatcher.InvokeAsync(() =>
+            {
+                // Сначала flush оставшийся текст
+                if (!string.IsNullOrEmpty(pendingText))
+                {
+                    var batchedProgress = new ChatProgress(ChatProgressType.TextDelta) { Text = pendingText };
+                    _handler((T)(object)batchedProgress);
+                }
+                // Затем обрабатываем текущее событие
+                _handler(value);
+            }, System.Windows.Threading.DispatcherPriority.Normal);
+        }
     }
 }
 

@@ -16,8 +16,14 @@ public class Product : BaseEntity
     /// </summary>
     public Guid? CategoryId { get; set; }
 
+    /// <summary>
+    /// Базовая единица измерения продукта (кг, л, шт, м, м²)
+    /// </summary>
+    public string BaseUnitId { get; set; } = "шт";
+
     // Navigation properties
     public ProductCategory? Category { get; set; }
+    public UnitOfMeasure? BaseUnit { get; set; }
     public ICollection<Item> Items { get; set; } = new List<Item>();
     public ICollection<ProductLabel> ProductLabels { get; set; } = new List<ProductLabel>();
 }

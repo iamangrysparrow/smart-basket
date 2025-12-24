@@ -30,8 +30,9 @@ public class ItemViewModel
         Name = item.Name;
         ProductId = item.ProductId;
         ProductName = item.Product?.Name ?? "Не задана";
-        UnitOfMeasure = item.UnitOfMeasure;
+        UnitOfMeasure = item.UnitId;
         UnitQuantity = item.UnitQuantity;
+        BaseUnitQuantity = item.BaseUnitQuantity;
         Shop = item.Shop;
         PurchaseCount = item.ReceiptItems?.Count ?? 0;
         StatusText = item.Product != null ? "✓" : "⚠️";
@@ -42,7 +43,8 @@ public class ItemViewModel
     public Guid ProductId { get; set; }
     public string ProductName { get; set; } = "Не задана";
     public string? UnitOfMeasure { get; set; }
-    public decimal? UnitQuantity { get; set; }
+    public decimal UnitQuantity { get; set; }
+    public decimal BaseUnitQuantity { get; set; }
     public string? Shop { get; set; }
     public int PurchaseCount { get; set; }
     public string StatusText { get; set; } = string.Empty;
@@ -60,13 +62,23 @@ public class ProductViewModel
         Id = product.Id;
         CategoryId = product.CategoryId;
         Name = product.Name;
+        BaseUnitId = product.BaseUnitId;
         ItemsCount = product.Items?.Count ?? 0;
     }
 
     public Guid Id { get; set; }
     public Guid? CategoryId { get; set; }
     public string Name { get; set; } = string.Empty;
+    /// <summary>
+    /// Базовая единица измерения продукта (кг, л, шт, м, м²)
+    /// </summary>
+    public string BaseUnitId { get; set; } = "шт";
     public int ItemsCount { get; set; }
+
+    /// <summary>
+    /// Отображаемое имя с базовой единицей: "Молоко (л)"
+    /// </summary>
+    public string DisplayName => $"{Name} ({BaseUnitId})";
 }
 
 /// <summary>
@@ -282,7 +294,9 @@ public partial class ItemGridViewModel : ObservableObject
         Name = item.Name;
         ProductId = item.ProductId;
         ProductName = item.Product?.Name ?? "—";
-        UnitOfMeasure = item.UnitOfMeasure ?? "шт";
+        UnitOfMeasure = item.UnitId ?? "шт";
+        UnitQuantity = item.UnitQuantity;
+        BaseUnitQuantity = item.BaseUnitQuantity;
         Shop = item.Shop ?? "—";
         PurchaseCount = item.ReceiptItems?.Count ?? 0;
 
@@ -308,6 +322,12 @@ public partial class ItemGridViewModel : ObservableObject
 
     [ObservableProperty]
     private string _unitOfMeasure = "шт";
+
+    [ObservableProperty]
+    private decimal _unitQuantity = 1;
+
+    [ObservableProperty]
+    private decimal _baseUnitQuantity = 1;
 
     [ObservableProperty]
     private string _shop = "—";

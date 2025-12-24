@@ -886,7 +886,7 @@ public partial class MainViewModel : ObservableObject
     private readonly object _categoryItemsLock = new();
 
     // Category filters
-    public ObservableCollection<string> CategoryFilters { get; } = new() { "Все", "Не категоризировано" };
+    public ObservableCollection<string> CategoryFilters { get; } = new() { "Все", "Без категории" };
     private readonly object _categoryFiltersLock = new();
 
     [ObservableProperty]
@@ -1245,7 +1245,10 @@ public class ReceiptItemViewModel
         Price = item.Price;
         Quantity = item.Quantity;
         Amount = item.Amount;
-        UnitOfMeasure = item.Item?.UnitOfMeasure;
+        // QuantityUnitId - единица количества в чеке (шт, кг, л)
+        // Оставляем свойство UnitOfMeasure для обратной совместимости с XAML
+        UnitOfMeasure = item.QuantityUnitId;
+        BaseUnitQuantity = item.BaseUnitQuantity;
 
         // Load labels from Item
         if (item.Item?.ItemLabels != null)
@@ -1263,6 +1266,13 @@ public class ReceiptItemViewModel
     public decimal? Price { get; }
     public decimal Quantity { get; }
     public decimal? Amount { get; }
+    /// <summary>
+    /// Единица измерения количества в чеке (шт, кг, л)
+    /// </summary>
     public string? UnitOfMeasure { get; }
+    /// <summary>
+    /// Количество в базовых единицах продукта
+    /// </summary>
+    public decimal BaseUnitQuantity { get; }
     public List<LabelViewModel> Labels { get; } = new();
 }

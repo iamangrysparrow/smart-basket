@@ -18,6 +18,12 @@ public class ExtractedItem
     /// </summary>
     [JsonPropertyName("product")]
     public string Product { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Базовая единица измерения продукта (кг, л, шт, м, м²)
+    /// </summary>
+    [JsonPropertyName("base_unit")]
+    public string BaseUnit { get; set; } = "шт";
 }
 
 /// <summary>
@@ -66,12 +72,25 @@ public interface IProductExtractionService
     /// </summary>
     /// <param name="itemNames">Названия товаров для обработки</param>
     /// <param name="existingProducts">Список существующих продуктов для переиспользования</param>
+    /// <param name="unitOfMeasures">Справочник единиц измерения для определения base_unit</param>
     /// <param name="progress">Отчёт о прогрессе</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Результат с нормализованными продуктами</returns>
     Task<ProductExtractionResult> ExtractAsync(
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string>? existingProducts = null,
+        IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Информация о единице измерения для передачи в LLM
+/// </summary>
+public class UnitOfMeasureInfo
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string BaseUnitId { get; set; } = string.Empty;
+    public bool IsBase { get; set; }
 }

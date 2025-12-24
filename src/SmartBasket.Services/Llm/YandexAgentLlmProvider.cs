@@ -789,9 +789,11 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             // Сброс только при явном status=incomplete в response.completed (происходит выше)
 
             // Парсим текстовые tool calls [TOOL_CALL_START] если native не получены
+            bool hasTruncatedToolCall = false;
             if (toolCalls.Count == 0 && fullResponse.Length > 0)
             {
-                var textToolCalls = TryParseTextToolCalls(fullResponse.ToString());
+                var (textToolCalls, truncated) = TryParseTextToolCallsWithDiagnostics(fullResponse.ToString());
+                hasTruncatedToolCall = truncated;
                 if (textToolCalls.Count > 0)
                 {
                     toolCalls.AddRange(textToolCalls);
@@ -829,6 +831,18 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 result.ToolCalls = toolCalls;
                 _logger.LogInformation("[YandexAgent Chat] <<< TOOL CALLS: {Count}", toolCalls.Count);
                 progress?.Report($"[YandexAgent Chat] {toolCalls.Count} tool call(s) received");
+            }
+            else if (hasTruncatedToolCall)
+            {
+                // Обнаружен обрезанный tool call - ответ модели был усечён
+                // Извлекаем текст до обрезанного tool call для показа пользователю
+                var responseText = ExtractTextBeforeToolCall(fullResponse.ToString());
+
+                result.IsSuccess = false;
+                result.Response = responseText; // Показываем что модель успела написать
+                result.ErrorMessage = "Ответ модели был обрезан. Возможно, превышен лимит токенов. Попробуйте переформулировать запрос короче.";
+                _logger.LogWarning("[YandexAgent Chat] <<< ОТВЕТ ОБРЕЗАН (truncated tool call)");
+                progress?.Report("[YandexAgent Chat] ⚠️ Ответ модели обрезан");
             }
             else if (fullResponse.Length > 0)
             {
@@ -1273,11 +1287,13 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 
     /// <summary>
     /// Парсит текстовые tool calls в формате [TOOL_CALL_START]name\n{json}\n[TOOL_CALL_END]
-    /// YandexAgent модель иногда выводит вызовы инструментов в таком текстовом формате
+    /// YandexAgent модель иногда выводит вызовы инструментов в таком текстовом формате.
+    /// Возвращает кортеж: (список tool calls, флаг обнаружения обрезанного tool call)
     /// </summary>
-    private List<LlmToolCall> TryParseTextToolCalls(string text)
+    private (List<LlmToolCall> ToolCalls, bool HasTruncated) TryParseTextToolCallsWithDiagnostics(string text)
     {
         var result = new List<LlmToolCall>();
+        bool hasTruncated = false;
 
         try
         {
@@ -1293,7 +1309,13 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 
                 // Ищем имя инструмента (до конца строки или до {)
                 var nameEnd = text.IndexOfAny(new[] { '\n', '\r', '{' }, afterTag);
-                if (nameEnd < 0) break;
+                if (nameEnd < 0)
+                {
+                    // Нет имени инструмента - вероятно обрезка после [TOOL_CALL_START]
+                    hasTruncated = true;
+                    _logger.LogWarning("[YandexAgent] TRUNCATED: [TOOL_CALL_START] found but no tool name or JSON");
+                    break;
+                }
 
                 var toolName = text.Substring(afterTag, nameEnd - afterTag).Trim();
                 if (string.IsNullOrEmpty(toolName))
@@ -1304,7 +1326,13 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 
                 // Ищем JSON - начинается с {
                 var jsonStart = text.IndexOf('{', nameEnd);
-                if (jsonStart < 0) break;
+                if (jsonStart < 0)
+                {
+                    // Нет начала JSON - обрезка после имени инструмента
+                    hasTruncated = true;
+                    _logger.LogWarning("[YandexAgent] TRUNCATED: Tool {ToolName} found but no JSON start", toolName);
+                    break;
+                }
 
                 // Ищем конец JSON - либо до [TOOL_CALL_END], либо до следующего [TOOL_CALL_START], либо до конца
                 var endTagIndex = text.IndexOf(endTag, jsonStart, StringComparison.OrdinalIgnoreCase);
@@ -1355,6 +1383,13 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                             toolName, ex.Message);
                     }
                 }
+                else
+                {
+                    // JSON не сбалансирован - вероятно обрезан из-за лимита токенов
+                    hasTruncated = true;
+                    _logger.LogWarning("[YandexAgent] TRUNCATED tool call detected! Tool: {ToolName}, JSON candidate ({Length} chars): {Json}",
+                        toolName, jsonCandidate.Length, jsonCandidate.Length > 200 ? jsonCandidate[..200] + "..." : jsonCandidate);
+                }
 
                 // Ищем следующий
                 startIndex = text.IndexOf(startTag, jsonStart + 1, StringComparison.OrdinalIgnoreCase);
@@ -1366,7 +1401,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
         }
 
         // Если не нашли [TOOL_CALL_START] формат, пробуем markdown code block
-        if (result.Count == 0)
+        if (result.Count == 0 && !hasTruncated)
         {
             var codeBlockToolCalls = TryParseMarkdownCodeBlockToolCalls(text);
             if (codeBlockToolCalls.Count > 0)
@@ -1376,7 +1411,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
         }
 
         // Если не нашли code block, пробуем inline JSON формат
-        if (result.Count == 0)
+        if (result.Count == 0 && !hasTruncated)
         {
             var inlineToolCalls = TryParseInlineJsonToolCalls(text);
             if (inlineToolCalls.Count > 0)
@@ -1385,7 +1420,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             }
         }
 
-        return result;
+        return (result, hasTruncated);
     }
 
     /// <summary>

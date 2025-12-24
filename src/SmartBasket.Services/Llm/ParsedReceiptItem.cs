@@ -51,14 +51,16 @@ public class ParsedReceiptItem
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Количество купленного
+    /// Количество купленного в чеке
     /// </summary>
     public decimal Quantity { get; set; } = 1;
 
     /// <summary>
-    /// Единица измерения за цену (шт, кг, л)
+    /// Единица измерения количества в чеке (шт, кг, л)
+    /// JSON: quantity_unit
     /// </summary>
-    public string? Unit { get; set; }
+    [JsonPropertyName("quantity_unit")]
+    public string? QuantityUnit { get; set; }
 
     /// <summary>
     /// Цена за единицу
@@ -74,11 +76,13 @@ public class ParsedReceiptItem
     /// <summary>
     /// Единица измерения товара (г, кг, мл, л, шт) - выделено из названия
     /// </summary>
-    public string? UnitOfMeasure { get; set; }
+    public string? Unit { get; set; }
 
     /// <summary>
     /// Количество в единице товара (например 930 для "930 мл") - выделено из названия
+    /// JSON: unit_quantity
     /// </summary>
+    [JsonPropertyName("unit_quantity")]
     [JsonConverter(typeof(NullableDecimalConverter))]
     public decimal? UnitQuantity { get; set; }
 }

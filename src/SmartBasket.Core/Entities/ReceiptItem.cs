@@ -16,9 +16,20 @@ public class ReceiptItem : BaseEntity
     public Guid ReceiptId { get; set; }
 
     /// <summary>
-    /// Количество
+    /// Количество в чеке
     /// </summary>
     public decimal Quantity { get; set; } = 1;
+
+    /// <summary>
+    /// Единица измерения количества в чеке (шт, кг, л)
+    /// </summary>
+    public string QuantityUnitId { get; set; } = "шт";
+
+    /// <summary>
+    /// Количество в базовой ЕИ продукта (пересчёт)
+    /// Например: 6 шт огурцов по 180г = 1.08 кг
+    /// </summary>
+    public decimal BaseUnitQuantity { get; set; }
 
     /// <summary>
     /// Цена за единицу
@@ -33,4 +44,5 @@ public class ReceiptItem : BaseEntity
     // Navigation properties
     public Item? Item { get; set; }
     public Receipt? Receipt { get; set; }
+    public UnitOfMeasure? QuantityUnit { get; set; }
 }
