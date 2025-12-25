@@ -177,7 +177,10 @@ public partial class App : Application
             options.Stores = shoppingSection.Stores;
         });
         services.AddSingleton<IShoppingSessionService, ShoppingSessionService>();
-        services.AddTransient<IShoppingChatService, ShoppingChatService>();
+        services.AddSingleton<IShoppingChatService, ShoppingChatService>();
+        // Lazy для разрыва циклической зависимости (ProductSelectorService -> ShoppingChatService -> ToolExecutor -> ... -> ProductSelectorService)
+        services.AddTransient(sp => new Lazy<IShoppingChatService>(() => sp.GetRequiredService<IShoppingChatService>()));
+        services.AddTransient<IProductSelectorService, ProductSelectorService>();
 
         // ViewModels
         services.AddTransient<MainViewModel>();

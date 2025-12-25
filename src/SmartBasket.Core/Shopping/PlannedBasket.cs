@@ -94,6 +94,11 @@ public class PlannedItem
     public decimal LineTotal { get; set; }
 
     /// <summary>
+    /// Обоснование выбора AI (почему выбран этот товар и это количество)
+    /// </summary>
+    public string? Reasoning { get; set; }
+
+    /// <summary>
     /// Товар найден и в наличии
     /// </summary>
     public bool IsAvailable => Match != null && Match.InStock;

@@ -17,6 +17,8 @@ public static class ToolServiceExtensions
 
         // Shopping модуль
         services.AddTransient<IToolHandler, UpdateBasketHandler>();
+        services.AddSingleton<SelectProductHandler>(); // Singleton для сохранения состояния между вызовами
+        services.AddTransient<IToolHandler>(sp => sp.GetRequiredService<SelectProductHandler>());
 
         // Утилиты
         services.AddTransient<IToolHandler, GetCurrentDateHandler>();

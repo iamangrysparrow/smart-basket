@@ -138,7 +138,7 @@ public class ShoppingChatService : IShoppingChatService
         // Получаем только нужные инструменты для Shopping модуля
         var allTools = _tools.GetToolDefinitions();
         var shoppingTools = allTools
-            .Where(t => t.Name is "update_basket" or "query" or "describe_data" or "get_current_datetime")
+            .Where(t => t.Name is "update_basket" or "query" or "describe_data" or "get_current_datetime" or "select_product")
             .ToList();
 
         _logger.LogDebug("[ShoppingChatService] Tools: {Tools}",
@@ -234,13 +234,16 @@ public class ShoppingChatService : IShoppingChatService
             foreach (var call in result.ToolCalls)
             {
                 // Уведомляем UI о вызове инструмента
+                var toolCallType = call.IsParsedFromText ? "fallback" : "native";
+                _logger.LogDebug("[ShoppingChatService] Reporting ToolCall to UI: {Name} ({Type})", call.Name, toolCallType);
+
                 progress?.Report(new ChatProgress(
                     ChatProgressType.ToolCall,
                     ToolName: call.Name,
                     ToolArgs: call.Arguments
                 ));
 
-                _logger.LogInformation("[ShoppingChatService] Executing tool: {Name}", call.Name);
+                _logger.LogInformation("[ShoppingChatService] Executing tool: {Name} ({Type})", call.Name, toolCallType);
 
                 var toolResult = await _tools.ExecuteAsync(call.Name, call.Arguments, cancellationToken);
 

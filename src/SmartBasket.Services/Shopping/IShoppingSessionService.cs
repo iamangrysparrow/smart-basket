@@ -1,5 +1,6 @@
 using AiWebSniffer.Core.Interfaces;
 using SmartBasket.Core.Shopping;
+using SmartBasket.Services.Chat;
 
 namespace SmartBasket.Services.Shopping;
 
@@ -83,20 +84,22 @@ public interface IShoppingSessionService
     #region Этап 2: Планирование (поиск в магазинах)
 
     /// <summary>
-    /// Запустить поиск товаров во всех магазинах
+    /// Запустить поиск товаров во всех магазинах с AI выбором лучшего товара
     /// </summary>
     /// <param name="webViewContext">Контекст WebView2 для парсеров</param>
     /// <param name="progress">Прогресс поиска</param>
+    /// <param name="aiProgress">Прогресс AI (для вывода в чат)</param>
     /// <param name="ct">Токен отмены</param>
     Task StartPlanningAsync(
         IWebViewContext webViewContext,
         IProgress<PlanningProgress>? progress = null,
+        IProgress<ChatProgress>? aiProgress = null,
         CancellationToken ct = default);
 
     /// <summary>
     /// Запустить поиск товаров (без WebView - выбросит исключение)
     /// </summary>
-    [Obsolete("Use StartPlanningAsync(IWebViewContext, IProgress, CancellationToken) instead")]
+    [Obsolete("Use StartPlanningAsync(IWebViewContext, IProgress, IProgress, CancellationToken) instead")]
     Task StartPlanningAsync(IProgress<PlanningProgress>? progress = null, CancellationToken ct = default);
 
     #endregion
@@ -204,6 +207,16 @@ public class PlanningProgress
     public string? ErrorMessage { get; set; }
 
     /// <summary>
+    /// Обоснование выбора AI
+    /// </summary>
+    public string? Reasoning { get; set; }
+
+    /// <summary>
+    /// Количество товара (рассчитанное AI)
+    /// </summary>
+    public int? SelectedQuantity { get; set; }
+
+    /// <summary>
     /// Общий прогресс (количество обработанных позиций)
     /// </summary>
     public int TotalProgress => (CurrentStore - 1) * TotalItems + CurrentItem;
@@ -233,6 +246,11 @@ public enum PlanningStatus
     /// Идёт поиск
     /// </summary>
     Searching,
+
+    /// <summary>
+    /// AI выбирает лучший товар
+    /// </summary>
+    Selecting,
 
     /// <summary>
     /// Товар найден

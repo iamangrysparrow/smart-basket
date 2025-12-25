@@ -44,8 +44,19 @@ public partial class ShoppingView : UserControl
     {
         try
         {
+            // WebView2 внутри невидимой вкладки не инициализируется
+            // Временно переключаемся на вкладку "Поиск" для инициализации
+            var originalTab = LeftTabControl.SelectedIndex;
+            LeftTabControl.SelectedItem = SearchTab;
+
+            // Даём время на отрисовку вкладки
+            await Task.Delay(100);
+
             // Ensure WebView2 is initialized
             await ParserWebView.EnsureCoreWebView2Async();
+
+            // Возвращаемся на исходную вкладку
+            LeftTabControl.SelectedIndex = originalTab;
 
             // Pass WebView2 to ViewModel for use by parsers
             viewModel.SetWebView(ParserWebView);

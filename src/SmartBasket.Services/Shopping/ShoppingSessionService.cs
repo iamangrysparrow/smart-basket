@@ -1,8 +1,10 @@
 using AiWebSniffer.Core.Interfaces;
+using AiWebSniffer.Core.Models;
 using AiWebSniffer.Parsers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmartBasket.Core.Shopping;
+using SmartBasket.Services.Chat;
 
 namespace SmartBasket.Services.Shopping;
 
@@ -14,6 +16,7 @@ public class ShoppingSessionService : IShoppingSessionService
 {
     private readonly ILogger<ShoppingSessionService> _logger;
     private readonly ShoppingSettings _settings;
+    private readonly IProductSelectorService _productSelector;
     private readonly Dictionary<string, IStoreParser> _parsers = new();
     private readonly Dictionary<string, StoreRuntimeConfig> _storeConfigs = new();
     private ShoppingSession? _currentSession;
@@ -27,10 +30,12 @@ public class ShoppingSessionService : IShoppingSessionService
 
     public ShoppingSessionService(
         IOptions<ShoppingSettings> settings,
+        IProductSelectorService productSelector,
         ILogger<ShoppingSessionService> logger)
     {
         _logger = logger;
         _settings = settings.Value;
+        _productSelector = productSelector;
 
         InitializeParsers();
     }
@@ -288,6 +293,7 @@ public class ShoppingSessionService : IShoppingSessionService
     public async Task StartPlanningAsync(
         IWebViewContext webViewContext,
         IProgress<PlanningProgress>? progress = null,
+        IProgress<ChatProgress>? aiProgress = null,
         CancellationToken ct = default)
     {
         if (_currentSession == null)
@@ -304,6 +310,9 @@ public class ShoppingSessionService : IShoppingSessionService
             .OrderBy(c => c.Priority)
             .Select(c => c.StoreId)
             .ToList();
+
+        // Словарь для хранения количества, рассчитанного AI для каждого товара
+        var aiSelections = new Dictionary<Guid, (string? ProductId, int Quantity, string? Reasoning)>();
 
         var storeIndex = 0;
         foreach (var storeId in stores)
@@ -352,6 +361,7 @@ public class ShoppingSessionService : IShoppingSessionService
                         config.SearchLimit,
                         ct);
 
+                    // Преобразуем результаты в ProductMatch
                     var matches = results.Select((r, i) => new ProductMatch
                     {
                         ProductId = r.Id,
@@ -363,11 +373,75 @@ public class ShoppingSessionService : IShoppingSessionService
                         ImageUrl = r.ImageUrl,
                         ProductUrl = r.ProductUrl,
                         MatchScore = 1.0f - (i * 0.1f),
-                        IsSelected = i == 0
+                        IsSelected = false // Сначала все невыбранные
                     }).ToList();
+
+                    // AI выбор лучшего товара
+                    string? selectedProductId = null;
+                    int selectedQuantity = (int)item.Quantity;
+                    string? reasoning = null;
+
+                    if (matches.Any())
+                    {
+                        // Уведомляем о начале AI выбора
+                        progress?.Report(new PlanningProgress
+                        {
+                            Store = storeId,
+                            StoreName = config.StoreName,
+                            ItemName = item.Name,
+                            CurrentItem = itemIndex,
+                            TotalItems = items.Count,
+                            CurrentStore = storeIndex,
+                            TotalStores = stores.Count,
+                            Status = PlanningStatus.Selecting
+                        });
+
+                        _logger.LogDebug("[ShoppingSession] AI selecting best product for '{Item}' from {Count} results",
+                            item.Name, matches.Count);
+
+                        // Вызываем AI для выбора лучшего товара
+                        var selection = await _productSelector.SelectBestProductAsync(
+                            item,
+                            results,
+                            storeId,
+                            config.StoreName,
+                            aiProgress,
+                            ct);
+
+                        if (selection != null)
+                        {
+                            selectedProductId = selection.SelectedProductId;
+                            selectedQuantity = selection.Quantity;
+                            reasoning = selection.Reasoning;
+
+                            _logger.LogInformation(
+                                "[ShoppingSession] AI selected: ProductId={ProductId}, Qty={Qty} for '{Item}'",
+                                selectedProductId ?? "null", selectedQuantity, item.Name);
+                        }
+                        else
+                        {
+                            _logger.LogWarning(
+                                "[ShoppingSession] AI returned null for '{Item}', falling back to first result",
+                                item.Name);
+                            // Fallback: выбираем первый товар в наличии
+                            selectedProductId = matches.FirstOrDefault(m => m.InStock)?.ProductId;
+                        }
+
+                        // Отмечаем выбранный товар
+                        foreach (var match in matches)
+                        {
+                            match.IsSelected = match.ProductId == selectedProductId;
+                        }
+
+                        // Сохраняем выбор AI для использования в BuildPlannedBasket
+                        aiSelections[item.Id] = (selectedProductId, selectedQuantity, reasoning);
+                    }
 
                     searchResult.ItemMatches[item.Id] = matches;
                     if (matches.Any(m => m.InStock)) searchResult.FoundCount++;
+
+                    // Находим выбранный товар для отчёта
+                    var selectedMatch = matches.FirstOrDefault(m => m.IsSelected);
 
                     progress?.Report(new PlanningProgress
                     {
@@ -378,9 +452,11 @@ public class ShoppingSessionService : IShoppingSessionService
                         TotalItems = items.Count,
                         CurrentStore = storeIndex,
                         TotalStores = stores.Count,
-                        Status = matches.Any() ? PlanningStatus.Found : PlanningStatus.NotFound,
-                        MatchedProduct = matches.FirstOrDefault()?.ProductName,
-                        Price = matches.FirstOrDefault()?.Price
+                        Status = selectedMatch != null ? PlanningStatus.Found : PlanningStatus.NotFound,
+                        MatchedProduct = selectedMatch?.ProductName,
+                        Price = selectedMatch?.Price,
+                        Reasoning = reasoning,
+                        SelectedQuantity = selectedQuantity
                     });
 
                     _logger.LogDebug("[ShoppingSession] Found {Count} matches for '{Item}' in {Store}",
@@ -411,8 +487,8 @@ public class ShoppingSessionService : IShoppingSessionService
             searchResult.IsComplete = true;
             _currentSession.StoreResults[storeId] = searchResult;
 
-            // Формируем PlannedBasket
-            var basket = BuildPlannedBasket(storeId, config, searchResult);
+            // Формируем PlannedBasket с учётом AI выбора
+            var basket = BuildPlannedBasket(storeId, config, searchResult, aiSelections);
             _currentSession.PlannedBaskets[storeId] = basket;
 
             _logger.LogInformation("[ShoppingSession] Completed {Store}: {Found}/{Total} items, total {Price:C}",
@@ -432,7 +508,11 @@ public class ShoppingSessionService : IShoppingSessionService
             "WebViewContext is required for parser operations.");
     }
 
-    private PlannedBasket BuildPlannedBasket(string storeId, StoreRuntimeConfig config, StoreSearchResult searchResult)
+    private PlannedBasket BuildPlannedBasket(
+        string storeId,
+        StoreRuntimeConfig config,
+        StoreSearchResult searchResult,
+        Dictionary<Guid, (string? ProductId, int Quantity, string? Reasoning)>? aiSelections = null)
     {
         var items = _currentSession!.DraftItems;
         var plannedItems = new List<PlannedItem>();
@@ -443,7 +523,16 @@ public class ShoppingSessionService : IShoppingSessionService
             var matches = searchResult.ItemMatches.GetValueOrDefault(item.Id) ?? new();
             var selected = matches.FirstOrDefault(m => m.IsSelected && m.InStock);
 
-            var lineTotal = selected != null ? selected.Price * (int)item.Quantity : 0;
+            // Используем количество из AI выбора, если есть
+            int quantity = (int)item.Quantity;
+            string? reasoning = null;
+            if (aiSelections != null && aiSelections.TryGetValue(item.Id, out var aiSelection))
+            {
+                quantity = aiSelection.Quantity;
+                reasoning = aiSelection.Reasoning;
+            }
+
+            var lineTotal = selected != null ? selected.Price * quantity : 0;
             total += lineTotal;
 
             plannedItems.Add(new PlannedItem
@@ -451,8 +540,9 @@ public class ShoppingSessionService : IShoppingSessionService
                 DraftItemId = item.Id,
                 DraftItemName = item.Name,
                 Match = selected,
-                Quantity = (int)item.Quantity,
-                LineTotal = lineTotal
+                Quantity = quantity,
+                LineTotal = lineTotal,
+                Reasoning = reasoning
             });
         }
 

@@ -98,6 +98,8 @@ public partial class ShoppingViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDraftingState))]
     [NotifyPropertyChangedFor(nameof(ShowDrafting))]
+    [NotifyPropertyChangedFor(nameof(ShowBasketPanel))]
+    [NotifyPropertyChangedFor(nameof(ShowProgressPanel))]
     [NotifyPropertyChangedFor(nameof(ShowPlanning))]
     [NotifyPropertyChangedFor(nameof(ShowAnalyzing))]
     [NotifyPropertyChangedFor(nameof(ShowFinalizing))]
@@ -113,6 +115,8 @@ public partial class ShoppingViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowWelcome))]
     [NotifyPropertyChangedFor(nameof(ShowDrafting))]
+    [NotifyPropertyChangedFor(nameof(ShowBasketPanel))]
+    [NotifyPropertyChangedFor(nameof(ShowProgressPanel))]
     private bool _hasSession;
 
     /// <summary>
@@ -319,13 +323,25 @@ public partial class ShoppingViewModel : ObservableObject
     public bool ShowWelcome => !HasSession && !IsInitializing;
 
     /// <summary>
-    /// Показывать экран формирования списка
+    /// Показывать экран формирования списка (включая Planning — для TabControl)
     /// </summary>
-    public bool ShowDrafting => HasSession && State == ShoppingSessionState.Drafting;
+    public bool ShowDrafting => HasSession &&
+        (State == ShoppingSessionState.Drafting || State == ShoppingSessionState.Planning);
 
     /// <summary>
-    /// Показывать экран планирования (поиск в магазинах)
+    /// Показывать панель корзины справа (только Drafting)
     /// </summary>
+    public bool ShowBasketPanel => HasSession && State == ShoppingSessionState.Drafting;
+
+    /// <summary>
+    /// Показывать панель прогресса справа (только Planning)
+    /// </summary>
+    public bool ShowProgressPanel => HasSession && State == ShoppingSessionState.Planning;
+
+    /// <summary>
+    /// Показывать экран планирования (поиск в магазинах) — УСТАРЕЛО, используется ShowProgressPanel
+    /// </summary>
+    [Obsolete("Use ShowProgressPanel instead")]
     public bool ShowPlanning => HasSession && State == ShoppingSessionState.Planning;
 
     /// <summary>
@@ -913,6 +929,7 @@ public partial class ShoppingViewModel : ObservableObject
         // Используем DispatcherProgress который явно вызывает InvokeAsync с низким приоритетом
         var progress = new DispatcherProgress<ChatProgress>(Application.Current.Dispatcher, p =>
         {
+            System.Diagnostics.Debug.WriteLine($"[ShoppingViewModel HANDLER-1] SWITCH ENTER: Type={p.Type}, ToolName={p.ToolName}");
             switch (p.Type)
             {
                 case ChatProgressType.TextDelta:
@@ -928,7 +945,9 @@ public partial class ShoppingViewModel : ObservableObject
                     break;
 
                 case ChatProgressType.ToolCall:
-                    _logger.LogDebug("[ShoppingViewModel] Tool call: {Tool}({Args})", p.ToolName, p.ToolArgs);
+                    System.Diagnostics.Debug.WriteLine($"[ShoppingViewModel HANDLER] ToolCall ENTER: {p.ToolName}");
+                    _logger.LogInformation("[ShoppingViewModel] UI received ToolCall: {Tool}", p.ToolName);
+                    System.Diagnostics.Debug.WriteLine($"[ShoppingViewModel HANDLER] ToolCall AFTER LOG: {p.ToolName}");
 
                     // Если до tool call был текст, содержащий JSON с tool call - очищаем его
                     // YandexGPT иногда дублирует tool call в виде JSON в тексте
@@ -1040,6 +1059,7 @@ public partial class ShoppingViewModel : ObservableObject
 
         var progress = new DispatcherProgress<ChatProgress>(Application.Current.Dispatcher, p =>
         {
+            System.Diagnostics.Debug.WriteLine($"[ShoppingViewModel HANDLER-2] SWITCH ENTER: Type={p.Type}, ToolName={p.ToolName}");
             switch (p.Type)
             {
                 case ChatProgressType.TextDelta:
@@ -1050,6 +1070,43 @@ public partial class ShoppingViewModel : ObservableObject
                     }
                     currentFinalAnswer.Text += p.Text;
                     assistantMessage.Text += p.Text;
+                    break;
+
+                case ChatProgressType.ToolCall:
+                    _logger.LogInformation("[ShoppingViewModel] Hidden msg: UI received ToolCall: {Tool}", p.ToolName);
+                    // Если до tool call был текст с JSON - очищаем
+                    if (currentFinalAnswer != null)
+                    {
+                        var cleanedText = CleanToolCallJsonFromText(currentFinalAnswer.Text, p.ToolName);
+                        if (string.IsNullOrWhiteSpace(cleanedText))
+                        {
+                            assistantMessage.Parts.Remove(currentFinalAnswer);
+                        }
+                        else
+                        {
+                            currentFinalAnswer.Text = cleanedText;
+                        }
+                    }
+                    // Создаём карточку tool call
+                    var toolPart = new ShoppingResponsePart
+                    {
+                        IsToolCall = true,
+                        ToolName = p.ToolName,
+                        ToolArgs = p.ToolArgs
+                    };
+                    assistantMessage.Parts.Add(toolPart);
+                    currentFinalAnswer = null;
+                    break;
+
+                case ChatProgressType.ToolResult:
+                    _logger.LogDebug("[ShoppingViewModel] Hidden msg: Tool result: {Tool} success={Success}", p.ToolName, p.ToolSuccess);
+                    var lastToolCall = assistantMessage.Parts
+                        .LastOrDefault(x => x.IsToolCall && x.ToolName == p.ToolName && x.ToolResult == null);
+                    if (lastToolCall != null)
+                    {
+                        lastToolCall.ToolResult = p.ToolResult;
+                        lastToolCall.ToolSuccess = p.ToolSuccess;
+                    }
                     break;
 
                 case ChatProgressType.Complete:
@@ -1226,9 +1283,12 @@ public partial class ShoppingViewModel : ObservableObject
         // Создаём Progress для получения обновлений
         var progress = new Progress<PlanningProgress>(OnPlanningProgress);
 
+        // Progress для AI выбора (отображает процесс AI в чате)
+        var aiProgress = new Progress<ChatProgress>(OnAiProgress);
+
         try
         {
-            await _sessionService.StartPlanningAsync(_webViewContext, progress, _planningCts.Token);
+            await _sessionService.StartPlanningAsync(_webViewContext, progress, aiProgress, _planningCts.Token);
 
             OverallProgress = 100;
             CurrentOperationText = "Поиск завершён!";
@@ -1317,6 +1377,7 @@ public partial class ShoppingViewModel : ObservableObject
                 storeCard.StatusText = p.Status switch
                 {
                     PlanningStatus.Searching => $"Поиск: {p.ItemName}",
+                    PlanningStatus.Selecting => $"AI выбирает: {p.ItemName}",
                     PlanningStatus.Found => $"Найдено: {p.CurrentItem}/{p.TotalItems}",
                     PlanningStatus.NotFound => $"Поиск: {p.CurrentItem}/{p.TotalItems}",
                     PlanningStatus.Error => $"Ошибка: {p.ErrorMessage}",
@@ -1325,18 +1386,65 @@ public partial class ShoppingViewModel : ObservableObject
             }
 
             // Добавляем в лог
-            var logMessage = p.Status switch
+            string? logMessage;
+            if (p.Status == PlanningStatus.Found && !string.IsNullOrEmpty(p.Reasoning))
             {
-                PlanningStatus.Searching => $"[{p.StoreName}] Поиск: {p.ItemName}",
-                PlanningStatus.Found => $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} ({p.Price:N0} ₽)",
-                PlanningStatus.NotFound => $"[{p.StoreName}] ✗ {p.ItemName} — не найдено",
-                PlanningStatus.Error => $"[{p.StoreName}] ⚠ {p.ItemName} — {p.ErrorMessage}",
-                _ => null
-            };
+                // AI выбрал товар с обоснованием
+                logMessage = $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} x{p.SelectedQuantity} ({p.Price:N0} ₽)\n   💡 {p.Reasoning}";
+            }
+            else
+            {
+                logMessage = p.Status switch
+                {
+                    PlanningStatus.Searching => $"[{p.StoreName}] Поиск: {p.ItemName}",
+                    PlanningStatus.Selecting => $"[{p.StoreName}] 🤖 AI выбирает лучший товар для: {p.ItemName}",
+                    PlanningStatus.Found => $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} ({p.Price:N0} ₽)",
+                    PlanningStatus.NotFound => $"[{p.StoreName}] ✗ {p.ItemName} — не найдено",
+                    PlanningStatus.Error => $"[{p.StoreName}] ⚠ {p.ItemName} — {p.ErrorMessage}",
+                    _ => null
+                };
+            }
 
             if (logMessage != null)
             {
                 AddPlanningLog(logMessage);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Обработка прогресса AI выбора
+    /// </summary>
+    private void OnAiProgress(ChatProgress p)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            switch (p.Type)
+            {
+                case ChatProgressType.TextDelta:
+                    // AI рассуждает вслух - можно показать в чате или логе
+                    // Пока просто игнорируем, чтобы не засорять лог
+                    break;
+
+                case ChatProgressType.ToolCall:
+                    // AI вызывает инструмент
+                    if (p.ToolName == "select_product")
+                    {
+                        AddPlanningLog($"🤖 AI вызывает select_product...");
+                    }
+                    break;
+
+                case ChatProgressType.ToolResult:
+                    // Результат инструмента
+                    if (p.ToolName == "select_product" && p.ToolSuccess == true)
+                    {
+                        AddPlanningLog($"✓ Товар выбран");
+                    }
+                    break;
+
+                case ChatProgressType.Complete:
+                    // AI завершил обработку
+                    break;
             }
         });
     }
@@ -2017,16 +2125,35 @@ public class DispatcherProgress<T> : IProgress<T>
                 }
             }
 
+            // Логируем ДО InvokeAsync чтобы понять, вызывается ли вообще
+            if (value is ChatProgress cp)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DispatcherProgress] BEFORE InvokeAsync: Type={cp.Type}, ToolName={cp.ToolName}");
+            }
+
             _dispatcher.InvokeAsync(() =>
             {
-                // Сначала flush оставшийся текст
-                if (!string.IsNullOrEmpty(pendingText))
+                try
                 {
-                    var batchedProgress = new ChatProgress(ChatProgressType.TextDelta) { Text = pendingText };
-                    _handler((T)(object)batchedProgress);
+                    // Логируем что callback начал выполняться
+                    if (value is ChatProgress cpInner)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[DispatcherProgress] INSIDE InvokeAsync: Type={cpInner.Type}, ToolName={cpInner.ToolName}");
+                    }
+
+                    // Сначала flush оставшийся текст
+                    if (!string.IsNullOrEmpty(pendingText))
+                    {
+                        var batchedProgress = new ChatProgress(ChatProgressType.TextDelta) { Text = pendingText };
+                        _handler((T)(object)batchedProgress);
+                    }
+                    // Затем обрабатываем текущее событие
+                    _handler(value);
                 }
-                // Затем обрабатываем текущее событие
-                _handler(value);
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[DispatcherProgress] ERROR in handler: {ex}");
+                }
             }, System.Windows.Threading.DispatcherPriority.Normal);
         }
     }

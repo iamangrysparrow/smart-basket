@@ -496,49 +496,8 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                     reasoningEffort, reasoningOptions?.Mode ?? "null");
             }
 
-            // Полное логирование запроса
-            _logger.LogDebug("[YandexAgent Chat] ===== FULL REQUEST JSON START =====");
-            _logger.LogDebug("[YandexAgent Chat] Request ({Length} chars):\n{Json}", requestJson.Length, requestJson);
-            _logger.LogDebug("[YandexAgent Chat] ===== FULL REQUEST JSON END =====");
-
-            // Полное логирование всех сообщений из истории
-            _logger.LogDebug("[YandexAgent Chat] ===== MESSAGE HISTORY START =====");
-            for (var i = 0; i < messageList.Count; i++)
-            {
-                var msg = messageList[i];
-                _logger.LogDebug("[YandexAgent Chat] [{Index}] Role={Role}, Content ({ContentLength} chars), ToolCalls={ToolCallsCount}, ToolCallId={ToolCallId}",
-                    i, msg.Role, msg.Content?.Length ?? 0, msg.ToolCalls?.Count ?? 0, msg.ToolCallId ?? "(null)");
-                if (!string.IsNullOrEmpty(msg.Content))
-                {
-                    _logger.LogDebug("[YandexAgent Chat] [{Index}] Content:\n{Content}", i, msg.Content);
-                }
-                if (msg.ToolCalls?.Count > 0)
-                {
-                    foreach (var tc in msg.ToolCalls)
-                    {
-                        _logger.LogDebug("[YandexAgent Chat] [{Index}] ToolCall: {Name} (id={Id}), Args:\n{Args}",
-                            i, tc.Name, tc.Id, tc.Arguments);
-                    }
-                }
-            }
-            _logger.LogDebug("[YandexAgent Chat] ===== MESSAGE HISTORY END =====");
-
-            // Полное логирование tools
-            if (yandexTools != null && yandexTools.Count > 0)
-            {
-                _logger.LogDebug("[YandexAgent Chat] ===== TOOLS DETAIL START =====");
-                foreach (var tool in yandexTools)
-                {
-                    _logger.LogDebug("[YandexAgent Chat] Tool: {Name}", tool.Name);
-                    _logger.LogDebug("[YandexAgent Chat]   Description: {Description}", tool.Description);
-                    if (tool.Parameters != null)
-                    {
-                        var paramsJson = JsonSerializer.Serialize(tool.Parameters, LlmJsonOptions.ForLogging);
-                        _logger.LogDebug("[YandexAgent Chat]   Parameters:\n{Params}", paramsJson);
-                    }
-                }
-                _logger.LogDebug("[YandexAgent Chat] ===== TOOLS DETAIL END =====");
-            }
+            // Логируем только размер запроса, без полного дампа
+            _logger.LogDebug("[YandexAgent Chat] Request JSON size: {Length} chars", requestJson.Length);
 
             progress?.Report($"[YandexAgent Chat] >>> ЗАПРОС К /v1/responses");
             progress?.Report($"[YandexAgent Chat] Agent: {_config.AgentId}");
@@ -642,13 +601,13 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                                 {
                                     Id = itemEvent.Item.Id ?? itemEvent.Item.CallId ?? Guid.NewGuid().ToString(),
                                     Name = itemEvent.Item.Name ?? "",
-                                    Arguments = itemEvent.Item.Arguments ?? "{}"
+                                    Arguments = itemEvent.Item.Arguments ?? "{}",
+                                    IsParsedFromText = false // Native API tool call
                                 };
                                 toolCalls.Add(toolCall);
 
-                                _logger.LogInformation("[YandexAgent Chat] Function call: id={Id}, name={Name}, args={Args}",
-                                    toolCall.Id, toolCall.Name, toolCall.Arguments);
-                                progress?.Report($"[YandexAgent Chat] 🔧 Tool call: {toolCall.Name} (id={toolCall.Id})");
+                                _logger.LogInformation("[YandexAgent Chat] [NATIVE] Tool call: {Name} (id={Id})",
+                                    toolCall.Name, toolCall.Id);
                             }
                         }
                         else if (eventType == "response.completed")
@@ -788,6 +747,9 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             // История хранится 30 дней, retry с тем же previous_response_id должен работать
             // Сброс только при явном status=incomplete в response.completed (происходит выше)
 
+            // Подсчитываем native tool calls
+            var nativeToolCallsCount = toolCalls.Count;
+
             // Парсим текстовые tool calls [TOOL_CALL_START] если native не получены
             bool hasTruncatedToolCall = false;
             if (toolCalls.Count == 0 && fullResponse.Length > 0)
@@ -797,27 +759,19 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 if (textToolCalls.Count > 0)
                 {
                     toolCalls.AddRange(textToolCalls);
-                    _logger.LogInformation("[YandexAgent Chat] Parsed {Count} tool call(s) from text [TOOL_CALL_START] format",
-                        textToolCalls.Count);
-                    progress?.Report($"[YandexAgent Chat] Parsed {textToolCalls.Count} tool call(s) from text");
+                    foreach (var tc in textToolCalls)
+                    {
+                        _logger.LogInformation("[YandexAgent Chat] [FALLBACK] Tool call: {Name} (id={Id})",
+                            tc.Name, tc.Id);
+                    }
                 }
             }
 
-            // Полное логирование ответа
-            _logger.LogDebug("[YandexAgent Chat] ===== FULL RESPONSE START =====");
-            _logger.LogDebug("[YandexAgent Chat] ResponseId: {ResponseId}", responseId ?? "(null)");
-            _logger.LogDebug("[YandexAgent Chat] ToolCalls count: {Count}", toolCalls.Count);
-            if (toolCalls.Count > 0)
-            {
-                foreach (var tc in toolCalls)
-                {
-                    _logger.LogDebug("[YandexAgent Chat] ToolCall: {Name} (id={Id}), Args:\n{Args}",
-                        tc.Name, tc.Id, tc.Arguments);
-                }
-            }
-            _logger.LogDebug("[YandexAgent Chat] Response text ({Length} chars):\n{Response}",
-                fullResponse.Length, fullResponse.ToString());
-            _logger.LogDebug("[YandexAgent Chat] ===== FULL RESPONSE END =====");
+            var fallbackToolCallsCount = toolCalls.Count - nativeToolCallsCount;
+
+            // Компактное логирование ответа (только при DEBUG)
+            _logger.LogDebug("[YandexAgent Chat] Response: id={ResponseId}, text={TextLen} chars, native_tools={NativeCount}, fallback_tools={FallbackCount}",
+                responseId ?? "(null)", fullResponse.Length, nativeToolCallsCount, fallbackToolCallsCount);
 
             // Если есть tool calls - возвращаем их
             if (toolCalls.Count > 0)
@@ -829,8 +783,17 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 result.Response = responseText;
                 result.ResponseId = responseId;
                 result.ToolCalls = toolCalls;
-                _logger.LogInformation("[YandexAgent Chat] <<< TOOL CALLS: {Count}", toolCalls.Count);
-                progress?.Report($"[YandexAgent Chat] {toolCalls.Count} tool call(s) received");
+
+                // Итоговое логирование с разбивкой native/fallback
+                if (fallbackToolCallsCount > 0)
+                {
+                    _logger.LogInformation("[YandexAgent Chat] <<< TOOL CALLS: {Count} (native={Native}, fallback={Fallback})",
+                        toolCalls.Count, nativeToolCallsCount, fallbackToolCallsCount);
+                }
+                else
+                {
+                    _logger.LogInformation("[YandexAgent Chat] <<< TOOL CALLS: {Count} (all native)", toolCalls.Count);
+                }
             }
             else if (hasTruncatedToolCall)
             {
