@@ -136,9 +136,10 @@ public class ShoppingChatService : IShoppingChatService
         _history.Add(new LlmChatMessage { Role = "user", Content = message });
 
         // Получаем только нужные инструменты для Shopping модуля
+        // Примечание: select_product НЕ включён — он вызывается напрямую из ProductSelectorService
         var allTools = _tools.GetToolDefinitions();
         var shoppingTools = allTools
-            .Where(t => t.Name is "update_basket" or "query" or "describe_data" or "get_current_datetime" or "select_product")
+            .Where(t => t.Name is "update_basket" or "query" or "describe_data" or "get_current_datetime")
             .ToList();
 
         _logger.LogDebug("[ShoppingChatService] Tools: {Tools}",

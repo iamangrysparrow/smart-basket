@@ -17,8 +17,7 @@ public static class ToolServiceExtensions
 
         // Shopping модуль
         services.AddTransient<IToolHandler, UpdateBasketHandler>();
-        services.AddSingleton<SelectProductHandler>(); // Singleton для сохранения состояния между вызовами
-        services.AddTransient<IToolHandler>(sp => sp.GetRequiredService<SelectProductHandler>());
+        // Примечание: SelectProductHandler удалён — ProductSelectorService использует прямой вызов LLM
 
         // Утилиты
         services.AddTransient<IToolHandler, GetCurrentDateHandler>();

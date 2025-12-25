@@ -20,6 +20,12 @@ namespace SmartBasket.WPF.Views.Shopping;
 /// </summary>
 public partial class ShoppingViewModel : ObservableObject
 {
+    // =====================================================================
+    // ТЕСТОВЫЙ РЕЖИМ: установить в true для пропуска авторизации и заполнения тестовой корзины
+    // =====================================================================
+    private const bool TEST_MODE = true;
+    // =====================================================================
+
     private readonly IShoppingSessionService _sessionService;
     private readonly IShoppingChatService _shoppingChatService;
     private readonly IDbContextFactory<SmartBasketDbContext> _dbContextFactory;
@@ -408,7 +414,14 @@ public partial class ShoppingViewModel : ObservableObject
             return;
         }
 
-        _logger.LogInformation("[ShoppingViewModel] Initializing welcome screen");
+        _logger.LogInformation("[ShoppingViewModel] Initializing welcome screen (TEST_MODE={TestMode})", TEST_MODE);
+
+        // В тестовом режиме сразу запускаем сессию с тестовыми данными
+        if (TEST_MODE)
+        {
+            await InitializeTestModeAsync();
+            return;
+        }
 
         IsInitializing = true;
         InitializingText = "Инициализация...";
@@ -429,6 +442,109 @@ public partial class ShoppingViewModel : ObservableObject
         {
             IsInitializing = false;
         }
+    }
+
+    /// <summary>
+    /// Инициализация тестового режима — сразу создаёт сессию с заполненной корзиной
+    /// </summary>
+    private async Task InitializeTestModeAsync()
+    {
+        _logger.LogInformation("[ShoppingViewModel] TEST MODE: Initializing with test basket");
+
+        IsInitializing = true;
+        InitializingText = "Тестовый режим: загрузка...";
+
+        try
+        {
+            // Инициализируем магазины (они нужны для поиска)
+            InitializeStoreStatuses();
+
+            // В тестовом режиме считаем все магазины авторизованными
+            foreach (var store in StoreAuthStatuses)
+            {
+                store.IsChecking = false;
+                store.IsAuthenticated = true;
+            }
+            HasAnyAuthenticatedStore = true;
+
+            // Создаём сессию
+            var session = await Task.Run(() => _sessionService.StartNewSessionAsync());
+            HasSession = true;
+            State = session.State;
+
+            // Начинаем conversation в ShoppingChatService
+            try
+            {
+                await Task.Run(() => _shoppingChatService.StartConversationAsync(session));
+                _logger.LogInformation("[ShoppingViewModel] TEST MODE: Chat conversation started");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[ShoppingViewModel] TEST MODE: Failed to start chat conversation");
+            }
+
+            // Заполняем корзину тестовыми данными
+            AddTestBasketItems();
+
+            // Добавляем системное сообщение
+            AddSystemMessage("🧪 ТЕСТОВЫЙ РЕЖИМ\n\nКорзина заполнена 28 товарами.\nМагазины считаются авторизованными.\n\nНажмите «Собрать корзины» для теста поиска.");
+
+            _logger.LogInformation("[ShoppingViewModel] TEST MODE: Ready with {Count} items", DraftItems.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ShoppingViewModel] TEST MODE: Initialization failed");
+            AddSystemMessage($"Ошибка инициализации тестового режима: {ex.Message}");
+        }
+        finally
+        {
+            IsInitializing = false;
+        }
+    }
+
+    /// <summary>
+    /// Добавляет тестовые товары в корзину (28 позиций)
+    /// </summary>
+    private void AddTestBasketItems()
+    {
+        var testItems = new[]
+        {
+            ("Шампиньоны", 1m, "кг", "Свежие овощи"),
+            ("Молоко 1,5%", 1m, "л", "Молоко"),
+            ("Томаты", 0.5m, "кг", "Свежие овощи"),
+            ("Лук репчатый", 0.5m, "кг", "Свежие овощи"),
+            ("Спагетти", 1m, "уп", "Макароны"),
+            ("Борщ с курицей", 2m, "уп", "Готовые продукты"),
+            ("Колбаса варёная докторская", 0.3m, "кг", "Мясо и птица"),
+            ("Сок апельсиновый", 1m, "л", "Соки"),
+            ("Вода питьевая газированная", 1.5m, "л", "Вода и газированные напитки"),
+            ("Огурцы", 0.5m, "кг", "Свежие овощи"),
+            ("Морковь", 0.5m, "кг", "Свежие овощи"),
+            ("Сыр полутвёрдый 45%", 0.2m, "кг", "Сыры"),
+            ("Яблоки", 1m, "кг", "Свежие фрукты"),
+            ("Бедра цыплёнка-бройлера на кости с кожей", 1m, "кг", "Куриное мясо"),
+            ("Конфеты шоколадные с суфлейной начинкой", 0.3m, "кг", "Прочие продукты"),
+            ("Голень куриная с кожей", 0.5m, "кг", "Куриное мясо"),
+            ("Варенье малиновое", 0.2m, "л", "Прочие продукты"),
+            ("Сок томатный", 1m, "л", "Соки"),
+            ("Картофель", 1m, "кг", "Свежие овощи"),
+            ("Сметана 15%", 0.2m, "л", "Кисломолочные продукты"),
+            ("Яйцо куриное", 10m, "шт", "Яйца"),
+            ("Сахар белый песок", 0.5m, "кг", "Прочие продукты"),
+            ("Кофе молотый", 0.2m, "кг", "Кофе и чай"),
+            ("Батон пшеничный в нарезке", 1m, "уп", "Хлебобулочные изделия"),
+            ("Подсолнечное масло рафинированное дезодорированное", 0.5m, "л", "Масла"),
+            ("Туалетная бумага", 2m, "уп", "Салфетки и бумага"),
+            ("Свёкла", 0.3m, "кг", "Свежие овощи"),
+            ("Горошек консервированный", 2m, "уп", "Консервированные овощи")
+        };
+
+        foreach (var (name, qty, unit, category) in testItems)
+        {
+            _sessionService.AddItem(name, qty, unit, category);
+        }
+
+        _logger.LogInformation("[ShoppingViewModel] TEST MODE: Added {Count} test items", testItems.Length);
     }
 
     /// <summary>
@@ -1360,9 +1476,32 @@ public partial class ShoppingViewModel : ObservableObject
     /// <summary>
     /// Обработка прогресса поиска
     /// </summary>
+    // Throttling для progress updates
+    private DateTime _lastProgressUpdate = DateTime.MinValue;
+    private const int ProgressUpdateIntervalMs = 50; // Обновлять UI не чаще чем раз в 50ms
+    private PlanningProgress? _pendingProgress;
+
     private void OnPlanningProgress(PlanningProgress p)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        // Progress<T> уже маршалит в UI поток, но мы добавляем throttling
+        // чтобы не перегружать UI при быстрых обновлениях
+        var now = DateTime.Now;
+
+        // Для важных событий (Found, NotFound, Error) — всегда обрабатываем
+        var isImportantEvent = p.Status is PlanningStatus.Found or PlanningStatus.NotFound or PlanningStatus.Error;
+
+        if (!isImportantEvent && (now - _lastProgressUpdate).TotalMilliseconds < ProgressUpdateIntervalMs)
+        {
+            // Сохраняем последний pending progress чтобы не потерять
+            _pendingProgress = p;
+            return;
+        }
+
+        _lastProgressUpdate = now;
+        _pendingProgress = null;
+
+        // Используем BeginInvoke вместо Invoke чтобы не блокировать поток
+        Application.Current.Dispatcher.BeginInvoke(() =>
         {
             // Обновляем общий прогресс
             OverallProgress = (int)p.ProgressPercent;
@@ -1385,77 +1524,178 @@ public partial class ShoppingViewModel : ObservableObject
                 };
             }
 
-            // Добавляем в лог
-            string? logMessage;
-            if (p.Status == PlanningStatus.Found && !string.IsNullOrEmpty(p.Reasoning))
+            // Добавляем в лог только важные события
+            if (isImportantEvent)
             {
-                // AI выбрал товар с обоснованием
-                logMessage = $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} x{p.SelectedQuantity} ({p.Price:N0} ₽)\n   💡 {p.Reasoning}";
-            }
-            else
-            {
-                logMessage = p.Status switch
+                string? logMessage;
+                if (p.Status == PlanningStatus.Found && !string.IsNullOrEmpty(p.Reasoning))
                 {
-                    PlanningStatus.Searching => $"[{p.StoreName}] Поиск: {p.ItemName}",
-                    PlanningStatus.Selecting => $"[{p.StoreName}] 🤖 AI выбирает лучший товар для: {p.ItemName}",
-                    PlanningStatus.Found => $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} ({p.Price:N0} ₽)",
-                    PlanningStatus.NotFound => $"[{p.StoreName}] ✗ {p.ItemName} — не найдено",
-                    PlanningStatus.Error => $"[{p.StoreName}] ⚠ {p.ItemName} — {p.ErrorMessage}",
-                    _ => null
-                };
-            }
+                    logMessage = $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} x{p.SelectedQuantity} ({p.Price:N0} ₽)\n   💡 {p.Reasoning}";
+                }
+                else
+                {
+                    logMessage = p.Status switch
+                    {
+                        PlanningStatus.Found => $"[{p.StoreName}] ✓ {p.ItemName} → {p.MatchedProduct} ({p.Price:N0} ₽)",
+                        PlanningStatus.NotFound => $"[{p.StoreName}] ✗ {p.ItemName} — не найдено",
+                        PlanningStatus.Error => $"[{p.StoreName}] ⚠ {p.ItemName} — {p.ErrorMessage}",
+                        _ => null
+                    };
+                }
 
-            if (logMessage != null)
-            {
-                AddPlanningLog(logMessage);
+                if (logMessage != null)
+                {
+                    var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                    PlanningLog.Add($"[{timestamp}] {logMessage}");
+                }
             }
         });
     }
 
     /// <summary>
-    /// Обработка прогресса AI выбора
+    /// Текущее сообщение AI при выборе товаров (для streaming)
+    /// </summary>
+    private ShoppingChatMessage? _currentAiSelectionMessage;
+
+    /// <summary>
+    /// Буфер текста для throttling TextDelta
+    /// </summary>
+    private readonly System.Text.StringBuilder _textDeltaBuffer = new();
+    private DateTime _lastTextDeltaFlush = DateTime.MinValue;
+    private const int TextDeltaFlushIntervalMs = 100; // Обновлять UI не чаще чем раз в 100ms
+
+    /// <summary>
+    /// Обработка прогресса AI выбора — выводит в чат и в лог (без блокировки UI)
     /// </summary>
     private void OnAiProgress(ChatProgress p)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        // Используем BeginInvoke вместо Invoke чтобы не блокировать поток
+        Application.Current.Dispatcher.BeginInvoke(() =>
         {
             switch (p.Type)
             {
                 case ChatProgressType.TextDelta:
-                    // AI рассуждает вслух - можно показать в чате или логе
-                    // Пока просто игнорируем, чтобы не засорять лог
+                    // AI рассуждает вслух — буферизируем и показываем в чате с throttling
+                    if (!string.IsNullOrEmpty(p.Text))
+                    {
+                        // Создаём сообщение если ещё нет
+                        if (_currentAiSelectionMessage == null)
+                        {
+                            _currentAiSelectionMessage = new ShoppingChatMessage
+                            {
+                                Role = ChatRole.Assistant,
+                                Text = "",
+                                Timestamp = DateTime.Now
+                            };
+                            Messages.Add(_currentAiSelectionMessage);
+                        }
+
+                        // Добавляем в буфер
+                        _textDeltaBuffer.Append(p.Text);
+
+                        // Flush если прошло достаточно времени
+                        var now = DateTime.Now;
+                        if ((now - _lastTextDeltaFlush).TotalMilliseconds >= TextDeltaFlushIntervalMs)
+                        {
+                            _currentAiSelectionMessage.Text += _textDeltaBuffer.ToString();
+                            _textDeltaBuffer.Clear();
+                            _lastTextDeltaFlush = now;
+                        }
+                    }
                     break;
 
                 case ChatProgressType.ToolCall:
+                    // Flush буфер перед tool call
+                    FlushTextDeltaBuffer();
+
                     // AI вызывает инструмент
                     if (p.ToolName == "select_product")
                     {
-                        AddPlanningLog($"🤖 AI вызывает select_product...");
+                        AddPlanningLogAsync($"🤖 AI вызывает select_product...");
+
+                        // Добавляем карточку tool call в текущее сообщение
+                        if (_currentAiSelectionMessage != null)
+                        {
+                            _currentAiSelectionMessage.Parts.Add(new ShoppingResponsePart
+                            {
+                                IsToolCall = true,
+                                ToolName = p.ToolName,
+                                ToolArgs = p.ToolArgs
+                            });
+                        }
                     }
                     break;
 
                 case ChatProgressType.ToolResult:
                     // Результат инструмента
-                    if (p.ToolName == "select_product" && p.ToolSuccess == true)
+                    if (p.ToolName == "select_product")
                     {
-                        AddPlanningLog($"✓ Товар выбран");
+                        if (p.ToolSuccess == true)
+                        {
+                            AddPlanningLogAsync($"✓ Товар выбран");
+                        }
+                        else
+                        {
+                            AddPlanningLogAsync($"✗ Ошибка выбора: {p.ToolResult}");
+                        }
+
+                        // Обновляем результат в карточке tool call
+                        if (_currentAiSelectionMessage != null)
+                        {
+                            var lastToolCall = _currentAiSelectionMessage.Parts
+                                .LastOrDefault(x => x.IsToolCall && x.ToolName == p.ToolName && x.ToolResult == null);
+                            if (lastToolCall != null)
+                            {
+                                lastToolCall.ToolResult = p.ToolResult;
+                                lastToolCall.ToolSuccess = p.ToolSuccess;
+                            }
+                        }
                     }
                     break;
 
                 case ChatProgressType.Complete:
-                    // AI завершил обработку
+                    // Flush буфер и сбрасываем сообщение
+                    FlushTextDeltaBuffer();
+                    _currentAiSelectionMessage = null;
                     break;
             }
         });
     }
 
     /// <summary>
-    /// Добавить запись в лог планирования
+    /// Flush буфера текста в сообщение
+    /// </summary>
+    private void FlushTextDeltaBuffer()
+    {
+        if (_textDeltaBuffer.Length > 0 && _currentAiSelectionMessage != null)
+        {
+            _currentAiSelectionMessage.Text += _textDeltaBuffer.ToString();
+            _textDeltaBuffer.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Добавить запись в лог планирования (блокирующий вызов)
     /// </summary>
     private void AddPlanningLog(string message)
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
         Application.Current.Dispatcher.Invoke(() =>
+        {
+            lock (_logLock)
+            {
+                PlanningLog.Add($"[{timestamp}] {message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Добавить запись в лог планирования (асинхронный, не блокирует)
+    /// </summary>
+    private void AddPlanningLogAsync(string message)
+    {
+        var timestamp = DateTime.Now.ToString("HH:mm:ss");
+        Application.Current.Dispatcher.BeginInvoke(() =>
         {
             lock (_logLock)
             {

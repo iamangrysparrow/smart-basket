@@ -178,8 +178,7 @@ public partial class App : Application
         });
         services.AddSingleton<IShoppingSessionService, ShoppingSessionService>();
         services.AddSingleton<IShoppingChatService, ShoppingChatService>();
-        // Lazy для разрыва циклической зависимости (ProductSelectorService -> ShoppingChatService -> ToolExecutor -> ... -> ProductSelectorService)
-        services.AddTransient(sp => new Lazy<IShoppingChatService>(() => sp.GetRequiredService<IShoppingChatService>()));
+        // ProductSelectorService теперь использует прямой вызов LLM (без ShoppingChatService)
         services.AddTransient<IProductSelectorService, ProductSelectorService>();
 
         // ViewModels

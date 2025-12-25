@@ -1,9 +1,28 @@
 using AiWebSniffer.Core.Models;
 using SmartBasket.Core.Shopping;
 using SmartBasket.Services.Chat;
-using SmartBasket.Services.Tools.Handlers;
 
 namespace SmartBasket.Services.Shopping;
+
+/// <summary>
+/// Результат выбора товара AI
+/// </summary>
+public record ProductSelection(
+    string DraftItemId,
+    string? SelectedProductId,
+    int Quantity,
+    string Reasoning,
+    List<ProductAlternative>? Alternatives = null
+);
+
+/// <summary>
+/// Альтернативный товар
+/// </summary>
+public record ProductAlternative(
+    string ProductId,
+    int Quantity,
+    string Reasoning
+);
 
 /// <summary>
 /// Сервис для AI-выбора лучшего товара из результатов поиска
