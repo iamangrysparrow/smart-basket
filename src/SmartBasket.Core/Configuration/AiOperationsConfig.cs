@@ -35,6 +35,13 @@ public class AiOperationsConfig
     public string? Shopping { get; set; }
 
     /// <summary>
+    /// Ключ провайдера для выбора товара из результатов поиска.
+    /// Фильтрует нерелевантные результаты, выбирает лучший + до 3 альтернатив.
+    /// Рекомендуется дешёвая модель: Ollama/qwen2.5:7b
+    /// </summary>
+    public string? ProductMatcher { get; set; }
+
+    /// <summary>
     /// Кастомные промпты для операций в связке с провайдером.
     /// Ключ: "Operation/ProviderKey", например "Classification/Ollama/llama3.2:3b"
     /// Значение: текст промпта

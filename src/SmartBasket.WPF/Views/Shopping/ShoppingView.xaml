@@ -11,6 +11,11 @@
              Background="{DynamicResource BackgroundBaseBrush}">
 
     <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="WorkflowEventTemplates.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
         <!-- User message style -->
         <Style x:Key="UserMessageBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource AccentLightBrush}"/>
@@ -442,6 +447,7 @@
                 </Grid>
             </Border>
         </DataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -936,6 +942,7 @@
                                       HorizontalScrollBarVisibility="Disabled"
                                       Background="{DynamicResource BackgroundBaseBrush}">
                             <StackPanel Margin="0,8,0,8">
+                                <!-- Legacy Messages (постепенно заменяется на WorkflowEvents) -->
                                 <ItemsControl ItemsSource="{Binding Messages}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -957,6 +964,10 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+
+                                <!-- NEW: Workflow Events (новая система событий) -->
+                                <ItemsControl ItemsSource="{Binding WorkflowEvents}"
+                                              ItemTemplateSelector="{StaticResource WorkflowEventTemplateSelector}"/>
 
                                 <!-- Typing indicator with animated dots -->
                                 <Border Style="{StaticResource AssistantMessageBorder}"

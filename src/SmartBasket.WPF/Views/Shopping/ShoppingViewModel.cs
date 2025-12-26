@@ -12,6 +12,7 @@ using SmartBasket.Core.Shopping;
 using SmartBasket.Data;
 using SmartBasket.Services.Chat;
 using SmartBasket.Services.Shopping;
+using SmartBasket.Services.Shopping.Operations;
 
 namespace SmartBasket.WPF.Views.Shopping;
 
@@ -28,10 +29,13 @@ public partial class ShoppingViewModel : ObservableObject
 
     private readonly IShoppingSessionService _sessionService;
     private readonly IShoppingChatService _shoppingChatService;
+    private readonly IShoppingChatOperation _chatOperation;
+    private readonly IBasketBuilderOperation _basketBuilder;
     private readonly IDbContextFactory<SmartBasketDbContext> _dbContextFactory;
     private readonly ILogger<ShoppingViewModel> _logger;
     private readonly object _itemsLock = new();
     private readonly object _messagesLock = new();
+    private readonly object _eventsLock = new();
 
     private WebView2? _webView;
     private IWebViewContext? _webViewContext;
@@ -41,11 +45,15 @@ public partial class ShoppingViewModel : ObservableObject
     public ShoppingViewModel(
         IShoppingSessionService sessionService,
         IShoppingChatService shoppingChatService,
+        IShoppingChatOperation chatOperation,
+        IBasketBuilderOperation basketBuilder,
         IDbContextFactory<SmartBasketDbContext> dbContextFactory,
         ILogger<ShoppingViewModel> logger)
     {
         _sessionService = sessionService;
         _shoppingChatService = shoppingChatService;
+        _chatOperation = chatOperation;
+        _basketBuilder = basketBuilder;
         _dbContextFactory = dbContextFactory;
         _logger = logger;
 
@@ -71,6 +79,7 @@ public partial class ShoppingViewModel : ObservableObject
     {
         BindingOperations.EnableCollectionSynchronization(DraftItems, _itemsLock);
         BindingOperations.EnableCollectionSynchronization(Messages, _messagesLock);
+        BindingOperations.EnableCollectionSynchronization(WorkflowEvents, _eventsLock);
         BindingOperations.EnableCollectionSynchronization(GroupedItems, _itemsLock);
         BindingOperations.EnableCollectionSynchronization(StoreProgress, _progressLock);
         BindingOperations.EnableCollectionSynchronization(PlanningLog, _logLock);
@@ -136,9 +145,14 @@ public partial class ShoppingViewModel : ObservableObject
     public ObservableCollection<DraftItemGroup> GroupedItems { get; } = new();
 
     /// <summary>
-    /// История сообщений чата
+    /// История сообщений чата (старая система, постепенно заменяется на WorkflowEvents)
     /// </summary>
     public ObservableCollection<ShoppingChatMessage> Messages { get; } = new();
+
+    /// <summary>
+    /// Лента событий workflow (новая система)
+    /// </summary>
+    public ObservableCollection<WorkflowEvent> WorkflowEvents { get; } = new();
 
     /// <summary>
     /// Текст ввода пользователя
@@ -451,6 +465,15 @@ public partial class ShoppingViewModel : ObservableObject
     {
         _logger.LogInformation("[ShoppingViewModel] TEST MODE: Initializing with test basket");
 
+        // Проверяем, есть ли уже активная сессия (при повторном открытии модуля)
+        var existingSession = _sessionService.CurrentSession;
+        if (existingSession != null)
+        {
+            _logger.LogInformation("[ShoppingViewModel] TEST MODE: Restoring existing session {SessionId}", existingSession.Id);
+            await RestoreExistingSessionAsync(existingSession);
+            return;
+        }
+
         IsInitializing = true;
         InitializingText = "Тестовый режим: загрузка...";
 
@@ -472,15 +495,26 @@ public partial class ShoppingViewModel : ObservableObject
             HasSession = true;
             State = session.State;
 
-            // Начинаем conversation в ShoppingChatService
+            // Начинаем conversation в ShoppingChatService (старая система)
             try
             {
                 await Task.Run(() => _shoppingChatService.StartConversationAsync(session));
-                _logger.LogInformation("[ShoppingViewModel] TEST MODE: Chat conversation started");
+                _logger.LogInformation("[ShoppingViewModel] TEST MODE: Chat conversation started (legacy)");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "[ShoppingViewModel] TEST MODE: Failed to start chat conversation");
+                _logger.LogWarning(ex, "[ShoppingViewModel] TEST MODE: Failed to start legacy chat conversation");
+            }
+
+            // Начинаем conversation в новой системе (IShoppingChatOperation)
+            try
+            {
+                await Task.Run(() => _chatOperation.StartConversationAsync(session));
+                _logger.LogInformation("[ShoppingViewModel] TEST MODE: Workflow conversation started");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[ShoppingViewModel] TEST MODE: Failed to start workflow conversation");
             }
 
             // Заполняем корзину тестовыми данными
@@ -500,6 +534,51 @@ public partial class ShoppingViewModel : ObservableObject
         {
             IsInitializing = false;
         }
+    }
+
+    /// <summary>
+    /// Восстановить состояние UI из существующей сессии (при повторном открытии модуля)
+    /// </summary>
+    private Task RestoreExistingSessionAsync(ShoppingSession session)
+    {
+        _logger.LogInformation("[ShoppingViewModel] Restoring session state: {State}, Items: {ItemCount}",
+            session.State, session.DraftItems.Count);
+
+        // Инициализируем магазины
+        InitializeStoreStatuses();
+
+        // В тестовом режиме все магазины авторизованы
+        if (TEST_MODE)
+        {
+            foreach (var store in StoreAuthStatuses)
+            {
+                store.IsChecking = false;
+                store.IsAuthenticated = true;
+            }
+            HasAnyAuthenticatedStore = true;
+        }
+
+        // Восстанавливаем состояние
+        HasSession = true;
+        State = session.State;
+
+        // Восстанавливаем товары в UI
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            DraftItems.Clear();
+            foreach (var item in session.DraftItems)
+            {
+                DraftItems.Add(item);
+            }
+            UpdateGroupedItems();
+        });
+
+        // Добавляем сообщение о восстановлении
+        AddSystemMessage($"♻️ Сессия восстановлена\n\nТоваров в корзине: {session.DraftItems.Count}");
+
+        _logger.LogInformation("[ShoppingViewModel] Session restored successfully");
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -1355,12 +1434,23 @@ public partial class ShoppingViewModel : ObservableObject
         }
     }
 
+    // Флаг для переключения между старой и новой системой поиска
+    private const bool USE_WORKFLOW_PLANNING = true;
+
     /// <summary>
     /// Начать планирование (поиск в магазинах)
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanStartPlanning))]
     private async Task StartPlanningAsync()
     {
+        // Используем новую систему на основе WorkflowProgress
+        if (USE_WORKFLOW_PLANNING)
+        {
+            await StartPlanningViaWorkflowAsync();
+            return;
+        }
+
+        // --- Старая реализация ниже ---
         if (_webViewContext == null)
         {
             AddSystemMessage("Ошибка: WebView2 не инициализирован");
@@ -1465,6 +1555,100 @@ public partial class ShoppingViewModel : ObservableObject
             _logger.LogError(ex, "[ShoppingViewModel] Planning failed");
             AddPlanningLog($"ОШИБКА: {ex.Message}");
             CurrentOperationText = "Ошибка при поиске";
+            State = ShoppingSessionState.Drafting;
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    /// <summary>
+    /// Начать планирование через новую систему (WorkflowProgress)
+    /// </summary>
+    private async Task StartPlanningViaWorkflowAsync()
+    {
+        if (_webViewContext == null)
+        {
+            AddWorkflowEvent(WorkflowEvent.Factory.Error("WebView2 не инициализирован"));
+            return;
+        }
+
+        _logger.LogInformation("[ShoppingViewModel] Starting planning via WorkflowProgress with {Count} items",
+            DraftItems.Count);
+
+        // Отменяем предыдущий поиск если был
+        _planningCts?.Cancel();
+        _planningCts = new CancellationTokenSource();
+
+        // Переключаемся в состояние Planning
+        State = ShoppingSessionState.Planning;
+        IsProcessing = true;
+
+        try
+        {
+            var progressStream = _basketBuilder.BuildBasketsAsync(
+                DraftItems.ToList(),
+                _webViewContext,
+                _planningCts.Token);
+
+            await ProcessWorkflowProgressAsync(progressStream, _planningCts.Token);
+
+            // Получаем собранные корзины
+            var builtBaskets = _basketBuilder.GetBuiltBaskets();
+
+            // Заполняем карточки корзин для анализа
+            Baskets.Clear();
+            var storeConfigs = _sessionService.GetStoreConfigs();
+
+            foreach (var basket in builtBaskets.Values.OrderBy(b => b.TotalPrice))
+            {
+                var storeConfig = storeConfigs.GetValueOrDefault(basket.Store);
+
+                Baskets.Add(new BasketCardViewModel
+                {
+                    StoreId = basket.Store,
+                    StoreName = basket.StoreName,
+                    TotalPrice = basket.TotalPrice,
+                    ItemsFound = basket.ItemsFound,
+                    ItemsTotal = basket.ItemsTotal,
+                    DeliveryTime = basket.DeliveryTime ?? "1-2 часа",
+                    DeliveryPrice = basket.DeliveryPrice ?? "Бесплатно",
+                    Color = storeConfig?.Color ?? "#7C4DFF",
+                    Items = basket.Items
+                        .Where(i => i.Match != null)
+                        .Select(i => new BasketItemViewModel
+                        {
+                            Name = i.Match!.ProductName,
+                            Price = i.Match.Price,
+                            Quantity = i.Quantity,
+                            LineTotal = i.LineTotal
+                        })
+                        .ToList()
+                });
+            }
+
+            // Автоматически выбираем самую дешёвую корзину
+            if (Baskets.Count > 0)
+            {
+                SelectBasket(Baskets[0]);
+            }
+
+            // Переходим в состояние Analyzing
+            State = ShoppingSessionState.Analyzing;
+            _logger.LogInformation("[ShoppingViewModel] Planning via workflow completed, {Count} baskets ready",
+                Baskets.Count);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("[ShoppingViewModel] Planning via workflow cancelled");
+            AddWorkflowEvent(WorkflowEvent.Factory.SystemMessage("Поиск отменён", isWarning: true));
+            State = ShoppingSessionState.Drafting;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ShoppingViewModel] Planning via workflow failed");
+            AddWorkflowEvent(WorkflowEvent.Factory.Error(ex.Message));
             State = ShoppingSessionState.Drafting;
         }
         finally
@@ -2147,6 +2331,140 @@ public partial class ShoppingViewModel : ObservableObject
             return "Рыба";
 
         return null;
+    }
+
+    #endregion
+
+    #region Workflow Events
+
+    /// <summary>
+    /// Добавить событие workflow (thread-safe, вызывает через Dispatcher)
+    /// </summary>
+    private void AddWorkflowEvent(WorkflowEvent evt)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            lock (_eventsLock)
+            {
+                WorkflowEvents.Add(evt);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Обработать поток событий от ShoppingChatOperation
+    /// </summary>
+    private async Task ProcessWorkflowProgressAsync(IAsyncEnumerable<WorkflowProgress> progressStream, CancellationToken ct)
+    {
+        WorkflowEvent? currentAiMessage = null;
+
+        await foreach (var progress in progressStream.WithCancellation(ct))
+        {
+            _logger.LogDebug("[ShoppingViewModel] WorkflowProgress: {Type}", progress.GetType().Name);
+
+            switch (progress)
+            {
+                case UserMessageProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.UserMessage(p.Text));
+                    break;
+
+                case TextDeltaProgress p:
+                    // Накапливаем текст в текущем AiMessage
+                    if (currentAiMessage == null)
+                    {
+                        currentAiMessage = WorkflowEvent.Factory.AiMessage();
+                        AddWorkflowEvent(currentAiMessage);
+                    }
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        currentAiMessage.Text += p.Text;
+                    });
+                    break;
+
+                case ChatCompleteProgress:
+                    // Завершаем текущий AI ответ
+                    if (currentAiMessage != null)
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            currentAiMessage.IsCompleted = true;
+                        });
+                        currentAiMessage = null;
+                    }
+                    break;
+
+                case ToolCallProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.ToolCall(p.Name, p.Args));
+                    break;
+
+                case ToolResultProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.ToolResult(p.Name, p.Result, p.Success));
+                    break;
+
+                case SearchStartedProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.SearchStarted(p.ProductName, p.StoreName, p.StoreColor));
+                    break;
+
+                case SearchCompletedProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.SearchCompleted(p.ProductName, p.StoreName, p.StoreColor, p.ResultCount));
+                    break;
+
+                case SearchFailedProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.SearchFailed(p.ProductName, p.StoreName, p.StoreColor, p.Error));
+                    break;
+
+                case ProductSelectionStartedProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.ProductSelectionStarted(p.DraftItemName, p.StoreName, p.StoreColor));
+                    break;
+
+                case ProductSelectionCompletedProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.ProductSelectionCompleted(
+                        p.DraftItemName, p.StoreName, p.StoreColor, p.Selected, p.Reason, p.Alternatives));
+                    break;
+
+                case ProductSelectionFailedProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.ProductSelectionFailed(
+                        p.DraftItemName, p.StoreName, p.StoreColor, p.Reason));
+                    break;
+
+                case SystemMessageProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.SystemMessage(p.Text, p.IsWarning));
+                    break;
+
+                case ChatErrorProgress p:
+                    AddWorkflowEvent(WorkflowEvent.Factory.Error(p.Error));
+                    break;
+
+                default:
+                    _logger.LogWarning("[ShoppingViewModel] Unknown WorkflowProgress type: {Type}", progress.GetType().Name);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Отправить сообщение через новую систему (IShoppingChatOperation)
+    /// </summary>
+    private async Task SendViaWorkflowAsync(string message, CancellationToken ct)
+    {
+        // Добавляем сообщение пользователя
+        AddWorkflowEvent(WorkflowEvent.Factory.UserMessage(message));
+
+        try
+        {
+            var progressStream = _chatOperation.ProcessMessageAsync(message, ct);
+            await ProcessWorkflowProgressAsync(progressStream, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("[ShoppingViewModel] Workflow message cancelled");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ShoppingViewModel] Error in workflow processing");
+            AddWorkflowEvent(WorkflowEvent.Factory.Error(ex.Message));
+        }
     }
 
     #endregion

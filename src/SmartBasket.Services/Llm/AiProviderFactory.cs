@@ -29,9 +29,15 @@ public enum AiOperation
     Chat,
 
     /// <summary>
-    /// Модуль закупок (Shopping) — формирование списка покупок
+    /// Модуль закупок (Shopping) — формирование списка покупок, диалог с AI
     /// </summary>
-    Shopping
+    Shopping,
+
+    /// <summary>
+    /// Выбор товара из результатов поиска (дешёвая модель)
+    /// Фильтрует нерелевантные результаты, выбирает лучший + альтернативы
+    /// </summary>
+    ProductMatcher
 }
 
 /// <summary>
@@ -104,6 +110,7 @@ public class AiProviderFactory : IAiProviderFactory
             AiOperation.Labels => _settings.AiOperations.Labels,
             AiOperation.Chat => _settings.AiOperations.Chat,
             AiOperation.Shopping => _settings.AiOperations.Shopping,
+            AiOperation.ProductMatcher => _settings.AiOperations.ProductMatcher,
             _ => null
         };
 

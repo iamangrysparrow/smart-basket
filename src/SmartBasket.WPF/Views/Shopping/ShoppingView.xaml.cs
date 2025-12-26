@@ -90,19 +90,20 @@ public partial class ShoppingView : UserControl
     {
         if (e.Key == Key.Enter)
         {
-            // AcceptsReturn=True, поэтому:
-            // - Enter = новая строка (по умолчанию)
-            // - Ctrl+Enter = отправить сообщение
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            // Enter = отправить сообщение
+            // Shift+Enter = новая строка
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
             {
-                // Ctrl+Enter = send message
-                if (DataContext is ShoppingViewModel viewModel && viewModel.SendMessageCommand.CanExecute(null))
-                {
-                    viewModel.SendMessageCommand.Execute(null);
-                    e.Handled = true;
-                }
+                // Shift+Enter = новая строка (TextBox с AcceptsReturn обработает сам)
+                return;
             }
-            // Enter без модификатора = новая строка, не обрабатываем
+
+            // Enter без Shift = отправить сообщение
+            if (DataContext is ShoppingViewModel viewModel && viewModel.SendMessageCommand.CanExecute(null))
+            {
+                viewModel.SendMessageCommand.Execute(null);
+                e.Handled = true;
+            }
         }
     }
 

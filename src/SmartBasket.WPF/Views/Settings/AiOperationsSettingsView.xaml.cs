@@ -39,6 +39,11 @@ public partial class AiOperationsSettingsView : UserControl
         EditPrompt("Shopping", SettingsViewModel?.AiOperations.Shopping);
     }
 
+    private void EditProductMatcherPrompt_Click(object sender, RoutedEventArgs e)
+    {
+        EditPrompt("ProductMatcher", SettingsViewModel?.AiOperations.ProductMatcher);
+    }
+
     private void EditPrompt(string operation, string? providerKey)
     {
         var vm = SettingsViewModel;
@@ -134,6 +139,18 @@ public partial class AiOperationsSettingsView : UserControl
         else
         {
             ShoppingPromptIndicator.Text = "";
+        }
+
+        // ProductMatcher indicator
+        var productMatcherProvider = vm.AiOperations.ProductMatcher;
+        if (!string.IsNullOrWhiteSpace(productMatcherProvider) &&
+            vm.AiOperations.HasCustomPrompt("ProductMatcher", productMatcherProvider))
+        {
+            ProductMatcherPromptIndicator.Text = " (настроен)";
+        }
+        else
+        {
+            ProductMatcherPromptIndicator.Text = "";
         }
     }
 }

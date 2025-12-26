@@ -108,8 +108,8 @@
                         </StackPanel>
                     </GroupBox>
 
-                    <!-- Shopping -->
-                    <GroupBox Header="Закупки" Style="{StaticResource ModernGroupBox}">
+                    <!-- Shopping Chat -->
+                    <GroupBox Header="Закупки: Чат с AI" Style="{StaticResource ModernGroupBox}">
                         <StackPanel>
                             <TextBlock Text="Модуль формирования списка покупок. Рекомендуется YandexAgent с tool calling."
                                        Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
@@ -132,6 +132,34 @@
                                     <Run Text="Редактировать промпт"/>
                                 </Hyperlink>
                                 <Run x:Name="ShoppingPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Product Matcher -->
+                    <GroupBox Header="Закупки: Выбор товара" Style="{StaticResource ModernGroupBox}">
+                        <StackPanel>
+                            <TextBlock Text="Выбор товара из результатов поиска. Фильтрует нерелевантные, выбирает лучший + до 3 альтернатив. Рекомендуется дешёвая модель: Ollama/qwen2.5:7b"
+                                       Style="{StaticResource TextSecondary}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" Text="{Binding ProductMatcher, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding DataContext.AvailableProviderKeys, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          IsEditable="True" FontSize="12" Padding="4,3"/>
+                            </Grid>
+                            <!-- Edit Prompt Link -->
+                            <TextBlock Margin="100,6,0,0">
+                                <Hyperlink Click="EditProductMatcherPrompt_Click"
+                                           TextDecorations="None"
+                                           Foreground="{DynamicResource AccentBrush}">
+                                    <Run Text="Редактировать промпт"/>
+                                </Hyperlink>
+                                <Run x:Name="ProductMatcherPromptIndicator" Text="" Foreground="{DynamicResource SuccessBrush}"/>
                             </TextBlock>
                         </StackPanel>
                     </GroupBox>

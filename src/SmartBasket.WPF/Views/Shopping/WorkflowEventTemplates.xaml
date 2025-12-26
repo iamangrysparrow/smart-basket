@@ -1,0 +1,414 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:SmartBasket.WPF.Views.Shopping"
+                    xmlns:mdxaml="clr-namespace:MdXaml;assembly=MdXaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Общие стили -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <Style x:Key="EventTimestampStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="SpinnerStyle" TargetType="Border">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Margin" Value="4,0"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard>
+                    <Storyboard RepeatBehavior="Forever">
+                        <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(RotateTransform.Angle)"
+                                         From="0" To="360" Duration="0:0:1"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- User Message Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="UserMessageTemplate">
+        <Grid Margin="60,4,12,4">
+            <Border Background="{DynamicResource AccentBrush}"
+                    CornerRadius="12,12,2,12"
+                    Padding="12,8">
+                <TextBlock Text="{Binding Text}"
+                           TextWrapping="Wrap"
+                           Foreground="White"/>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- AI Message Template (with streaming support) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="AiMessageTemplate">
+        <Grid Margin="12,4,60,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- AI Avatar -->
+            <Border Grid.Column="0"
+                    Width="32" Height="32"
+                    CornerRadius="16"
+                    Background="{DynamicResource BackgroundLayer2Brush}"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Top">
+                <TextBlock Text="🤖"
+                           FontSize="16"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+
+            <!-- Message -->
+            <Border Grid.Column="1"
+                    Background="{DynamicResource BackgroundLayer2Brush}"
+                    CornerRadius="12,12,12,2"
+                    Padding="12,8">
+                <StackPanel>
+                    <mdxaml:MarkdownScrollViewer Markdown="{Binding Text}"
+                                                  MarkdownStyle="{DynamicResource ChatMarkdownStyle}"
+                                                  Background="Transparent"
+                                                  VerticalScrollBarVisibility="Disabled"/>
+
+                    <!-- Typing indicator -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsCompleted, Converter={StaticResource InverseBoolToVis}}">
+                        <Border Style="{StaticResource SpinnerStyle}"/>
+                        <TextBlock Text="печатает..."
+                                   Style="{StaticResource EventTimestampStyle}"
+                                   Margin="4,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Tool Call Template (compact) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="ToolCallTemplate">
+        <Border Margin="48,2,48,2"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚙️" Margin="0,0,6,0"/>
+                <TextBlock Text="{Binding ToolName}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentBrush}"/>
+                <Border Style="{StaticResource SpinnerStyle}"
+                        Visibility="{Binding IsCompleted, Converter={StaticResource InverseBoolToVis}}"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Tool Result Template (compact) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="ToolResultTemplate">
+        <Border Margin="48,2,48,2"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Margin="0,0,6,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="✓"/>
+                            <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ToolSuccess}" Value="False">
+                                    <Setter Property="Text" Value="✗"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding ToolName}"
+                           Foreground="{DynamicResource TextMutedBrush}"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Search Started Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="SearchStartedTemplate">
+        <Border Margin="24,2,24,2"
+                BorderThickness="0,0,0,0"
+                Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <Border Style="{StaticResource SpinnerStyle}"/>
+                <TextBlock Text="Поиск " Foreground="{DynamicResource TextMutedBrush}"/>
+                <TextBlock Text="{Binding ProductName}" FontWeight="SemiBold"/>
+                <TextBlock Text=" в " Foreground="{DynamicResource TextMutedBrush}"/>
+                <Border CornerRadius="4" Padding="4,1" Margin="2,0">
+                    <Border.Background>
+                        <SolidColorBrush Color="{Binding StoreColor}"/>
+                    </Border.Background>
+                    <TextBlock Text="{Binding StoreName}" Foreground="White" FontSize="11"/>
+                </Border>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Search Completed Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="SearchCompletedTemplate">
+        <Border Margin="24,2,24,2" Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="✓ " Foreground="{DynamicResource SuccessBrush}"/>
+                <TextBlock Text="{Binding ProductName}" FontWeight="SemiBold"/>
+                <TextBlock Text=" — " Foreground="{DynamicResource TextMutedBrush}"/>
+                <TextBlock Text="{Binding SearchResultCount}" Foreground="{DynamicResource AccentBrush}"/>
+                <TextBlock Text=" результатов" Foreground="{DynamicResource TextMutedBrush}"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Search Failed Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="SearchFailedTemplate">
+        <Border Margin="24,2,24,2" Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="✗ " Foreground="{DynamicResource ErrorBrush}"/>
+                <TextBlock Text="{Binding ProductName}" FontWeight="SemiBold"/>
+                <TextBlock Text=": " Foreground="{DynamicResource TextMutedBrush}"/>
+                <TextBlock Text="{Binding Text}" Foreground="{DynamicResource ErrorBrush}"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Product Selection Started Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="ProductSelectionStartedTemplate">
+        <Border Margin="24,2,24,2" Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <Border Style="{StaticResource SpinnerStyle}"/>
+                <TextBlock Text="Выбор товара для " Foreground="{DynamicResource TextMutedBrush}"/>
+                <TextBlock Text="{Binding ProductName}" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Product Selection Completed Template (развёрнутая карточка) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="ProductSelectionCompletedTemplate">
+        <Border Margin="12,8,12,8"
+                Background="{DynamicResource BackgroundLayer1Brush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12">
+            <StackPanel>
+                <!-- Header: Item name + Store -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="✓ " Foreground="{DynamicResource SuccessBrush}" FontSize="14"/>
+                    <TextBlock Text="{Binding ProductName}"
+                               FontWeight="SemiBold"
+                               FontSize="14"/>
+                    <Border CornerRadius="4" Padding="6,2" Margin="8,0,0,0">
+                        <Border.Background>
+                            <SolidColorBrush Color="{Binding StoreColor}"/>
+                        </Border.Background>
+                        <TextBlock Text="{Binding StoreName}" Foreground="White" FontSize="11"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- Selected product card -->
+                <Border Background="{DynamicResource BackgroundLayer2Brush}"
+                        CornerRadius="6"
+                        Padding="10"
+                        Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Product image placeholder -->
+                        <Border Grid.Column="0"
+                                Width="48" Height="48"
+                                CornerRadius="6"
+                                Background="{DynamicResource BackgroundLayer1Brush}"
+                                Margin="0,0,10,0">
+                            <TextBlock Text="📦"
+                                       FontSize="24"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Product info -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedProduct.Name}"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Foreground="{DynamicResource TextMutedBrush}" FontSize="12">
+                                <Run Text="{Binding SelectedProduct.Quantity, StringFormat='{}{0:#.##}'}"/>
+                                <Run Text="{Binding SelectedProduct.Unit}"/>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <!-- Price -->
+                        <TextBlock Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource AccentBrush}">
+                            <Run Text="{Binding SelectedProduct.Price, StringFormat='{}{0:N2}'}"/>
+                            <Run Text="₽"/>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
+                <!-- Reasoning -->
+                <TextBlock Text="{Binding SelectionReason}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           FontSize="12"
+                           Margin="0,0,0,8"/>
+
+                <!-- Alternatives (if any) -->
+                <Expander Header="Альтернативы"
+                          IsExpanded="False"
+                          Visibility="{Binding Alternatives.Count, Converter={StaticResource IntToVis}}">
+                    <ItemsControl ItemsSource="{Binding Alternatives}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource BackgroundBaseBrush}"
+                                        CornerRadius="4"
+                                        Padding="8"
+                                        Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Foreground="{DynamicResource TextMutedBrush}">
+                                            <Run Text="{Binding Price, StringFormat='{}{0:N2}'}"/>
+                                            <Run Text="₽"/>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Product Selection Failed Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="ProductSelectionFailedTemplate">
+        <Border Margin="12,4,12,4"
+                Background="{DynamicResource ErrorBackgroundBrush}"
+                BorderBrush="{DynamicResource ErrorBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="✗ " Foreground="{DynamicResource ErrorBrush}"/>
+                <TextBlock Text="{Binding ProductName}" FontWeight="SemiBold"/>
+                <TextBlock Text=": " Foreground="{DynamicResource TextMutedBrush}"/>
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- System Message Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="SystemMessageTemplate">
+        <Border Margin="24,4,24,4"
+                Background="{DynamicResource WarningBackgroundBrush}"
+                CornerRadius="6"
+                Padding="10">
+            <TextBlock Text="{Binding Text}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource WarningBrush}"
+                       FontStyle="Italic"/>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Error Template -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <DataTemplate x:Key="ErrorTemplate">
+        <Border Margin="24,4,24,4"
+                Background="{DynamicResource ErrorBackgroundBrush}"
+                BorderBrush="{DynamicResource ErrorBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️ " FontSize="14"/>
+                <TextBlock Text="{Binding Text}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ErrorBrush}"/>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- Template Selector (used in ItemsControl) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <local:WorkflowEventTemplateSelector x:Key="WorkflowEventTemplateSelector"
+                                          UserMessageTemplate="{StaticResource UserMessageTemplate}"
+                                          AiMessageTemplate="{StaticResource AiMessageTemplate}"
+                                          ToolCallTemplate="{StaticResource ToolCallTemplate}"
+                                          ToolResultTemplate="{StaticResource ToolResultTemplate}"
+                                          SearchStartedTemplate="{StaticResource SearchStartedTemplate}"
+                                          SearchCompletedTemplate="{StaticResource SearchCompletedTemplate}"
+                                          SearchFailedTemplate="{StaticResource SearchFailedTemplate}"
+                                          ProductSelectionStartedTemplate="{StaticResource ProductSelectionStartedTemplate}"
+                                          ProductSelectionCompletedTemplate="{StaticResource ProductSelectionCompletedTemplate}"
+                                          ProductSelectionFailedTemplate="{StaticResource ProductSelectionFailedTemplate}"
+                                          SystemMessageTemplate="{StaticResource SystemMessageTemplate}"
+                                          ErrorTemplate="{StaticResource ErrorTemplate}"/>
+
+</ResourceDictionary>

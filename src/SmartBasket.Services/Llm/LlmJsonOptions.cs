@@ -1,39 +1,26 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using SmartBasket.Core.Helpers;
 
 namespace SmartBasket.Services.Llm;
 
 /// <summary>
-/// Общие настройки JSON сериализации для всех LLM провайдеров.
-/// Кириллица и спецсимволы НЕ экранируются как \uXXXX - читаемо в логах!
+/// Настройки JSON для LLM провайдеров.
+/// Использует глобальные опции из SmartBasket.Core.Helpers.Json
 /// </summary>
 public static class LlmJsonOptions
 {
     /// <summary>
-    /// Для логирования и отправки запросов - pretty print, кириллица без экранирования
+    /// Для логирования - pretty print, кириллица без экранирования
     /// </summary>
-    public static readonly JsonSerializerOptions ForLogging = new()
-    {
-        WriteIndented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
+    public static JsonSerializerOptions ForLogging => Json.PrettyOptions;
 
     /// <summary>
-    /// Для парсинга ответов - case insensitive property names
+    /// Для парсинга ответов - case insensitive
     /// </summary>
-    public static readonly JsonSerializerOptions ForParsing = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
+    public static JsonSerializerOptions ForParsing => Json.ParseOptions;
 
     /// <summary>
-    /// Минимальные настройки для компактного JSON без pretty print
+    /// Компактный JSON без pretty print
     /// </summary>
-    public static readonly JsonSerializerOptions Compact = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
+    public static JsonSerializerOptions Compact => Json.DefaultOptions;
 }

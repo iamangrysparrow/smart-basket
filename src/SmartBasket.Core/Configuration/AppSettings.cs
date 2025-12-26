@@ -45,4 +45,10 @@ public class AppSettings
     /// </summary>
     public int QueryMaxRows { get; set; } = 1000;
 
+    /// <summary>
+    /// URL Seq сервера для структурированного логирования.
+    /// Default: http://localhost:5341
+    /// </summary>
+    public string? SeqUrl { get; set; }
+
 }

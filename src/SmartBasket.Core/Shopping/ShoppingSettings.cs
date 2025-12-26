@@ -30,7 +30,7 @@ public class StoreSettings
     /// <summary>
     /// Максимум результатов поиска
     /// </summary>
-    public int SearchLimit { get; set; } = 3;
+    public int SearchLimit { get; set; } = 8;
 
     /// <summary>
     /// Приоритет магазина (меньше = выше приоритет)
@@ -61,7 +61,7 @@ public class StoreRuntimeConfig
     /// <summary>
     /// Максимум результатов поиска
     /// </summary>
-    public int SearchLimit { get; set; } = 3;
+    public int SearchLimit { get; set; } = 8;
 
     /// <summary>
     /// Цвет бренда (для UI)

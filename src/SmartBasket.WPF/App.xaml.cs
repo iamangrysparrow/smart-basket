@@ -20,6 +20,7 @@ using SmartBasket.Services.Sources;
 using SmartBasket.Services.Tools;
 using SmartBasket.Services.Chat;
 using SmartBasket.Services.Shopping;
+using SmartBasket.Services.Shopping.Operations;
 using SmartBasket.Services.Units;
 using SmartBasket.WPF.Logging;
 using SmartBasket.WPF.Services;
@@ -93,6 +94,10 @@ public partial class App : Application
         var sessionTimestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
         var logsPath = Path.Combine(logsDir, $"smartbasket_{sessionTimestamp}.log");
 
+        var seqUrl = string.IsNullOrWhiteSpace(_appSettings!.SeqUrl)
+            ? "http://localhost:5341"
+            : _appSettings.SeqUrl;
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
@@ -103,6 +108,7 @@ public partial class App : Application
                 outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}",
                 retainedFileCountLimit: 30)
             .WriteTo.LogViewer(LogEventLevel.Debug)
+            .WriteTo.Seq(seqUrl)
             .CreateLogger();
 
         // Logging via Serilog
@@ -180,6 +186,10 @@ public partial class App : Application
         services.AddSingleton<IShoppingChatService, ShoppingChatService>();
         // ProductSelectorService теперь использует прямой вызов LLM (без ShoppingChatService)
         services.AddTransient<IProductSelectorService, ProductSelectorService>();
+        // Shopping Operations (новая архитектура — WorkflowProgress)
+        services.AddTransient<IShoppingChatOperation, ShoppingChatOperation>();
+        services.AddTransient<IProductMatcherOperation, ProductMatcherOperation>();
+        services.AddTransient<IBasketBuilderOperation, BasketBuilderOperation>();
 
         // ViewModels
         services.AddTransient<MainViewModel>();

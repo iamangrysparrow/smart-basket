@@ -124,10 +124,44 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
         }
     }
 
+    /// <summary>
+    /// Генерация с переменными промпта.
+    /// Агент в Yandex AI Studio должен содержать плейсхолдеры {{ИМЯ_ПЕРЕМЕННОЙ}}.
+    /// </summary>
+    /// <param name="variables">Словарь переменных для подстановки в промпт агента</param>
+    /// <param name="input">Входное сообщение (например, "Выполни инструкцию")</param>
+    /// <param name="progress">Прогресс-репортер</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    public async Task<LlmGenerationResult> GenerateWithVariablesAsync(
+        Dictionary<string, string> variables,
+        string input = "Выполни инструкцию",
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await GenerateAsyncInternal(
+            input,
+            variables,
+            progress,
+            cancellationToken);
+    }
+
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
+    {
+        return await GenerateAsyncInternal(
+            prompt,
+            variables: null,
+            progress,
+            cancellationToken);
+    }
+
+    private async Task<LlmGenerationResult> GenerateAsyncInternal(
+        string input,
+        Dictionary<string, string>? variables,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
     {
         var result = new LlmGenerationResult();
 
@@ -159,20 +193,51 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
             // REST Assistant API формат запроса с поддержкой streaming
+            var promptInfo = new PromptInfo { Id = _config.AgentId };
+            if (variables != null && variables.Count > 0)
+            {
+                promptInfo.Variables = variables;
+            }
+
             var request = new RestAssistantRequest
             {
-                Prompt = new PromptInfo { Id = _config.AgentId },
-                Input = prompt,
+                Prompt = promptInfo,
+                Input = input,
                 Stream = true  // Включаем streaming
             };
 
             // Compact JSON для экономии токенов на входе
             var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.Compact);
 
-            // Логирование в формате ARCHITECTURE-AI.md
-            progress?.Report($"[YandexAgent] === PROMPT START ===");
-            progress?.Report(prompt);
-            progress?.Report($"[YandexAgent] === PROMPT END ===");
+            // Для отладки — красивый JSON (используем ForLogging с кириллицей!)
+            var prettyJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
+
+            // Логирование в ILogger (полный JSON)
+            _logger.LogDebug("[YandexAgent] === REQUEST JSON ===\n{RequestJson}", prettyJson);
+
+            // Логирование в progress (краткое)
+            if (variables != null && variables.Count > 0)
+            {
+                progress?.Report($"[YandexAgent] === VARIABLES ({variables.Count}) ===");
+                foreach (var kv in variables)
+                {
+                    // Показываем полное значение для отладки
+                    progress?.Report($"  {kv.Key}: {kv.Value}");
+                }
+                progress?.Report($"[YandexAgent] Input: {input}");
+            }
+            else
+            {
+                progress?.Report($"[YandexAgent] === INPUT START ===");
+                progress?.Report(input);
+                progress?.Report($"[YandexAgent] === INPUT END ===");
+            }
+
+            // Логируем полный JSON в progress для отладки
+            progress?.Report($"[YandexAgent] === FULL REQUEST JSON ===");
+            progress?.Report(prettyJson);
+            progress?.Report($"[YandexAgent] === END REQUEST JSON ===");
+
             progress?.Report($"[YandexAgent] Sending STREAMING request to {YandexAgentApiUrl} (agent: {_config.AgentId}, timeout: {timeoutSeconds}s)...");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -1075,6 +1140,14 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
     {
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Переменные для подстановки в промпт агента.
+        /// Агент должен содержать плейсхолдеры вида {{ИМЯ_ПЕРЕМЕННОЙ}}
+        /// </summary>
+        [JsonPropertyName("variables")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<string, string>? Variables { get; set; }
     }
 
     private class RestAssistantResponse
