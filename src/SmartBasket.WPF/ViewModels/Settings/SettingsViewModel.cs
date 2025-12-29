@@ -859,6 +859,130 @@ public partial class SettingsViewModel : ObservableObject
                     _log?.Invoke($"[Settings] YandexAgent ответ: {errorBody}");
                 }
             }
+            else if (SelectedAiProvider.Provider == AiProviderType.GigaChat)
+            {
+                // Проверка обязательных полей
+                if (string.IsNullOrWhiteSpace(SelectedAiProvider.ApiKey))
+                {
+                    StatusMessage = $"Тест {providerKey}: API ключ (Authorization Key) не указан";
+                    _log?.Invoke($"[Settings] GigaChat: API ключ отсутствует");
+                    return;
+                }
+
+                if (_httpClientFactory == null)
+                {
+                    StatusMessage = $"Тест {providerKey}: HttpClient недоступен";
+                    _log?.Invoke($"[Settings] Ошибка: HttpClientFactory не инициализирован");
+                    return;
+                }
+
+                // Тест GigaChat: сначала получаем OAuth токен
+                _log?.Invoke($"[Settings] GigaChat: получение OAuth токена...");
+
+                using var client = _httpClientFactory.CreateClient();
+
+                // Важно: отключаем проверку сертификата для GigaChat (они используют самоподписанный)
+                var handler = new System.Net.Http.HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+                };
+                using var gigaChatClient = new System.Net.Http.HttpClient(handler);
+                gigaChatClient.Timeout = TimeSpan.FromSeconds(30);
+
+                // OAuth запрос
+                var oauthRequest = new System.Net.Http.HttpRequestMessage(
+                    System.Net.Http.HttpMethod.Post,
+                    "https://ngw.devices.sberbank.ru:9443/api/v2/oauth");
+
+                // Scope из настроек (PERS, B2B, CORP)
+                var scopeValue = SelectedAiProvider.GigaChatScope.ToString().ToUpperInvariant();
+                var scope = $"GIGACHAT_API_{scopeValue}";
+                var formContent = new System.Net.Http.FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("scope", scope)
+                });
+                oauthRequest.Content = formContent;
+
+                // Basic авторизация с Authorization Key
+                var authKey = SelectedAiProvider.ApiKey;
+                oauthRequest.Headers.Add("Authorization", $"Basic {authKey}");
+                oauthRequest.Headers.Add("RqUID", Guid.NewGuid().ToString());
+
+                _log?.Invoke($"[Settings] GigaChat OAuth URL: https://ngw.devices.sberbank.ru:9443/api/v2/oauth");
+                _log?.Invoke($"[Settings] GigaChat Scope: {scope}");
+
+                var oauthResponse = await gigaChatClient.SendAsync(oauthRequest);
+
+                if (oauthResponse.IsSuccessStatusCode)
+                {
+                    var oauthBody = await oauthResponse.Content.ReadAsStringAsync();
+                    _log?.Invoke($"[Settings] GigaChat OAuth ответ: {oauthBody.Substring(0, Math.Min(100, oauthBody.Length))}...");
+
+                    // Парсим access_token
+                    var oauthJson = System.Text.Json.JsonDocument.Parse(oauthBody);
+                    if (oauthJson.RootElement.TryGetProperty("access_token", out var tokenElement))
+                    {
+                        var accessToken = tokenElement.GetString();
+                        _log?.Invoke($"[Settings] GigaChat: OAuth токен получен успешно");
+
+                        // Теперь делаем тестовый запрос к Chat API
+                        _log?.Invoke($"[Settings] GigaChat: тестовый запрос к Chat API...");
+
+                        var model = SelectedAiProvider.Model ?? "GigaChat";
+                        var chatRequest = new
+                        {
+                            model = model,
+                            messages = new[]
+                            {
+                                new { role = "user", content = "Ответь одним словом: Работает" }
+                            },
+                            max_tokens = 10,
+                            temperature = 0.1,
+                            stream = false
+                        };
+
+                        var chatJson = System.Text.Json.JsonSerializer.Serialize(chatRequest);
+                        var chatContent = new System.Net.Http.StringContent(chatJson, System.Text.Encoding.UTF8, "application/json");
+
+                        var chatHttpRequest = new System.Net.Http.HttpRequestMessage(
+                            System.Net.Http.HttpMethod.Post,
+                            "https://gigachat.devices.sberbank.ru/api/v1/chat/completions")
+                        {
+                            Content = chatContent
+                        };
+                        chatHttpRequest.Headers.Add("Authorization", $"Bearer {accessToken}");
+
+                        var chatResponse = await gigaChatClient.SendAsync(chatHttpRequest);
+
+                        if (chatResponse.IsSuccessStatusCode)
+                        {
+                            var chatBody = await chatResponse.Content.ReadAsStringAsync();
+                            _log?.Invoke($"[Settings] GigaChat Chat ответ: {chatBody.Substring(0, Math.Min(200, chatBody.Length))}...");
+                            StatusMessage = $"Тест {providerKey}: OK";
+                            _log?.Invoke($"[Settings] GigaChat: тест пройден успешно!");
+                        }
+                        else
+                        {
+                            var errorBody = await chatResponse.Content.ReadAsStringAsync();
+                            StatusMessage = $"Тест {providerKey}: Chat API HTTP {(int)chatResponse.StatusCode}";
+                            _log?.Invoke($"[Settings] GigaChat Chat ошибка: {chatResponse.StatusCode}");
+                            _log?.Invoke($"[Settings] GigaChat Chat ответ: {errorBody}");
+                        }
+                    }
+                    else
+                    {
+                        StatusMessage = $"Тест {providerKey}: OAuth токен не найден в ответе";
+                        _log?.Invoke($"[Settings] GigaChat OAuth: access_token не найден");
+                    }
+                }
+                else
+                {
+                    var errorBody = await oauthResponse.Content.ReadAsStringAsync();
+                    StatusMessage = $"Тест {providerKey}: OAuth HTTP {(int)oauthResponse.StatusCode}";
+                    _log?.Invoke($"[Settings] GigaChat OAuth ошибка: {oauthResponse.StatusCode}");
+                    _log?.Invoke($"[Settings] GigaChat OAuth ответ: {errorBody}");
+                }
+            }
             else
             {
                 StatusMessage = $"Тест {providerKey}: неподдерживаемый провайдер";

@@ -21,6 +21,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<YandexAgentLlmProvider> _logger;
     private readonly AiProviderConfig _config;
+    private readonly ITokenUsageService _tokenUsageService;
 
     // ID последнего ответа для поддержки истории диалога
     private string? _lastResponseId;
@@ -80,11 +81,13 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
     public YandexAgentLlmProvider(
         IHttpClientFactory httpClientFactory,
         ILogger<YandexAgentLlmProvider> logger,
-        AiProviderConfig config)
+        AiProviderConfig config,
+        ITokenUsageService tokenUsageService)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _config = config;
+        _tokenUsageService = tokenUsageService;
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default)
@@ -147,9 +150,17 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // YandexAgent использует PreviousResponseId из sessionContext если есть
+        if (sessionContext?.PreviousResponseId != null && _lastResponseId == null)
+        {
+            _lastResponseId = sessionContext.PreviousResponseId;
+            _logger.LogDebug("[YandexAgent] Using PreviousResponseId from sessionContext: {Id}", sessionContext.PreviousResponseId);
+        }
+
         return await GenerateAsyncInternal(
             prompt,
             variables: null,
@@ -395,16 +406,24 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // YandexAgent использует PreviousResponseId из sessionContext если есть
+        if (sessionContext?.PreviousResponseId != null && _lastResponseId == null)
+        {
+            _lastResponseId = sessionContext.PreviousResponseId;
+            _logger.LogDebug("[YandexAgent Chat] Using PreviousResponseId from sessionContext: {Id}", sessionContext.PreviousResponseId);
+        }
+
         // Retry logic: до 2 повторных попыток при ошибке API
         const int maxRetries = 2;
         var messageList = messages.ToList();
 
         for (var attempt = 0; attempt <= maxRetries; attempt++)
         {
-            var result = await ChatAsyncInternal(messageList, tools, progress, cancellationToken);
+            var result = await ChatAsyncInternal(messageList, tools, sessionContext, progress, cancellationToken);
 
             // Успех или отмена пользователем - возвращаем сразу
             if (result.IsSuccess || cancellationToken.IsCancellationRequested)
@@ -437,6 +456,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
     private async Task<LlmGenerationResult> ChatAsyncInternal(
         List<LlmChatMessage> messageList,
         IEnumerable<ToolDefinition>? tools,
+        LlmSessionContext? sessionContext,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -617,6 +637,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
             var fullResponse = new StringBuilder();
             string? responseId = null;
             var toolCalls = new List<LlmToolCall>();
+            LlmTokenUsage? usage = null;
 
             using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
             using var reader = new StreamReader(stream);
@@ -682,6 +703,21 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                             var status = eventObj?.Response?.Status;
                             var id = eventObj?.Response?.Id;
                             var outputText = eventObj?.Response?.OutputText;
+                            var apiUsage = eventObj?.Response?.Usage;
+
+                            // Парсим usage если доступен
+                            if (apiUsage != null)
+                            {
+                                usage = new LlmTokenUsage(
+                                    PromptTokens: apiUsage.InputTokens,
+                                    CompletionTokens: apiUsage.OutputTokens,
+                                    PrecachedPromptTokens: null,
+                                    ReasoningTokens: null,
+                                    TotalTokens: apiUsage.TotalTokens > 0 ? apiUsage.TotalTokens : apiUsage.InputTokens + apiUsage.OutputTokens
+                                );
+                                _logger.LogDebug("[YandexAgent Chat] Usage: input={Input}, output={Output}, total={Total}",
+                                    apiUsage.InputTokens, apiUsage.OutputTokens, usage.TotalTokens);
+                            }
 
                             _logger.LogInformation("[YandexAgent Chat] response.completed: id={Id}, status={Status}, outputText={OutputLen} chars",
                                 id ?? "(null)", status ?? "(null)", outputText?.Length ?? 0);
@@ -848,6 +884,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 result.Response = responseText;
                 result.ResponseId = responseId;
                 result.ToolCalls = toolCalls;
+                result.Usage = usage;
 
                 // Итоговое логирование с разбивкой native/fallback
                 if (fallbackToolCallsCount > 0)
@@ -868,6 +905,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 
                 result.IsSuccess = false;
                 result.Response = responseText; // Показываем что модель успела написать
+                result.Usage = usage;
                 result.ErrorMessage = "Ответ модели был обрезан. Возможно, превышен лимит токенов. Попробуйте переформулировать запрос короче.";
                 _logger.LogWarning("[YandexAgent Chat] <<< ОТВЕТ ОБРЕЗАН (truncated tool call)");
                 progress?.Report("[YandexAgent Chat] ⚠️ Ответ модели обрезан");
@@ -877,6 +915,7 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 result.IsSuccess = true;
                 result.Response = fullResponse.ToString();
                 result.ResponseId = responseId;
+                result.Usage = usage;
                 _logger.LogInformation("[YandexAgent Chat] <<< ОТВЕТ ПОЛУЧЕН");
                 progress?.Report($"[YandexAgent Chat] Total response: {fullResponse.Length} chars");
             }
@@ -886,6 +925,25 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
                 result.ErrorMessage = "YandexAgent returned empty response";
                 _logger.LogWarning("[YandexAgent Chat] <<< ПУСТОЙ ОТВЕТ");
                 progress?.Report($"[YandexAgent Chat] ERROR: Empty response");
+            }
+
+            // Логируем использование токенов в БД
+            if (usage != null)
+            {
+                try
+                {
+                    await _tokenUsageService.LogUsageAsync(
+                        provider: "YandexAgent",
+                        model: _config.AgentId ?? "unknown",
+                        aiFunction: AiFunctionNames.Chat,
+                        usage: usage,
+                        sessionId: sessionContext?.SessionId,
+                        cancellationToken: cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[YandexAgent Chat] Failed to log token usage: {Message}", ex.Message);
+                }
             }
 
             _logger.LogInformation("[YandexAgent Chat] ========================================");
@@ -1319,6 +1377,24 @@ public class YandexAgentLlmProvider : ILlmProvider, IReasoningProvider
 
         [JsonPropertyName("status")]
         public string? Status { get; set; }
+
+        [JsonPropertyName("usage")]
+        public YandexAgentUsage? Usage { get; set; }
+    }
+
+    /// <summary>
+    /// Статистика использования токенов от YandexAgent API
+    /// </summary>
+    private class YandexAgentUsage
+    {
+        [JsonPropertyName("input_tokens")]
+        public int InputTokens { get; set; }
+
+        [JsonPropertyName("output_tokens")]
+        public int OutputTokens { get; set; }
+
+        [JsonPropertyName("total_tokens")]
+        public int TotalTokens { get; set; }
     }
 
     /// <summary>

@@ -1,0 +1,11 @@
+## Что ищет пользователь
+Название: {{DRAFT_ITEM_NAME}}
+Требуемое количество: {{DRAFT_ITEM_QUANTITY}} {{DRAFT_ITEM_UNIT}}
+{{DRAFT_ITEM_CATEGORY}}
+
+{{PURCHASE_HISTORY}}
+
+## Результаты поиска в магазине
+{{SEARCH_RESULTS}}
+
+Выбери лучший товар из результатов поиска.

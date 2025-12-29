@@ -3,29 +3,35 @@ using System.Text.Json.Serialization;
 namespace SmartBasket.Services.Llm;
 
 /// <summary>
-/// Продукт или категория из результата классификации.
-/// Модель возвращает и категории и продукты в одном списке.
+/// Продукт из результата классификации (новый формат с номером категории).
 /// </summary>
 public class ClassifiedProduct
 {
     /// <summary>
-    /// Название продукта или категории
+    /// Название продукта
     /// </summary>
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Название родительской категории (null для корневых)
+    /// Номер категории из промпта (1, 2, 3...)
+    /// </summary>
+    [JsonPropertyName("category")]
+    public int CategoryNumber { get; set; }
+
+    // --- Legacy поля для обратной совместимости ---
+
+    /// <summary>
+    /// [Legacy] Название родительской категории (null для корневых)
     /// </summary>
     [JsonPropertyName("parent")]
     public string? Parent { get; set; }
 
     /// <summary>
-    /// true = это конечный продукт (лист дерева)
-    /// false = это категория (может иметь потомков)
+    /// [Legacy] true = это конечный продукт (лист дерева)
     /// </summary>
     [JsonPropertyName("product")]
-    public bool IsProduct { get; set; }
+    public bool IsProduct { get; set; } = true;
 }
 
 /// <summary>
@@ -56,6 +62,11 @@ public class ProductClassificationResult
     /// Список продуктов и категорий
     /// </summary>
     public List<ClassifiedProduct> Products { get; set; } = new();
+
+    /// <summary>
+    /// Маппинг: номер категории из промпта → Guid категории в БД
+    /// </summary>
+    public Dictionary<int, Guid> CategoryNumberToGuid { get; set; } = new();
 
     /// <summary>
     /// Сырой ответ от LLM (для отладки)

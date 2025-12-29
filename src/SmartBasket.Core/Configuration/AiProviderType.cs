@@ -23,5 +23,10 @@ public enum AiProviderType
     /// <summary>
     /// Yandex AI Agent (использует OpenAI SDK с кастомным агентом)
     /// </summary>
-    YandexAgent
+    YandexAgent,
+
+    /// <summary>
+    /// GigaChat (Sber)
+    /// </summary>
+    GigaChat
 }

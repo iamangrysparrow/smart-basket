@@ -71,6 +71,10 @@ namespace SmartBasket.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("BaseUnitQuantity")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -86,11 +90,14 @@ namespace SmartBasket.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("UnitOfMeasure")
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                    b.Property<string>("UnitId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("шт");
 
-                    b.Property<decimal?>("UnitQuantity")
+                    b.Property<decimal>("UnitQuantity")
                         .HasPrecision(10, 3)
                         .HasColumnType("TEXT");
 
@@ -104,6 +111,8 @@ namespace SmartBasket.Data.Migrations
                     b.HasIndex("ProductId");
 
                     b.HasIndex("Shop");
+
+                    b.HasIndex("UnitId");
 
                     b.ToTable("Items");
                 });
@@ -158,6 +167,13 @@ namespace SmartBasket.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BaseUnitId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("шт");
+
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("TEXT");
 
@@ -173,6 +189,8 @@ namespace SmartBasket.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BaseUnitId");
 
                     b.HasIndex("CategoryId");
 
@@ -194,6 +212,9 @@ namespace SmartBasket.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("Number")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("TEXT");
@@ -284,6 +305,10 @@ namespace SmartBasket.Data.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("BaseUnitQuantity")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -298,6 +323,13 @@ namespace SmartBasket.Data.Migrations
                         .HasPrecision(10, 3)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("QuantityUnitId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("шт");
+
                     b.Property<Guid>("ReceiptId")
                         .HasColumnType("TEXT");
 
@@ -308,9 +340,183 @@ namespace SmartBasket.Data.Migrations
 
                     b.HasIndex("ItemId");
 
+                    b.HasIndex("QuantityUnitId");
+
                     b.HasIndex("ReceiptId");
 
                     b.ToTable("ReceiptItems");
+                });
+
+            modelBuilder.Entity("SmartBasket.Core.Entities.TokenUsage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AiFunction")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PrecachedPromptTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ReasoningTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RequestId")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TotalTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AiFunction");
+
+                    b.HasIndex("DateTime");
+
+                    b.HasIndex("Provider");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("TokenUsages");
+                });
+
+            modelBuilder.Entity("SmartBasket.Core.Entities.UnitOfMeasure", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BaseUnitId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Coefficient")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsBase")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BaseUnitId");
+
+                    b.ToTable("UnitOfMeasures");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "г",
+                            BaseUnitId = "кг",
+                            Coefficient = 0.001m,
+                            IsBase = false,
+                            Name = "грамм"
+                        },
+                        new
+                        {
+                            Id = "кг",
+                            BaseUnitId = "кг",
+                            Coefficient = 1m,
+                            IsBase = true,
+                            Name = "килограмм"
+                        },
+                        new
+                        {
+                            Id = "мл",
+                            BaseUnitId = "л",
+                            Coefficient = 0.001m,
+                            IsBase = false,
+                            Name = "миллилитр"
+                        },
+                        new
+                        {
+                            Id = "л",
+                            BaseUnitId = "л",
+                            Coefficient = 1m,
+                            IsBase = true,
+                            Name = "литр"
+                        },
+                        new
+                        {
+                            Id = "шт",
+                            BaseUnitId = "шт",
+                            Coefficient = 1m,
+                            IsBase = true,
+                            Name = "штука"
+                        },
+                        new
+                        {
+                            Id = "мм",
+                            BaseUnitId = "м",
+                            Coefficient = 0.001m,
+                            IsBase = false,
+                            Name = "миллиметр"
+                        },
+                        new
+                        {
+                            Id = "см",
+                            BaseUnitId = "м",
+                            Coefficient = 0.01m,
+                            IsBase = false,
+                            Name = "сантиметр"
+                        },
+                        new
+                        {
+                            Id = "м",
+                            BaseUnitId = "м",
+                            Coefficient = 1m,
+                            IsBase = true,
+                            Name = "метр"
+                        },
+                        new
+                        {
+                            Id = "см²",
+                            BaseUnitId = "м²",
+                            Coefficient = 0.0001m,
+                            IsBase = false,
+                            Name = "кв. сантиметр"
+                        },
+                        new
+                        {
+                            Id = "м²",
+                            BaseUnitId = "м²",
+                            Coefficient = 1m,
+                            IsBase = true,
+                            Name = "кв. метр"
+                        });
                 });
 
             modelBuilder.Entity("SmartBasket.Core.Entities.Item", b =>
@@ -321,7 +527,15 @@ namespace SmartBasket.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SmartBasket.Core.Entities.UnitOfMeasure", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Product");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("SmartBasket.Core.Entities.ItemLabel", b =>
@@ -345,10 +559,18 @@ namespace SmartBasket.Data.Migrations
 
             modelBuilder.Entity("SmartBasket.Core.Entities.Product", b =>
                 {
+                    b.HasOne("SmartBasket.Core.Entities.UnitOfMeasure", "BaseUnit")
+                        .WithMany()
+                        .HasForeignKey("BaseUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SmartBasket.Core.Entities.ProductCategory", "Category")
                         .WithMany("Products")
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("BaseUnit");
 
                     b.Navigation("Category");
                 });
@@ -390,6 +612,12 @@ namespace SmartBasket.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SmartBasket.Core.Entities.UnitOfMeasure", "QuantityUnit")
+                        .WithMany()
+                        .HasForeignKey("QuantityUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SmartBasket.Core.Entities.Receipt", "Receipt")
                         .WithMany("Items")
                         .HasForeignKey("ReceiptId")
@@ -398,7 +626,20 @@ namespace SmartBasket.Data.Migrations
 
                     b.Navigation("Item");
 
+                    b.Navigation("QuantityUnit");
+
                     b.Navigation("Receipt");
+                });
+
+            modelBuilder.Entity("SmartBasket.Core.Entities.UnitOfMeasure", b =>
+                {
+                    b.HasOne("SmartBasket.Core.Entities.UnitOfMeasure", "BaseUnit")
+                        .WithMany()
+                        .HasForeignKey("BaseUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BaseUnit");
                 });
 
             modelBuilder.Entity("SmartBasket.Core.Entities.Item", b =>

@@ -15,6 +15,7 @@ public class OllamaLlmProvider : ILlmProvider
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OllamaLlmProvider> _logger;
     private readonly AiProviderConfig _config;
+    private readonly ITokenUsageService _tokenUsageService;
 
     public string Name => $"Ollama/{_config.Model}";
 
@@ -30,11 +31,13 @@ public class OllamaLlmProvider : ILlmProvider
     public OllamaLlmProvider(
         IHttpClientFactory httpClientFactory,
         ILogger<OllamaLlmProvider> logger,
-        AiProviderConfig config)
+        AiProviderConfig config,
+        ITokenUsageService tokenUsageService)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _config = config;
+        _tokenUsageService = tokenUsageService;
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default)
@@ -62,9 +65,11 @@ public class OllamaLlmProvider : ILlmProvider
 
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // Ollama не поддерживает сессии — игнорируем sessionContext
         var result = new LlmGenerationResult();
 
         try
@@ -141,6 +146,7 @@ public class OllamaLlmProvider : ILlmProvider
 
             var fullResponse = new StringBuilder();
             var lineBuffer = new StringBuilder();
+            LlmTokenUsage? usage = null;
 
             using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
             using var reader = new StreamReader(stream);
@@ -182,6 +188,23 @@ public class OllamaLlmProvider : ILlmProvider
                             progress?.Report($"  {lineBuffer}");
                             lineBuffer.Clear();
                         }
+
+                        // Парсим usage из последнего чанка
+                        if (chunk.PromptEvalCount.HasValue || chunk.EvalCount.HasValue)
+                        {
+                            var promptTokens = chunk.PromptEvalCount ?? 0;
+                            var completionTokens = chunk.EvalCount ?? 0;
+                            usage = new LlmTokenUsage(
+                                PromptTokens: promptTokens,
+                                CompletionTokens: completionTokens,
+                                PrecachedPromptTokens: null,
+                                ReasoningTokens: null,
+                                TotalTokens: promptTokens + completionTokens
+                            );
+
+                            _logger.LogInformation("[Ollama] Usage: prompt={Prompt}, completion={Completion}, total={Total}",
+                                usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
+                        }
                         break;
                     }
                 }
@@ -193,6 +216,7 @@ public class OllamaLlmProvider : ILlmProvider
 
             result.IsSuccess = true;
             result.Response = fullResponse.ToString();
+            result.Usage = usage;
 
             _logger.LogInformation("[Ollama] <<< ОТВЕТ ПОЛУЧЕН");
             _logger.LogInformation("[Ollama] Response length: {Length} chars", result.Response?.Length ?? 0);
@@ -200,6 +224,25 @@ public class OllamaLlmProvider : ILlmProvider
             _logger.LogDebug("[Ollama] Response:\n{Response}", result.Response);
             _logger.LogDebug("[Ollama] ===== FULL RESPONSE END =====");
             _logger.LogInformation("[Ollama] ========================================");
+
+            // Логируем использование токенов в БД
+            if (usage != null)
+            {
+                try
+                {
+                    await _tokenUsageService.LogUsageAsync(
+                        provider: "Ollama",
+                        model: _config.Model,
+                        aiFunction: AiFunctionNames.Parsing,
+                        usage: usage,
+                        sessionId: sessionContext?.SessionId,
+                        cancellationToken: cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Ollama] Failed to log token usage: {Message}", ex.Message);
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -227,9 +270,11 @@ public class OllamaLlmProvider : ILlmProvider
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // Ollama не поддерживает сессии — игнорируем sessionContext
         var result = new LlmGenerationResult();
 
         try
@@ -357,6 +402,7 @@ public class OllamaLlmProvider : ILlmProvider
             var lineBuffer = new StringBuilder();
             var collectedToolCalls = new List<LlmToolCall>();
             var rawChunks = new StringBuilder(); // Для логирования сырых чанков
+            LlmTokenUsage? usage = null;
 
             _logger.LogDebug("[Ollama Chat] ===== STREAMING RESPONSE START =====");
 
@@ -435,6 +481,23 @@ public class OllamaLlmProvider : ILlmProvider
                             progress?.Report($"  {lineBuffer}");
                             lineBuffer.Clear();
                         }
+
+                        // Парсим usage из последнего чанка
+                        if (chunk.PromptEvalCount.HasValue || chunk.EvalCount.HasValue)
+                        {
+                            var promptTokens = chunk.PromptEvalCount ?? 0;
+                            var completionTokens = chunk.EvalCount ?? 0;
+                            usage = new LlmTokenUsage(
+                                PromptTokens: promptTokens,
+                                CompletionTokens: completionTokens,
+                                PrecachedPromptTokens: null,
+                                ReasoningTokens: null,
+                                TotalTokens: promptTokens + completionTokens
+                            );
+
+                            _logger.LogInformation("[Ollama Chat] Usage: prompt={Prompt}, completion={Completion}, total={Total}",
+                                usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
+                        }
                         break;
                     }
                 }
@@ -446,6 +509,7 @@ public class OllamaLlmProvider : ILlmProvider
 
             result.IsSuccess = true;
             result.Response = fullResponse.ToString();
+            result.Usage = usage;
 
             _logger.LogDebug("[Ollama Chat] ===== STREAMING RESPONSE END =====");
 
@@ -493,6 +557,25 @@ public class OllamaLlmProvider : ILlmProvider
             _logger.LogDebug("[Ollama Chat] Response:\n{Response}", result.Response);
             _logger.LogDebug("[Ollama Chat] ===== FINAL RESPONSE END =====");
             _logger.LogInformation("[Ollama Chat] ========================================");
+
+            // Логируем использование токенов в БД
+            if (usage != null)
+            {
+                try
+                {
+                    await _tokenUsageService.LogUsageAsync(
+                        provider: "Ollama",
+                        model: _config.Model,
+                        aiFunction: AiFunctionNames.Chat,
+                        usage: usage,
+                        sessionId: sessionContext?.SessionId,
+                        cancellationToken: cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Ollama Chat] Failed to log token usage: {Message}", ex.Message);
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -923,6 +1006,12 @@ public class OllamaLlmProvider : ILlmProvider
 
         [JsonPropertyName("done")]
         public bool Done { get; set; }
+
+        [JsonPropertyName("prompt_eval_count")]
+        public int? PromptEvalCount { get; set; }
+
+        [JsonPropertyName("eval_count")]
+        public int? EvalCount { get; set; }
     }
 
     // DTOs for /api/chat
@@ -969,6 +1058,12 @@ public class OllamaLlmProvider : ILlmProvider
 
         [JsonPropertyName("done")]
         public bool Done { get; set; }
+
+        [JsonPropertyName("prompt_eval_count")]
+        public int? PromptEvalCount { get; set; }
+
+        [JsonPropertyName("eval_count")]
+        public int? EvalCount { get; set; }
     }
 
     private class OllamaChatStreamMessage

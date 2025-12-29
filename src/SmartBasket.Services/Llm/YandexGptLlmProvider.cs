@@ -19,6 +19,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<YandexGptLlmProvider> _logger;
     private readonly AiProviderConfig _config;
+    private readonly ITokenUsageService _tokenUsageService;
 
     // Runtime override для reasoning параметров (устанавливаются из UI)
     private Core.Configuration.ReasoningMode? _runtimeReasoningMode;
@@ -80,11 +81,13 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
     public YandexGptLlmProvider(
         IHttpClientFactory httpClientFactory,
         ILogger<YandexGptLlmProvider> logger,
-        AiProviderConfig config)
+        AiProviderConfig config,
+        ITokenUsageService tokenUsageService)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _config = config;
+        _tokenUsageService = tokenUsageService;
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(CancellationToken cancellationToken = default)
@@ -121,9 +124,11 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
 
     public async Task<LlmGenerationResult> GenerateAsync(
         string prompt,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // YandexGPT не поддерживает сессии — игнорируем sessionContext
         var result = new LlmGenerationResult();
 
         try
@@ -165,6 +170,18 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
                 Stream = true
             };
 
+            var requestJson = JsonSerializer.Serialize(request, LlmJsonOptions.ForLogging);
+
+            _logger.LogInformation("[YandexGPT] ========================================");
+            _logger.LogInformation("[YandexGPT] >>> ЗАПРОС К YandexGPT (GenerateAsync)");
+            _logger.LogInformation("[YandexGPT] URL: {Url}", YandexGptApiUrl);
+            _logger.LogInformation("[YandexGPT] Model: {Model}", modelUri);
+            _logger.LogInformation("[YandexGPT] Timeout: {Timeout}s", timeoutSeconds);
+            _logger.LogInformation("[YandexGPT] Temperature: {Temp}, MaxTokens: {MaxTokens}", temperature, maxTokens);
+            _logger.LogDebug("[YandexGPT] ===== REQUEST JSON START =====");
+            _logger.LogDebug("[YandexGPT] Request ({Length} chars):\n{Json}", requestJson.Length, requestJson);
+            _logger.LogDebug("[YandexGPT] ===== REQUEST JSON END =====");
+
             progress?.Report($"  [YandexGPT] Sending STREAMING request to {YandexGptApiUrl}...");
             progress?.Report($"  [YandexGPT] Model: {modelUri}");
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -196,7 +213,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             }
 
             // Парсим OpenAI SSE streaming ответ
-            var (responseText, _) = await ParseOpenAiStreamingResponse(response, progress, linkedCts.Token);
+            var (responseText, _, usage) = await ParseOpenAiStreamingResponse(response, progress, linkedCts.Token);
 
             stopwatch.Stop();
             progress?.Report($"  [YandexGPT] === END STREAMING ({stopwatch.Elapsed.TotalSeconds:F1}s) ===");
@@ -205,7 +222,27 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             {
                 result.IsSuccess = true;
                 result.Response = responseText;
+                result.Usage = usage;
                 progress?.Report($"  [YandexGPT] Total response: {responseText.Length} chars");
+
+                // Логируем использование токенов в БД
+                if (usage != null)
+                {
+                    try
+                    {
+                        await _tokenUsageService.LogUsageAsync(
+                            provider: "YandexGPT",
+                            model: modelUri,
+                            aiFunction: AiFunctionNames.Parsing,
+                            usage: usage,
+                            sessionId: sessionContext?.SessionId,
+                            cancellationToken: cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[YandexGPT] Failed to log token usage: {Message}", ex.Message);
+                    }
+                }
             }
             else
             {
@@ -237,9 +274,11 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
     public async Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // YandexGPT не поддерживает сессии — игнорируем sessionContext
         var result = new LlmGenerationResult();
 
         try
@@ -403,7 +442,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             }
 
             // Парсим OpenAI streaming ответ
-            var (responseText, toolCalls) = await ParseOpenAiStreamingResponse(response, progress, linkedCts.Token);
+            var (responseText, toolCalls, usage) = await ParseOpenAiStreamingResponse(response, progress, linkedCts.Token);
 
             stopwatch.Stop();
 
@@ -411,6 +450,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             {
                 result.IsSuccess = true;
                 result.Response = responseText;
+                result.Usage = usage;
 
                 if (toolCalls.Count > 0)
                 {
@@ -426,6 +466,25 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
                 _logger.LogDebug("[YandexGPT Chat] ===== FINAL RESPONSE START =====");
                 _logger.LogDebug("[YandexGPT Chat] Response:\n{Response}", result.Response);
                 _logger.LogDebug("[YandexGPT Chat] ===== FINAL RESPONSE END =====");
+
+                // Логируем использование токенов в БД
+                if (usage != null)
+                {
+                    try
+                    {
+                        await _tokenUsageService.LogUsageAsync(
+                            provider: "YandexGPT",
+                            model: modelUri,
+                            aiFunction: AiFunctionNames.Chat,
+                            usage: usage,
+                            sessionId: sessionContext?.SessionId,
+                            cancellationToken: cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[YandexGPT Chat] Failed to log token usage: {Message}", ex.Message);
+                    }
+                }
             }
             else
             {
@@ -581,7 +640,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
     /// Парсит OpenAI SSE streaming ответ
     /// Формат: data: {...}\n\ndata: {...}\n\ndata: [DONE]
     /// </summary>
-    private async Task<(string ResponseText, List<LlmToolCall> ToolCalls)> ParseOpenAiStreamingResponse(
+    private async Task<(string ResponseText, List<LlmToolCall> ToolCalls, LlmTokenUsage? Usage)> ParseOpenAiStreamingResponse(
         HttpResponseMessage response,
         IProgress<string>? progress,
         CancellationToken ct)
@@ -589,6 +648,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
         var fullResponse = new StringBuilder();
         var toolCalls = new List<LlmToolCall>();
         var toolCallsInProgress = new Dictionary<int, (string Id, string Name, StringBuilder Args)>();
+        LlmTokenUsage? usage = null;
 
         progress?.Report($"  [YandexGPT] === STREAMING RESPONSE ===");
 
@@ -615,7 +675,24 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             try
             {
                 var chunk = JsonSerializer.Deserialize<OpenAiStreamChunk>(data, LlmJsonOptions.ForParsing);
-                if (chunk?.Choices == null || chunk.Choices.Length == 0) continue;
+                if (chunk == null) continue;
+
+                // Парсим usage если пришёл
+                if (chunk.Usage != null)
+                {
+                    usage = new LlmTokenUsage(
+                        PromptTokens: chunk.Usage.PromptTokens,
+                        CompletionTokens: chunk.Usage.CompletionTokens,
+                        PrecachedPromptTokens: null,
+                        ReasoningTokens: chunk.Usage.CompletionTokensDetails?.ReasoningTokens,
+                        TotalTokens: chunk.Usage.TotalTokens
+                    );
+
+                    _logger.LogInformation("[YandexGPT] Usage: prompt={Prompt}, completion={Completion}, reasoning={Reasoning}, total={Total}",
+                        usage.PromptTokens, usage.CompletionTokens, usage.ReasoningTokens, usage.TotalTokens);
+                }
+
+                if (chunk.Choices == null || chunk.Choices.Length == 0) continue;
 
                 var choice = chunk.Choices[0];
                 var delta = choice.Delta;
@@ -683,7 +760,7 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
             }
         }
 
-        return (fullResponse.ToString(), toolCalls);
+        return (fullResponse.ToString(), toolCalls, usage);
     }
 
     // ==================== OpenAI-совместимые DTOs ====================
@@ -822,6 +899,30 @@ public class YandexGptLlmProvider : ILlmProvider, IReasoningProvider
 
         [JsonPropertyName("choices")]
         public OpenAiStreamChoice[]? Choices { get; set; }
+
+        [JsonPropertyName("usage")]
+        public OpenAiUsage? Usage { get; set; }
+    }
+
+    private class OpenAiUsage
+    {
+        [JsonPropertyName("prompt_tokens")]
+        public int PromptTokens { get; set; }
+
+        [JsonPropertyName("completion_tokens")]
+        public int CompletionTokens { get; set; }
+
+        [JsonPropertyName("total_tokens")]
+        public int TotalTokens { get; set; }
+
+        [JsonPropertyName("completion_tokens_details")]
+        public CompletionTokensDetails? CompletionTokensDetails { get; set; }
+    }
+
+    private class CompletionTokensDetails
+    {
+        [JsonPropertyName("reasoning_tokens")]
+        public int? ReasoningTokens { get; set; }
     }
 
     private class OpenAiStreamChoice

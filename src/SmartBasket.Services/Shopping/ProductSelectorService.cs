@@ -55,24 +55,15 @@ public class ProductSelectorService : IProductSelectorService
                 return null;
             }
 
-            // Загружаем шаблон промпта
-            var template = LoadPromptTemplate("prompt_shopping_select_product.txt");
-
             // Форматируем результаты поиска
             var resultsText = FormatSearchResults(searchResults);
 
-            // Подставляем плейсхолдеры
-            var prompt = template
-                .Replace("{{DRAFT_ITEM_ID}}", draftItem.Id.ToString())
-                .Replace("{{DRAFT_ITEM_NAME}}", draftItem.Name)
-                .Replace("{{DRAFT_ITEM_QUANTITY}}", draftItem.Quantity.ToString("0.##"))
-                .Replace("{{DRAFT_ITEM_UNIT}}", draftItem.Unit)
-                .Replace("{{DRAFT_ITEM_CATEGORY}}", draftItem.Category ?? "Не указана")
-                .Replace("{{STORE_NAME}}", storeName)
-                .Replace("{{SEARCH_RESULTS}}", resultsText);
+            // Загружаем system/user промпты
+            var (systemPrompt, userPrompt) = LoadPrompts(
+                draftItem, storeName, resultsText);
 
-            _logger.LogInformation("[ProductSelectorService] Prompt length: {Length} chars", prompt.Length);
-            _logger.LogDebug("[ProductSelectorService] Full prompt:\n{Prompt}", prompt);
+            _logger.LogInformation("[ProductSelectorService] System: {SysLen} chars, User: {UsrLen} chars",
+                systemPrompt.Length, userPrompt.Length);
 
             // Создаём tool definition для select_product
             var selectProductTool = CreateSelectProductToolDefinition();
@@ -80,11 +71,8 @@ public class ProductSelectorService : IProductSelectorService
             // Сообщения для LLM
             var messages = new List<LlmChatMessage>
             {
-                new()
-                {
-                    Role = "user",
-                    Content = prompt
-                }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             };
 
             // Один прямой вызов LLM
@@ -296,26 +284,64 @@ public class ProductSelectorService : IProductSelectorService
         return sb.ToString();
     }
 
-    private string LoadPromptTemplate(string fileName)
+    private (string System, string User) LoadPrompts(
+        DraftItem draftItem,
+        string storeName,
+        string resultsText)
     {
-        // Ищем в папке приложения
-        var path = Path.Combine(AppContext.BaseDirectory, fileName);
+        var systemPath = Path.Combine(AppContext.BaseDirectory, "prompt_shopping_select_product_system.txt");
+        var userPath = Path.Combine(AppContext.BaseDirectory, "prompt_shopping_select_product_user.txt");
 
-        if (!File.Exists(path))
+        string systemPrompt;
+        string userPrompt;
+
+        if (File.Exists(systemPath) && File.Exists(userPath))
         {
-            // Fallback: ищем рядом с exe
-            path = Path.Combine(
-                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "",
-                fileName);
+            systemPrompt = File.ReadAllText(systemPath);
+            var userTemplate = File.ReadAllText(userPath);
+
+            userPrompt = userTemplate
+                .Replace("{{DRAFT_ITEM_NAME}}", draftItem.Name)
+                .Replace("{{DRAFT_ITEM_QUANTITY}}", draftItem.Quantity.ToString("0.##"))
+                .Replace("{{DRAFT_ITEM_UNIT}}", draftItem.Unit)
+                .Replace("{{DRAFT_ITEM_CATEGORY}}", draftItem.Category ?? "Не указана")
+                .Replace("{{PURCHASE_HISTORY}}", "")
+                .Replace("{{SEARCH_RESULTS}}", resultsText);
+        }
+        else
+        {
+            _logger.LogWarning("[ProductSelectorService] Prompt files not found, using defaults");
+            (systemPrompt, userPrompt) = GetDefaultPrompts(draftItem, storeName, resultsText);
         }
 
-        if (!File.Exists(path))
-        {
-            _logger.LogError("[ProductSelectorService] Prompt template not found: {FileName}", fileName);
-            throw new FileNotFoundException($"Prompt template not found: {fileName}", fileName);
-        }
+        return (systemPrompt, userPrompt);
+    }
 
-        return File.ReadAllText(path);
+    private static (string System, string User) GetDefaultPrompts(
+        DraftItem draftItem,
+        string storeName,
+        string resultsText)
+    {
+        var system = @"Ты — эксперт по выбору товаров из результатов поиска интернет-магазинов.
+
+Твоя задача:
+1. Выбери товар с лучшим соотношением цена/объём
+2. Рассчитай количество упаковок для требуемого объёма
+3. Если ничего не подходит — selected_product_id = null
+
+Используй tool select_product для ответа.";
+
+        var user = $@"Что ищет пользователь:
+Название: {draftItem.Name}
+Требуемое количество: {draftItem.Quantity:0.##} {draftItem.Unit}
+Магазин: {storeName}
+
+Результаты поиска:
+{resultsText}
+
+Выбери лучший товар.";
+
+        return (system, user);
     }
 }
 

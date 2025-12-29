@@ -515,7 +515,18 @@ public partial class ProductsItemsView : UserControl
 
     #region Reclassify
 
+    private async void ReclassifyCategory_Click(object sender, RoutedEventArgs e)
+    {
+        // Используем тот же обработчик что и для кнопки Reclassify
+        await ReclassifySelectedCategoryAsync();
+    }
+
     private async void ReclassifyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ReclassifySelectedCategoryAsync();
+    }
+
+    private async Task ReclassifySelectedCategoryAsync()
     {
         if (_viewModel == null) return;
 
@@ -559,19 +570,6 @@ public partial class ProductsItemsView : UserControl
                 MessageBoxImage.Information);
             return;
         }
-
-        // Load custom prompt from AI Operations settings
-        var appSettings = App.Services.GetRequiredService<AppSettings>();
-        var ops = appSettings.AiOperations;
-        string? customPrompt = null;
-
-        if (!string.IsNullOrWhiteSpace(ops.Classification))
-        {
-            customPrompt = ops.GetCustomPrompt("Classification", ops.Classification);
-        }
-
-        // Set custom prompt before building prompt for preview
-        _viewModel._classificationService.SetCustomPrompt(customPrompt);
 
         // Build prompt for preview
         var prompt = await _viewModel._classificationService.BuildPromptForProductsAsync(productNames);

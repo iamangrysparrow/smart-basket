@@ -59,25 +59,41 @@ public partial class AiOperationsSettingsView : UserControl
             return;
         }
 
-        // Get current custom prompt (or null for default)
-        var currentPrompt = vm.AiOperations.GetPrompt(operation, providerKey);
+        // Get current custom prompts (or null for default)
+        var currentSystemPrompt = vm.AiOperations.GetSystemPrompt(operation, providerKey);
+        var currentUserPrompt = vm.AiOperations.GetUserPrompt(operation, providerKey);
 
-        // Open editor window
-        var editor = new PromptEditorWindow(operation, providerKey, currentPrompt, vm.Log)
+        // Open editor window with both prompts
+        var editor = new PromptEditorWindow(
+            operation,
+            providerKey,
+            currentSystemPrompt,
+            currentUserPrompt,
+            vm.Log)
         {
             Owner = Window.GetWindow(this)
         };
 
         if (editor.ShowDialog() == true)
         {
-            // Save prompt if it's custom, remove if it's same as default
-            if (editor.IsCustomPrompt)
+            // Save system prompt if custom, remove if same as default
+            if (editor.IsSystemPromptCustom)
             {
-                vm.AiOperations.SetPrompt(operation, providerKey, editor.PromptText);
+                vm.AiOperations.SetSystemPrompt(operation, providerKey, editor.SystemPromptText);
             }
             else
             {
-                vm.AiOperations.SetPrompt(operation, providerKey, null);
+                vm.AiOperations.SetSystemPrompt(operation, providerKey, null);
+            }
+
+            // Save user prompt if custom, remove if same as default
+            if (editor.IsUserPromptCustom)
+            {
+                vm.AiOperations.SetUserPrompt(operation, providerKey, editor.UserPromptText);
+            }
+            else
+            {
+                vm.AiOperations.SetUserPrompt(operation, providerKey, null);
             }
 
             vm.MarkAsChanged();

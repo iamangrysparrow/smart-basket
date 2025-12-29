@@ -91,11 +91,9 @@ public partial class ReclassifyDialog : Window
                 Dispatcher.Invoke(() => ProgressText.Text = msg);
             });
 
-            // Set custom prompt before classification
-            _classificationService.SetCustomPrompt(PromptTextBox.Text);
-
-            // Run reclassification for the selected category
-            Result = await _classificationService.ReclassifyCategoryAsync(_categoryId, progress, _cts.Token);
+            // Run reclassification for the selected category with edited prompt
+            var editedPrompt = PromptTextBox.Text;
+            Result = await _classificationService.ReclassifyCategoryAsync(_categoryId, editedPrompt, progress, _cts.Token);
 
             // Show result
             ProgressPanel.Visibility = Visibility.Collapsed;

@@ -69,16 +69,19 @@ public class AiProviderFactory : IAiProviderFactory
     private readonly AppSettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ITokenUsageService _tokenUsageService;
     private readonly Dictionary<string, ILlmProvider> _providersCache = new();
 
     public AiProviderFactory(
         AppSettings settings,
         IHttpClientFactory httpClientFactory,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        ITokenUsageService tokenUsageService)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        _tokenUsageService = tokenUsageService ?? throw new ArgumentNullException(nameof(tokenUsageService));
     }
 
     public ILlmProvider? GetProvider(string key)
@@ -129,6 +132,7 @@ public class AiProviderFactory : IAiProviderFactory
             AiProviderType.Ollama => CreateOllamaProvider(config),
             AiProviderType.YandexGPT => CreateYandexGptProvider(config),
             AiProviderType.YandexAgent => CreateYandexAgentProvider(config),
+            AiProviderType.GigaChat => CreateGigaChatProvider(config),
             AiProviderType.OpenAI => throw new NotImplementedException("OpenAI provider is not implemented yet"),
             _ => throw new ArgumentException($"Unknown provider type: {config.Provider}")
         };
@@ -139,7 +143,8 @@ public class AiProviderFactory : IAiProviderFactory
         return new OllamaLlmProvider(
             _httpClientFactory,
             _loggerFactory.CreateLogger<OllamaLlmProvider>(),
-            config);
+            config,
+            _tokenUsageService);
     }
 
     private ILlmProvider CreateYandexGptProvider(AiProviderConfig config)
@@ -147,7 +152,8 @@ public class AiProviderFactory : IAiProviderFactory
         return new YandexGptLlmProvider(
             _httpClientFactory,
             _loggerFactory.CreateLogger<YandexGptLlmProvider>(),
-            config);
+            config,
+            _tokenUsageService);
     }
 
     private ILlmProvider CreateYandexAgentProvider(AiProviderConfig config)
@@ -155,6 +161,16 @@ public class AiProviderFactory : IAiProviderFactory
         return new YandexAgentLlmProvider(
             _httpClientFactory,
             _loggerFactory.CreateLogger<YandexAgentLlmProvider>(),
-            config);
+            config,
+            _tokenUsageService);
+    }
+
+    private ILlmProvider CreateGigaChatProvider(AiProviderConfig config)
+    {
+        return new GigaChatLlmProvider(
+            _httpClientFactory,
+            _loggerFactory.CreateLogger<GigaChatLlmProvider>(),
+            config,
+            _tokenUsageService);
     }
 }

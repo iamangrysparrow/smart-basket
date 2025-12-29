@@ -4,23 +4,28 @@ using System.Windows;
 namespace SmartBasket.WPF.Views;
 
 /// <summary>
-/// Окно редактирования промпта для AI операции
+/// Окно редактирования промптов для AI операции.
+/// Поддерживает два промпта: системный и пользовательский.
 /// </summary>
 public partial class PromptEditorWindow : Window
 {
     private readonly string _operation;
     private readonly string _providerKey;
-    private readonly string _defaultPrompt;
+    private readonly string _defaultSystemPrompt;
+    private readonly string _defaultUserPrompt;
     private readonly Action<string>? _log;
 
     /// <summary>
-    /// Placeholders для каждой операции
+    /// Placeholders для пользовательского промпта каждой операции
     /// </summary>
     private static readonly Dictionary<string, string[]> OperationPlaceholders = new()
     {
-        ["Classification"] = new[] { "{{EXISTING_HIERARCHY}}", "{{EXISTING_HIERARCHY_JSON}}", "{{ITEMS}}" },
+        ["ProductExtraction"] = new[] { "{{ITEMS}}" },
+        ["Classification"] = new[] { "{{EXISTING_HIERARCHY}}", "{{EXISTING_HIERARCHY_JSON}}", "{{PRODUCTS}}" },
         ["Labels"] = new[] { "{{LABELS}}", "{{ITEMS}}" },
-        ["Parsing"] = new[] { "{{YEAR}}", "{{RECEIPT_TEXT}}" }
+        ["Parsing"] = new[] { "{{YEAR}}", "{{RECEIPT_TEXT}}" },
+        ["Shopping"] = new[] { "{{TODAY}}", "{{SHOPPING_LIST}}" },
+        ["ProductMatcher"] = new[] { "{{PRODUCT_NAME}}", "{{SEARCH_RESULTS}}" }
     };
 
     /// <summary>
@@ -28,57 +33,62 @@ public partial class PromptEditorWindow : Window
     /// </summary>
     private static readonly Dictionary<string, string> OperationNames = new()
     {
+        ["ProductExtraction"] = "Выделение продукта",
         ["Classification"] = "Классификация товаров",
         ["Labels"] = "Назначение меток",
-        ["Parsing"] = "Парсинг чеков"
+        ["Parsing"] = "Парсинг чеков",
+        ["Shopping"] = "Закупки: Чат с AI",
+        ["ProductMatcher"] = "Закупки: Выбор товара"
     };
 
     /// <summary>
-    /// Файлы дефолтных промптов
+    /// Файлы дефолтных промптов (system, user)
     /// </summary>
-    private static readonly Dictionary<string, string> DefaultPromptFiles = new()
+    private static readonly Dictionary<string, (string SystemFile, string UserFile)> DefaultPromptFiles = new()
     {
-        ["Classification"] = "prompt_classify_products.txt",
-        ["Labels"] = "prompt_assign_labels.txt",
-        ["Parsing"] = "prompt_template.txt"
+        ["ProductExtraction"] = ("prompt_extract_products_system.txt", "prompt_extract_products_user.txt"),
+        ["Classification"] = ("prompt_classify_products_system.txt", "prompt_classify_products_user.txt"),
+        ["Labels"] = ("prompt_assign_labels_system.txt", "prompt_assign_labels_user.txt"),
+        ["Parsing"] = ("prompt_template_system.txt", "prompt_template_user.txt"),
+        ["Shopping"] = ("prompt_shopping_system.txt", "prompt_shopping_user.txt"),
+        ["ProductMatcher"] = ("prompt_shopping_select_product_system.txt", "prompt_shopping_select_product_user.txt")
     };
 
     /// <summary>
     /// Умные промпты для продвинутых моделей (GPT-4, Claude и т.п.)
     /// </summary>
-    private static readonly Dictionary<string, string> SmartPrompts = new()
+    private static readonly Dictionary<string, (string System, string User)> SmartPrompts = new()
     {
-        ["Classification"] = """
-            Ты — классификатор товаров для домашней бухгалтерии.
+        ["Classification"] = (
+            System: """
+                Ты — классификатор товаров для домашней бухгалтерии.
+                Классифицируй продукты в существующую иерархию категорий.
 
-            ТЕКУЩИЙ КАТАЛОГ ПРОДУКТОВ (JSON):
-            {{EXISTING_HIERARCHY_JSON}}
+                ПРАВИЛА:
+                1. Каждый продукт ОБЯЗАТЕЛЬНО должен быть отнесён к категории
+                2. ЗАПРЕЩЕНО использовать "Не категоризировано", "Другое", "Прочее"
+                3. Если подходящей категории нет — создай новую
+                4. Используй существующие категории если они подходят
 
-            ТОВАРЫ ДЛЯ КЛАССИФИКАЦИИ:
-            {{ITEMS}}
+                Верни JSON: {"products": [{"name": "...", "parent": "..." или null, "product": true/false}]}
+                """,
+            User: """
+                СУЩЕСТВУЮЩАЯ ИЕРАРХИЯ (JSON):
+                {{EXISTING_HIERARCHY_JSON}}
 
-            ПРАВИЛА:
-            1. Каждый товар ОБЯЗАТЕЛЬНО должен быть отнесён к конкретной категории продуктов
-            2. ЗАПРЕЩЕНО использовать категории типа "Не категоризировано", "Другое", "Прочее", "Разное"
-            3. Если подходящей категории нет — создай новую с понятным названием (Батон -> Хлеб, Варенье -> Консервация)
-            4. Используй существующие категории из каталога если они подходят
+                ПРОДУКТЫ ДЛЯ КЛАССИФИКАЦИИ:
+                {{PRODUCTS}}
 
-            Верни JSON:
-            - products: новые категории (если нужны), каждая с name и parent (null для корневых)
-            - items: для каждого товара укажи name, product (категория) и path (путь в иерархии как массив)
-
-            Пример:
-            {
-              "products": [{"name": "Йогурт", "parent": "Молочные продукты"}],
-              "items": [{"name": "Молоко Домик в деревне 2.5%", "product": "Молоко", "path": ["Молочные продукты", "Молоко"]}]
-            }
-            """
+                Классифицируй все продукты.
+                """
+        )
     };
 
     public PromptEditorWindow(
         string operation,
         string providerKey,
-        string? currentPrompt,
+        string? currentSystemPrompt,
+        string? currentUserPrompt,
         Action<string>? log = null)
     {
         InitializeComponent();
@@ -87,8 +97,8 @@ public partial class PromptEditorWindow : Window
         _providerKey = providerKey;
         _log = log;
 
-        // Load default prompt from file
-        _defaultPrompt = LoadDefaultPrompt(operation);
+        // Load default prompts from files
+        (_defaultSystemPrompt, _defaultUserPrompt) = LoadDefaultPrompts(operation);
 
         // Set UI
         OperationText.Text = OperationNames.TryGetValue(operation, out var name) ? name : operation;
@@ -104,10 +114,14 @@ public partial class PromptEditorWindow : Window
             PlaceholdersText.Text = "Нет доступных placeholders";
         }
 
-        // Set prompt text (current or default)
-        PromptTextBox.Text = !string.IsNullOrWhiteSpace(currentPrompt)
-            ? currentPrompt
-            : _defaultPrompt;
+        // Set prompt texts (current or default)
+        SystemPromptTextBox.Text = !string.IsNullOrWhiteSpace(currentSystemPrompt)
+            ? currentSystemPrompt
+            : _defaultSystemPrompt;
+
+        UserPromptTextBox.Text = !string.IsNullOrWhiteSpace(currentUserPrompt)
+            ? currentUserPrompt
+            : _defaultUserPrompt;
 
         // Show smart prompt button only for operations that have one
         SmartPromptButton.Visibility = SmartPrompts.ContainsKey(operation)
@@ -118,36 +132,80 @@ public partial class PromptEditorWindow : Window
     }
 
     /// <summary>
-    /// Текст промпта после редактирования
+    /// Legacy constructor for backward compatibility
     /// </summary>
-    public string PromptText => PromptTextBox.Text;
-
-    /// <summary>
-    /// Был ли промпт изменён относительно дефолта
-    /// </summary>
-    public bool IsCustomPrompt => !string.Equals(PromptText.Trim(), _defaultPrompt.Trim(), StringComparison.Ordinal);
-
-    /// <summary>
-    /// Загрузить дефолтный промпт из файла
-    /// </summary>
-    private string LoadDefaultPrompt(string operation)
+    public PromptEditorWindow(
+        string operation,
+        string providerKey,
+        string? currentPrompt,
+        Action<string>? log = null)
+        : this(operation, providerKey, currentPrompt, null, log)
     {
-        if (!DefaultPromptFiles.TryGetValue(operation, out var fileName))
+    }
+
+    /// <summary>
+    /// Текст системного промпта
+    /// </summary>
+    public string SystemPromptText => SystemPromptTextBox.Text;
+
+    /// <summary>
+    /// Текст пользовательского промпта
+    /// </summary>
+    public string UserPromptText => UserPromptTextBox.Text;
+
+    /// <summary>
+    /// Был ли системный промпт изменён относительно дефолта
+    /// </summary>
+    public bool IsSystemPromptCustom =>
+        !string.Equals(SystemPromptText.Trim(), _defaultSystemPrompt.Trim(), StringComparison.Ordinal);
+
+    /// <summary>
+    /// Был ли пользовательский промпт изменён относительно дефолта
+    /// </summary>
+    public bool IsUserPromptCustom =>
+        !string.Equals(UserPromptText.Trim(), _defaultUserPrompt.Trim(), StringComparison.Ordinal);
+
+    /// <summary>
+    /// Есть ли хотя бы один кастомный промпт
+    /// </summary>
+    public bool HasCustomPrompts => IsSystemPromptCustom || IsUserPromptCustom;
+
+    /// <summary>
+    /// Legacy property for backward compatibility
+    /// </summary>
+    public string PromptText => SystemPromptText;
+
+    /// <summary>
+    /// Legacy property for backward compatibility
+    /// </summary>
+    public bool IsCustomPrompt => HasCustomPrompts;
+
+    /// <summary>
+    /// Загрузить дефолтные промпты из файлов
+    /// </summary>
+    private (string SystemPrompt, string UserPrompt) LoadDefaultPrompts(string operation)
+    {
+        if (!DefaultPromptFiles.TryGetValue(operation, out var files))
         {
-            _log?.Invoke($"[PromptEditor] No default file for operation: {operation}");
-            return string.Empty;
+            _log?.Invoke($"[PromptEditor] No default files for operation: {operation}");
+            return (string.Empty, string.Empty);
         }
 
-        // Try to find file in app directory
         var appDir = AppDomain.CurrentDomain.BaseDirectory;
-        var filePath = Path.Combine(appDir, fileName);
+        var systemPrompt = LoadPromptFile(Path.Combine(appDir, files.SystemFile), operation, "system");
+        var userPrompt = LoadPromptFile(Path.Combine(appDir, files.UserFile), operation, "user");
 
+        return (systemPrompt, userPrompt);
+    }
+
+    private string LoadPromptFile(string filePath, string operation, string promptType)
+    {
         if (File.Exists(filePath))
         {
             try
             {
                 var content = File.ReadAllText(filePath);
-                _log?.Invoke($"[PromptEditor] Loaded default from: {filePath}");
+                _log?.Invoke($"[PromptEditor] Loaded {promptType} prompt from: {filePath}");
                 return content;
             }
             catch (Exception ex)
@@ -157,82 +215,91 @@ public partial class PromptEditorWindow : Window
         }
         else
         {
-            _log?.Invoke($"[PromptEditor] Default file not found: {filePath}");
+            _log?.Invoke($"[PromptEditor] {promptType} file not found: {filePath}");
         }
 
-        // Fallback hardcoded prompts
-        return GetHardcodedDefaultPrompt(operation);
+        // Return hardcoded fallback
+        return GetHardcodedDefaultPrompt(operation, promptType);
     }
 
     /// <summary>
     /// Хардкод дефолтных промптов на случай если файлы не найдены
     /// </summary>
-    private static string GetHardcodedDefaultPrompt(string operation)
+    private static string GetHardcodedDefaultPrompt(string operation, string promptType)
     {
-        return operation switch
+        return (operation, promptType) switch
         {
-            // Примечание: Для умных моделей (GPT-4, Claude и т.п.) используйте:
-            // {{EXISTING_HIERARCHY_JSON}} вместо {{EXISTING_HIERARCHY}} для JSON-формата иерархии
-            // и добавьте "path" в items для указания пути: ["Родитель", "Категория"]
-            "Classification" => """
-                Выдели продукты из списка товаров и построй иерархию.
+            ("Classification", "system") => """
+                Ты — эксперт по классификации продуктов в иерархическую систему категорий.
+                Продукт — это конечный элемент иерархии (лист дерева), у него нет потомков.
 
-                СУЩЕСТВУЮЩАЯ ИЕРАРХИЯ ПРОДУКТОВ (используй её, добавляй новые только если нужно):
-                {{EXISTING_HIERARCHY}}
-
-                ТОВАРЫ ДЛЯ КЛАССИФИКАЦИИ:
-                {{ITEMS}}
-
-                ПРАВИЛА:
-                1. Продукт - это категория товаров (Молоко, Овощи, Фрукты, Кофе молотый и т.п.)
-                2. Продукты могут быть иерархичными: Овощи -> Томаты
-                3. Если продукт уже есть в существующей иерархии - используй его
-                4. Если продукта нет - создай новый и укажи parent если он вложенный
-                5. ЗАПРЕЩЕНО использовать "Не категоризировано", "Другое", "Прочее" - всегда создавай конкретную категорию
+                КРИТИЧЕСКИ ВАЖНО:
+                - Каждый продукт из входного списка ОБЯЗАТЕЛЬНО должен быть в ответе с "product": true
+                - Используй существующие категории из иерархии, если они подходят
+                - Создавай новые категории только если существующие не подходят
 
                 ФОРМАТ ОТВЕТА (строго JSON):
-                {
-                  "products": [
-                    {"name": "Название продукта", "parent": null или "Название родителя"}
-                  ],
-                  "items": [
-                    {"name": "Полное название товара", "product": "Название продукта"}
-                  ]
-                }
-
-                Классифицируй товары:
+                {"products": [{"name": "Название", "parent": null или "name-родителя", "product": true/false}]}
                 """,
 
-            "Labels" => """
+            ("Classification", "user") => """
+                СУЩЕСТВУЮЩАЯ ИЕРАРХИЯ КАТЕГОРИЙ (используй её):
+                {{EXISTING_HIERARCHY}}
+
+                ПРОДУКТЫ ДЛЯ КЛАССИФИКАЦИИ:
+                {{PRODUCTS}}
+
+                Классифицируй ВСЕ продукты из входного списка.
+                """,
+
+            ("Labels", "system") => """
                 Назначь подходящие метки для каждого товара из списка.
 
+                ПРАВИЛА:
+                1. Выбирай метки ТОЛЬКО из списка ДОСТУПНЫЕ МЕТКИ
+                2. Товар может иметь 0, 1 или несколько меток
+                3. НЕ придумывай новые метки
+                4. Если ни одна метка не подходит — верни пустой массив labels: []
+
+                ФОРМАТ ОТВЕТА (строго JSON):
+                [{"item": "название товара", "labels": ["Метка1", "Метка2"]}]
+                """,
+
+            ("Labels", "user") => """
                 ДОСТУПНЫЕ МЕТКИ:
                 {{LABELS}}
 
                 ТОВАРЫ:
                 {{ITEMS}}
 
-                ПРАВИЛА:
-                1. Для каждого товара выбери подходящие метки ТОЛЬКО из списка ДОСТУПНЫЕ МЕТКИ
-                2. Товар может иметь 0, 1 или несколько меток
-                3. НЕ придумывай новые метки
-                4. Если ни одна метка не подходит — верни пустой массив labels: []
-
-                ФОРМАТ ОТВЕТА (строго JSON массив объектов):
-                [
-                  {"item": "название товара 1", "labels": ["Метка1", "Метка2"]},
-                  {"item": "название товара 2", "labels": []}
-                ]
-
-                Назначь метки:
+                Назначь метки товарам.
                 """,
 
-            "Parsing" => """
+            ("ProductExtraction", "system") => """
+                Извлеки название продукта из названия товара.
+                Убери бренды, объёмы, маркировки. Оставь только суть.
+
+                Примеры:
+                "Молоко Домик в деревне 2.5% 1л" → "Молоко"
+                "Сок J7 апельсиновый 0.97л" → "Сок апельсиновый"
+
+                ФОРМАТ ОТВЕТА (строго JSON):
+                {"products": [{"item": "исходное название", "product": "название продукта"}]}
+                """,
+
+            ("ProductExtraction", "user") => """
+                ТОВАРЫ:
+                {{ITEMS}}
+
+                Извлеки продукты.
+                """,
+
+            ("Parsing", "system") => """
                 Извлеки данные чека в JSON.
 
                 ПРАВИЛА ДЛЯ ЧЕКА:
                 - shop: название магазина
-                - order_datetime: дата YYYY-MM-DD:hh:mm (год {{YEAR}} если не указан)
+                - order_datetime: дата YYYY-MM-DD:hh:mm
                 - total: итоговая сумма
                 - items: массив товаров
 
@@ -242,12 +309,39 @@ public partial class PromptEditorWindow : Window
                 - unit: единица (шт/кг/л)
                 - price: цена за единицу
                 - amount: итоговая цена
+                """,
 
-                JSON:
-                {"shop":"","order_datetime":"","total":0,"items":[{"name":"","quantity":1,"unit":"шт","price":0,"amount":0}]}
+            ("Parsing", "user") => """
+                Год если не указан: {{YEAR}}
 
                 Текст чека:
                 {{RECEIPT_TEXT}}
+                """,
+
+            ("Shopping", "system") => """
+                Ты — помощник для формирования списка покупок на неделю.
+                Анализируй историю покупок и помогай составить оптимальный список.
+                """,
+
+            ("Shopping", "user") => """
+                Дата: {{TODAY}}
+
+                Список покупок:
+                {{SHOPPING_LIST}}
+                """,
+
+            ("ProductMatcher", "system") => """
+                Выбери наиболее подходящий товар из результатов поиска.
+                Учитывай название, цену, объём.
+
+                Верни JSON: {"best": индекс, "alternatives": [индексы до 3 шт]}
+                """,
+
+            ("ProductMatcher", "user") => """
+                Ищем: {{PRODUCT_NAME}}
+
+                Результаты поиска:
+                {{SEARCH_RESULTS}}
                 """,
 
             _ => string.Empty
@@ -257,14 +351,15 @@ public partial class PromptEditorWindow : Window
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(
-            "Сбросить промпт к значению по умолчанию?\nВсе изменения будут потеряны.",
+            "Сбросить оба промпта к значениям по умолчанию?\nВсе изменения будут потеряны.",
             "Подтверждение",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)
         {
-            PromptTextBox.Text = _defaultPrompt;
+            SystemPromptTextBox.Text = _defaultSystemPrompt;
+            UserPromptTextBox.Text = _defaultUserPrompt;
             _log?.Invoke($"[PromptEditor] Reset to default for {_operation}");
         }
     }
@@ -275,32 +370,32 @@ public partial class PromptEditorWindow : Window
             return;
 
         var result = MessageBox.Show(
-            "Заменить текущий промпт на умный промпт для продвинутых моделей?\n\nЭтот промпт использует JSON-формат иерархии и поддерживает path в ответе.",
+            "Заменить текущие промпты на умные промпты для продвинутых моделей?\n\nЭти промпты оптимизированы для GPT-4, Claude и подобных моделей.",
             "Умный промпт",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)
         {
-            PromptTextBox.Text = smartPrompt;
+            SystemPromptTextBox.Text = smartPrompt.System;
+            UserPromptTextBox.Text = smartPrompt.User;
             _log?.Invoke($"[PromptEditor] Smart prompt applied for {_operation}");
         }
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(PromptText))
+        if (string.IsNullOrWhiteSpace(SystemPromptText) && string.IsNullOrWhiteSpace(UserPromptText))
         {
             MessageBox.Show(
-                "Промпт не может быть пустым",
+                "Хотя бы один промпт должен быть заполнен",
                 "Ошибка",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-            PromptTextBox.Focus();
             return;
         }
 
-        _log?.Invoke($"[PromptEditor] Saved prompt for {_operation}/{_providerKey} (custom: {IsCustomPrompt})");
+        _log?.Invoke($"[PromptEditor] Saved prompts for {_operation}/{_providerKey} (system custom: {IsSystemPromptCustom}, user custom: {IsUserPromptCustom})");
         DialogResult = true;
     }
 }

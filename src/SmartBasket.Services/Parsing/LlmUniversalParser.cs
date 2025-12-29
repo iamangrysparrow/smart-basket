@@ -15,8 +15,8 @@ public class LlmUniversalParser : IReceiptTextParser
     private readonly IAiProviderFactory _providerFactory;
     private readonly IResponseParser _responseParser;
     private readonly ILogger<LlmUniversalParser> _logger;
-    private string? _promptTemplate;
-    private string? _promptTemplatePath;
+    private string? _systemPromptPath;
+    private string? _userPromptPath;
 
     /// <summary>
     /// Ключ AI провайдера для парсинга (из конфигурации парсера)
@@ -53,12 +53,12 @@ public class LlmUniversalParser : IReceiptTextParser
     }
 
     /// <summary>
-    /// Установить путь к файлу шаблона prompt
+    /// Установить пути к файлам промптов (system и user)
     /// </summary>
-    public void SetPromptTemplatePath(string path)
+    public void SetPromptPaths(string systemPath, string userPath)
     {
-        _promptTemplatePath = path;
-        _promptTemplate = null; // Reset cache
+        _systemPromptPath = systemPath;
+        _userPromptPath = userPath;
     }
 
     public ParsedReceipt Parse(string receiptText, DateTime emailDate, string? subject = null)
@@ -129,17 +129,24 @@ public class LlmUniversalParser : IReceiptTextParser
                 progress?.Report($"  [LLM Parser] Truncated to 8000 chars");
             }
 
-            var prompt = BuildParsingPrompt(cleanedBody, emailDate, progress);
+            var (systemPrompt, userPrompt) = BuildMessages(cleanedBody, emailDate, progress);
 
-            progress?.Report($"  [LLM Parser] Prompt ready: {prompt.Length} chars");
-            _logger.LogDebug("Prompt length: {Length}", prompt.Length);
+            progress?.Report($"  [LLM Parser] System prompt: {systemPrompt.Length} chars, User prompt: {userPrompt.Length} chars");
+            _logger.LogDebug("System prompt: {SysLen}, User prompt: {UsrLen}", systemPrompt.Length, userPrompt.Length);
 
             // Генерируем ответ через LLM провайдер
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             progress?.Report($"  [LLM Parser] Sending request via {provider.Name}...");
 
-            var llmResult = await provider.GenerateAsync(
-                prompt,
+            var messages = new List<LlmChatMessage>
+            {
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
+            };
+
+            var llmResult = await provider.ChatAsync(
+                messages,
+                tools: null,
                 progress: progress,
                 cancellationToken: cancellationToken);
 
@@ -235,39 +242,43 @@ public class LlmUniversalParser : IReceiptTextParser
         return HtmlHelper.CleanHtml(html);
     }
 
-    private string BuildParsingPrompt(string emailBody, DateTime emailDate, IProgress<string>? progress = null)
+    private (string SystemPrompt, string UserPrompt) BuildMessages(string emailBody, DateTime emailDate, IProgress<string>? progress = null)
     {
         var year = emailDate.Year;
 
-        // Try to load template from file
-        if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
+        // Try to load from files
+        if (!string.IsNullOrEmpty(_systemPromptPath) && File.Exists(_systemPromptPath) &&
+            !string.IsNullOrEmpty(_userPromptPath) && File.Exists(_userPromptPath))
         {
             try
             {
-                _promptTemplate = File.ReadAllText(_promptTemplatePath);
-                progress?.Report($"  [LLM Parser] Loaded prompt template from: {_promptTemplatePath}");
+                var systemPrompt = File.ReadAllText(_systemPromptPath);
+                var userPrompt = File.ReadAllText(_userPromptPath)
+                    .Replace("{{YEAR}}", year.ToString())
+                    .Replace("{{RECEIPT_TEXT}}", emailBody);
+                progress?.Report($"  [LLM Parser] Loaded prompts from files");
+                return (systemPrompt, userPrompt);
             }
             catch (Exception ex)
             {
-                progress?.Report($"  [LLM Parser] Failed to load template: {ex.Message}, using default");
-                _promptTemplate = null;
+                progress?.Report($"  [LLM Parser] Failed to load prompts: {ex.Message}, using defaults");
             }
         }
-
-        if (!string.IsNullOrEmpty(_promptTemplate))
+        else
         {
-            return _promptTemplate
-                .Replace("{{YEAR}}", year.ToString())
-                .Replace("{{RECEIPT_TEXT}}", emailBody);
+            progress?.Report($"  [LLM Parser] Prompt files not configured, using defaults");
         }
 
-        // Default prompt (fallback)
-        return $@"Извлеки данные чека в JSON. Текст чека:
-{emailBody}
+        return GetDefaultPrompts(emailBody, year);
+    }
+
+    private static (string System, string User) GetDefaultPrompts(string emailBody, int year)
+    {
+        var system = @"Ты — парсер чеков. Извлекай данные чека в JSON.
 
 Правила:
 - shop: название магазина (АШАН, Пятёрочка и т.п.)
-- date: дата в формате YYYY-MM-DD (год {year} если не указан)
+- date: дата в формате YYYY-MM-DD
 - order_number: номер заказа (например H03255764114)
 - total: итоговая сумма (число)
 - items: массив товаров
@@ -280,7 +291,16 @@ public class LlmUniversalParser : IReceiptTextParser
 ИГНОРИРУЙ строки: ""Собрано"", ""Оплата"", ""Доставка"", ""Сервисный сбор"", телефоны, адреса.
 
 JSON:
-{{""shop"":"""",""date"":"""",""order_number"":"""",""total"":0,""items"":[{{""name"":"""",""quantity"":1,""price"":0}}]}}";
+{""shop"":"""",""date"":"""",""order_number"":"""",""total"":0,""items"":[{""name"":"""",""quantity"":1,""price"":0}]}";
+
+        var user = $@"Год по умолчанию (если не указан в чеке): {year}
+
+Текст чека:
+{emailBody}
+
+Извлеки данные чека в JSON.";
+
+        return (system, user);
     }
 
     // DTOs for JSON parsing

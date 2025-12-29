@@ -57,14 +57,9 @@ public class ProductExtractionResult
 public interface IProductExtractionService
 {
     /// <summary>
-    /// Установить путь к файлу шаблона prompt для выделения продуктов
+    /// Установить пути к файлам промптов (system и user)
     /// </summary>
-    void SetPromptTemplatePath(string path);
-
-    /// <summary>
-    /// Установить кастомный prompt напрямую (приоритет над файлом)
-    /// </summary>
-    void SetCustomPrompt(string? prompt);
+    void SetPromptPaths(string systemPath, string userPath);
 
     /// <summary>
     /// Выделить продукты из названий товаров.
@@ -73,6 +68,7 @@ public interface IProductExtractionService
     /// <param name="itemNames">Названия товаров для обработки</param>
     /// <param name="existingProducts">Список существующих продуктов для переиспользования</param>
     /// <param name="unitOfMeasures">Справочник единиц измерения для определения base_unit</param>
+    /// <param name="sessionContext">Контекст сессии для кэширования токенов (опционально)</param>
     /// <param name="progress">Отчёт о прогрессе</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Результат с нормализованными продуктами</returns>
@@ -80,6 +76,7 @@ public interface IProductExtractionService
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string>? existingProducts = null,
         IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures = null,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 }

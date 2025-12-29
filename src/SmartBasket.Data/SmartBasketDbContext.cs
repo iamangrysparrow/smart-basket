@@ -19,6 +19,7 @@ public class SmartBasketDbContext : DbContext
     public DbSet<ProductLabel> ProductLabels => Set<ProductLabel>();
     public DbSet<ItemLabel> ItemLabels => Set<ItemLabel>();
     public DbSet<EmailHistory> EmailHistory => Set<EmailHistory>();
+    public DbSet<TokenUsage> TokenUsages => Set<TokenUsage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -209,6 +210,21 @@ public class SmartBasketDbContext : DbContext
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
             entity.Property(e => e.ErrorMessage).HasMaxLength(2000);
             entity.HasIndex(e => e.EmailId).IsUnique();
+        });
+
+        // TokenUsage (статистика использования токенов AI)
+        modelBuilder.Entity<TokenUsage>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Model).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.RequestId).HasMaxLength(50);
+            entity.Property(e => e.SessionId).HasMaxLength(50);
+            entity.Property(e => e.AiFunction).HasMaxLength(50).IsRequired();
+            entity.HasIndex(e => e.DateTime);
+            entity.HasIndex(e => e.Provider);
+            entity.HasIndex(e => e.AiFunction);
+            entity.HasIndex(e => e.SessionId);
         });
     }
 

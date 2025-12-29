@@ -69,6 +69,13 @@ public class AiProviderConfig
     /// Уровень рассуждений: Low, Medium, High
     /// </summary>
     public ReasoningEffort ReasoningEffort { get; set; } = ReasoningEffort.Low;
+
+    // --- GigaChat specific ---
+
+    /// <summary>
+    /// Scope для GigaChat API (PERS, B2B, CORP)
+    /// </summary>
+    public GigaChatScope GigaChatScope { get; set; } = GigaChatScope.PERS;
 }
 
 /// <summary>
@@ -106,4 +113,25 @@ public enum ReasoningEffort
     /// Приоритет более полного и тщательного рассуждения
     /// </summary>
     High
+}
+
+/// <summary>
+/// Scope для GigaChat API
+/// </summary>
+public enum GigaChatScope
+{
+    /// <summary>
+    /// Доступ для физических лиц
+    /// </summary>
+    PERS,
+
+    /// <summary>
+    /// Доступ для ИП и юридических лиц по платным пакетам
+    /// </summary>
+    B2B,
+
+    /// <summary>
+    /// Доступ для ИП и юридических лиц по схеме pay-as-you-go
+    /// </summary>
+    CORP
 }

@@ -9,7 +9,7 @@ namespace SmartBasket.WPF.ViewModels.Settings;
 public partial class AiOperationsViewModel : ObservableObject
 {
     /// <summary>
-    /// Кастомные промпты: ключ "Operation/ProviderKey" → текст промпта
+    /// Кастомные промпты: ключ "Operation/ProviderKey/system" или "Operation/ProviderKey/user" → текст промпта
     /// </summary>
     private readonly Dictionary<string, string> _prompts = new();
 
@@ -58,20 +58,54 @@ public partial class AiOperationsViewModel : ObservableObject
     private string _productMatcher = string.Empty;
 
     /// <summary>
-    /// Получить кастомный промпт для операции и провайдера
+    /// Получить кастомный системный промпт для операции и провайдера
     /// </summary>
-    public string? GetPrompt(string operation, string providerKey)
+    public string? GetSystemPrompt(string operation, string providerKey)
     {
-        var key = AiOperationsConfig.GetPromptKey(operation, providerKey);
+        var key = AiOperationsConfig.GetSystemPromptKey(operation, providerKey);
+        if (_prompts.TryGetValue(key, out var prompt))
+            return prompt;
+
+        // Fallback to legacy key
+        var legacyKey = AiOperationsConfig.GetPromptKey(operation, providerKey);
+        return _prompts.TryGetValue(legacyKey, out var legacyPrompt) ? legacyPrompt : null;
+    }
+
+    /// <summary>
+    /// Получить кастомный пользовательский промпт для операции и провайдера
+    /// </summary>
+    public string? GetUserPrompt(string operation, string providerKey)
+    {
+        var key = AiOperationsConfig.GetUserPromptKey(operation, providerKey);
         return _prompts.TryGetValue(key, out var prompt) ? prompt : null;
     }
 
     /// <summary>
-    /// Установить кастомный промпт для операции и провайдера
+    /// Установить кастомный системный промпт для операции и провайдера
     /// </summary>
-    public void SetPrompt(string operation, string providerKey, string? prompt)
+    public void SetSystemPrompt(string operation, string providerKey, string? prompt)
     {
-        var key = AiOperationsConfig.GetPromptKey(operation, providerKey);
+        var key = AiOperationsConfig.GetSystemPromptKey(operation, providerKey);
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            _prompts.Remove(key);
+        }
+        else
+        {
+            _prompts[key] = prompt;
+        }
+
+        // Remove legacy key if exists
+        var legacyKey = AiOperationsConfig.GetPromptKey(operation, providerKey);
+        _prompts.Remove(legacyKey);
+    }
+
+    /// <summary>
+    /// Установить кастомный пользовательский промпт для операции и провайдера
+    /// </summary>
+    public void SetUserPrompt(string operation, string providerKey, string? prompt)
+    {
+        var key = AiOperationsConfig.GetUserPromptKey(operation, providerKey);
         if (string.IsNullOrWhiteSpace(prompt))
         {
             _prompts.Remove(key);
@@ -83,13 +117,30 @@ public partial class AiOperationsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Проверить, есть ли кастомный промпт для операции и провайдера
+    /// Проверить, есть ли кастомные промпты для операции и провайдера
     /// </summary>
     public bool HasCustomPrompt(string operation, string providerKey)
     {
-        var key = AiOperationsConfig.GetPromptKey(operation, providerKey);
-        return _prompts.ContainsKey(key);
+        var systemKey = AiOperationsConfig.GetSystemPromptKey(operation, providerKey);
+        var userKey = AiOperationsConfig.GetUserPromptKey(operation, providerKey);
+        var legacyKey = AiOperationsConfig.GetPromptKey(operation, providerKey);
+
+        return _prompts.ContainsKey(systemKey) ||
+               _prompts.ContainsKey(userKey) ||
+               _prompts.ContainsKey(legacyKey);
     }
+
+    /// <summary>
+    /// Legacy: Получить кастомный промпт для операции и провайдера
+    /// </summary>
+    public string? GetPrompt(string operation, string providerKey)
+        => GetSystemPrompt(operation, providerKey);
+
+    /// <summary>
+    /// Legacy: Установить кастомный промпт для операции и провайдера
+    /// </summary>
+    public void SetPrompt(string operation, string providerKey, string? prompt)
+        => SetSystemPrompt(operation, providerKey, prompt);
 
     /// <summary>
     /// Преобразование обратно в конфигурацию

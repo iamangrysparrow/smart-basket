@@ -3,6 +3,22 @@ using SmartBasket.Services.Tools.Models;
 namespace SmartBasket.Services.Llm;
 
 /// <summary>
+/// Статистика использования токенов от LLM провайдера
+/// </summary>
+public record LlmTokenUsage(
+    /// <summary>Токены промпта (входные)</summary>
+    int PromptTokens,
+    /// <summary>Токены ответа (выходные)</summary>
+    int CompletionTokens,
+    /// <summary>Кэшированные токены промпта (GigaChat)</summary>
+    int? PrecachedPromptTokens,
+    /// <summary>Токены на размышление (YandexGPT reasoning)</summary>
+    int? ReasoningTokens,
+    /// <summary>Итоговое количество токенов</summary>
+    int TotalTokens
+);
+
+/// <summary>
 /// Вызов инструмента от LLM
 /// </summary>
 public class LlmToolCall
@@ -75,6 +91,11 @@ public class LlmGenerationResult
     /// Есть ли вызовы инструментов в ответе
     /// </summary>
     public bool HasToolCalls => ToolCalls?.Count > 0;
+
+    /// <summary>
+    /// Статистика использования токенов
+    /// </summary>
+    public LlmTokenUsage? Usage { get; set; }
 }
 
 /// <summary>
@@ -96,10 +117,12 @@ public interface ILlmProvider
     /// Сгенерировать текст по prompt
     /// </summary>
     /// <param name="prompt">Prompt для генерации</param>
+    /// <param name="sessionContext">Контекст сессии для кэширования токенов (опционально)</param>
     /// <param name="progress">Отчёт о прогрессе (для streaming)</param>
     /// <param name="cancellationToken">Токен отмены</param>
     Task<LlmGenerationResult> GenerateAsync(
         string prompt,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 
@@ -113,11 +136,13 @@ public interface ILlmProvider
     /// </summary>
     /// <param name="messages">История сообщений (user, assistant, system, tool)</param>
     /// <param name="tools">Доступные инструменты (опционально)</param>
+    /// <param name="sessionContext">Контекст сессии для кэширования токенов (опционально)</param>
     /// <param name="progress">Отчёт о прогрессе (для streaming)</param>
     /// <param name="cancellationToken">Токен отмены</param>
     Task<LlmGenerationResult> ChatAsync(
         IEnumerable<LlmChatMessage> messages,
         IEnumerable<ToolDefinition>? tools = null,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 

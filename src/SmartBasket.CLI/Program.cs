@@ -962,7 +962,8 @@ async Task<int> TestYandexAgentProviderAsync(AiProviderConfig provider)
     var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
     var logger = serviceProvider.GetRequiredService<ILogger<SmartBasket.Services.Llm.YandexAgentLlmProvider>>();
 
-    var agentProvider = new SmartBasket.Services.Llm.YandexAgentLlmProvider(httpClientFactory, logger, provider);
+    var tokenUsageService = new NullTokenUsageService();
+    var agentProvider = new SmartBasket.Services.Llm.YandexAgentLlmProvider(httpClientFactory, logger, provider, tokenUsageService);
 
     var testPrompt = "Напиши короткий тост на день рождения. 2-3 предложения.";
 
@@ -1289,4 +1290,23 @@ async Task<int> TestChatServiceAsync(AppSettings appSettings, string? providerKe
     }
 
     return results.All(r => r.success) ? 0 : 1;
+}
+
+/// <summary>
+/// No-op реализация ITokenUsageService для CLI тестов
+/// </summary>
+class NullTokenUsageService : ITokenUsageService
+{
+    public Task LogUsageAsync(
+        string provider,
+        string model,
+        string aiFunction,
+        LlmTokenUsage usage,
+        string? requestId = null,
+        string? sessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        // No-op: не сохраняем в БД в CLI
+        return Task.CompletedTask;
+    }
 }

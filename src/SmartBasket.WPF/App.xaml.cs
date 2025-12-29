@@ -137,9 +137,11 @@ public partial class App : Application
 
         // LLM Services (use AI providers via factory)
         services.AddSingleton<IResponseParser, ResponseParser>();
+        services.AddSingleton<IAiSessionManager, AiSessionManager>();
         services.AddTransient<IProductExtractionService, ProductExtractionService>();
         services.AddTransient<IProductClassificationService, ProductClassificationService>();
         services.AddTransient<ILabelAssignmentService, LabelAssignmentService>();
+        services.AddTransient<ITokenUsageService, TokenUsageService>();
 
         // Parsers
         services.AddSingleton<IReceiptTextParser, InstamartReceiptParser>();

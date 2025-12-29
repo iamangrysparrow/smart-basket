@@ -12,6 +12,12 @@ public class ProductCategory : BaseEntity
     public required string Name { get; set; }
 
     /// <summary>
+    /// Номер категории из файла product_categories.txt.
+    /// Используется для маппинга при классификации LLM.
+    /// </summary>
+    public int? Number { get; set; }
+
+    /// <summary>
     /// Ссылка на родительскую категорию для иерархии
     /// </summary>
     public Guid? ParentId { get; set; }

@@ -18,12 +18,15 @@ public class ProductClassificationService : IProductClassificationService
     private readonly IResponseParser _responseParser;
     private readonly SmartBasketDbContext _dbContext;
     private readonly ILogger<ProductClassificationService> _logger;
-    private string? _promptTemplate;
-    private string? _promptTemplatePath;
-    private string? _customPrompt;
+    private string? _systemPromptPath;
+    private string? _userPromptPath;
+    private bool _promptPathsInitialized;
 
     // Трекинг созданных категорий в текущей сессии (для удаления пустых)
     private readonly HashSet<Guid> _createdCategoryIds = new();
+
+    // Кэш иерархии категорий из файла product_categories.txt: Number → (Name, ParentNumber)
+    private Dictionary<int, (string Name, int? ParentNumber)>? _defaultCategoryHierarchy;
 
     public ProductClassificationService(
         IAiProviderFactory providerFactory,
@@ -37,21 +40,44 @@ public class ProductClassificationService : IProductClassificationService
         _logger = logger;
     }
 
-    public void SetPromptTemplatePath(string path)
+    public void SetPromptPaths(string systemPath, string userPath)
     {
-        _promptTemplatePath = path;
-        _promptTemplate = null;
+        _systemPromptPath = systemPath;
+        _userPromptPath = userPath;
+        _promptPathsInitialized = true;
+        _logger.LogDebug("Prompt paths set: system={System}, user={User}", systemPath, userPath);
     }
 
-    public void SetCustomPrompt(string? prompt)
+    /// <summary>
+    /// Инициализировать пути к файлам промптов из директории приложения
+    /// </summary>
+    private void EnsurePromptPathsInitialized()
     {
-        _customPrompt = prompt;
-        _logger.LogDebug("Custom prompt set: {HasPrompt}", !string.IsNullOrWhiteSpace(prompt));
+        if (_promptPathsInitialized) return;
+
+        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var systemPath = Path.Combine(appDir, "prompt_classify_products_system.txt");
+        var userPath = Path.Combine(appDir, "prompt_classify_products_user.txt");
+
+        if (File.Exists(systemPath))
+        {
+            _systemPromptPath = systemPath;
+            _logger.LogDebug("Auto-detected system prompt: {Path}", systemPath);
+        }
+
+        if (File.Exists(userPath))
+        {
+            _userPromptPath = userPath;
+            _logger.LogDebug("Auto-detected user prompt: {Path}", userPath);
+        }
+
+        _promptPathsInitialized = true;
     }
 
     public async Task<ProductClassificationResult> ClassifyAsync(
         IReadOnlyList<string> productNames,
         IReadOnlyList<ExistingCategory> existingCategories,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -82,17 +108,29 @@ public class ProductClassificationService : IProductClassificationService
             progress?.Report($"  [Classify] Using provider: {provider.Name}");
             progress?.Report($"  [Classify] Classifying {productNames.Count} products...");
 
-            var prompt = BuildPrompt(productNames, existingCategories, progress);
-            progress?.Report($"  [Classify] Prompt ready: {prompt.Length} chars");
-            progress?.Report($"  [Classify] === PROMPT START ===");
-            progress?.Report(prompt);
-            progress?.Report($"  [Classify] === PROMPT END ===");
+            // Строим System/User сообщения с маппингом категорий
+            var (systemPrompt, userPrompt, categoryMapping) = BuildMessages(productNames, existingCategories, progress);
+            progress?.Report($"  [Classify] System prompt: {systemPrompt.Length} chars, User prompt: {userPrompt.Length} chars");
+            progress?.Report($"  [Classify] === SYSTEM PROMPT START ===");
+            progress?.Report(systemPrompt);
+            progress?.Report($"  [Classify] === SYSTEM PROMPT END ===");
+            progress?.Report($"  [Classify] === USER PROMPT START ===");
+            progress?.Report(userPrompt);
+            progress?.Report($"  [Classify] === USER PROMPT END ===");
+
+            var messages = new List<LlmChatMessage>
+            {
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
+            };
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             progress?.Report($"  [Classify] Sending request via {provider.Name}...");
 
-            var llmResult = await provider.GenerateAsync(
-                prompt,
+            var llmResult = await provider.ChatAsync(
+                messages,
+                tools: null,
+                sessionContext: sessionContext,
                 progress: progress,
                 cancellationToken: cancellationToken);
 
@@ -107,6 +145,7 @@ public class ProductClassificationService : IProductClassificationService
             }
 
             result.RawResponse = llmResult.Response;
+            result.CategoryNumberToGuid = categoryMapping;
             progress?.Report($"  [Classify] Total response: {llmResult.Response.Length} chars");
 
             // Extract and parse JSON using unified ResponseParser
@@ -117,9 +156,8 @@ public class ProductClassificationService : IProductClassificationService
                 result.Products = parseResult.Data.Products;
                 result.IsSuccess = true;
 
-                var categories = result.Products.Count(p => !p.IsProduct);
-                var products = result.Products.Count(p => p.IsProduct);
-                result.Message = $"Got {categories} categories, {products} products";
+                var productsCount = result.Products.Count;
+                result.Message = $"Got {productsCount} products classified";
                 progress?.Report($"  [Classify] {result.Message} (method: {parseResult.ExtractionMethod})");
             }
             else
@@ -147,67 +185,270 @@ public class ProductClassificationService : IProductClassificationService
         return result;
     }
 
+    /// <summary>
+    /// Классификация с кастомным промптом (объединённый system + user).
+    /// Используется для реклассификации с отредактированным промптом из UI.
+    /// Пытается извлечь маппинг категорий из промпта (номера → Guid).
+    /// </summary>
+    private async Task<ProductClassificationResult> ClassifyWithCustomPromptAsync(
+        string customPrompt,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new ProductClassificationResult();
+
+        try
+        {
+            // Получаем провайдер для классификации
+            var provider = _providerFactory.GetProviderForOperation(AiOperation.Classification);
+            if (provider == null)
+            {
+                var errorMsg = "No AI provider configured for Classification operation.";
+                _logger.LogError(errorMsg);
+                progress?.Report($"  [Classify] ERROR: {errorMsg}");
+                result.IsSuccess = false;
+                result.Message = errorMsg;
+                return result;
+            }
+
+            progress?.Report($"  [Classify] Using provider: {provider.Name}");
+            progress?.Report($"  [Classify] Custom prompt: {customPrompt.Length} chars");
+
+            // Пытаемся извлечь маппинг категорий из промпта (если он сгенерирован BuildMessages)
+            var categoryMapping = await ExtractCategoryMappingFromPromptAsync(customPrompt, cancellationToken);
+            result.CategoryNumberToGuid = categoryMapping;
+            progress?.Report($"  [Classify] Extracted category mapping: {categoryMapping.Count} entries");
+
+            // Разделяем промпт на system и user по двойному переносу строки
+            var separatorIndex = customPrompt.IndexOf("\n\n", StringComparison.Ordinal);
+            string systemPrompt, userPrompt;
+
+            if (separatorIndex > 0)
+            {
+                systemPrompt = customPrompt[..separatorIndex].Trim();
+                userPrompt = customPrompt[(separatorIndex + 2)..].Trim();
+            }
+            else
+            {
+                // Fallback: загружаем категории из файла для системного промпта
+                var existingCategories = await GetExistingCategoriesAsync(cancellationToken);
+                var (categoriesText, _) = LoadNumberedCategoriesFromFile(existingCategories);
+                systemPrompt = GetDefaultSystemPrompt(categoriesText);
+                userPrompt = customPrompt;
+            }
+
+            progress?.Report($"  [Classify] === SYSTEM PROMPT START ===");
+            progress?.Report(systemPrompt);
+            progress?.Report($"  [Classify] === SYSTEM PROMPT END ===");
+            progress?.Report($"  [Classify] === USER PROMPT START ===");
+            progress?.Report(userPrompt);
+            progress?.Report($"  [Classify] === USER PROMPT END ===");
+
+            var messages = new List<LlmChatMessage>
+            {
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
+            };
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            progress?.Report($"  [Classify] Sending request via {provider.Name}...");
+
+            var llmResult = await provider.ChatAsync(
+                messages,
+                tools: null,
+                sessionContext: null,
+                progress: progress,
+                cancellationToken: cancellationToken);
+
+            stopwatch.Stop();
+            progress?.Report($"  [Classify] Response received in {stopwatch.Elapsed.TotalSeconds:F1}s");
+
+            if (!llmResult.IsSuccess || string.IsNullOrEmpty(llmResult.Response))
+            {
+                result.IsSuccess = false;
+                result.Message = llmResult.ErrorMessage ?? "Empty response from LLM";
+                return result;
+            }
+
+            result.RawResponse = llmResult.Response;
+            progress?.Report($"  [Classify] Total response: {llmResult.Response.Length} chars");
+
+            // Parse JSON
+            var parseResult = _responseParser.ParseJsonObject<ClassificationResponse>(llmResult.Response, progress);
+
+            if (parseResult.IsSuccess && parseResult.Data != null)
+            {
+                result.Products = parseResult.Data.Products;
+                result.IsSuccess = true;
+
+                var productsCount = result.Products.Count;
+                result.Message = $"Got {productsCount} products classified";
+                progress?.Report($"  [Classify] {result.Message} (method: {parseResult.ExtractionMethod})");
+            }
+            else
+            {
+                progress?.Report($"  [Classify] JSON parse error: {parseResult.ErrorMessage}");
+                result.IsSuccess = false;
+                result.Message = parseResult.ErrorMessage ?? "Failed to parse JSON";
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            result.IsSuccess = false;
+            result.Message = "Operation cancelled by user";
+            throw;
+        }
+        catch (Exception ex)
+        {
+            result.IsSuccess = false;
+            result.Message = $"Error: {ex.Message}";
+            _logger.LogError(ex, "Classification with custom prompt error");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Извлекает маппинг номер→Guid из промпта.
+    /// Использует закэшированную карту из файла product_categories.txt.
+    /// </summary>
+    private async Task<Dictionary<int, Guid>> ExtractCategoryMappingFromPromptAsync(
+        string prompt,
+        CancellationToken cancellationToken)
+    {
+        // Загружаем существующие категории из БД
+        var existingCategories = await GetExistingCategoriesAsync(cancellationToken);
+
+        // Используем тот же метод что и BuildMessages
+        var (_, mapping) = LoadNumberedCategoriesFromFile(existingCategories);
+
+        return mapping;
+    }
+
+    /// <summary>
+    /// Строит System и User промпты для ChatAsync.
+    /// Возвращает промпты + маппинг номер категории → Guid.
+    /// </summary>
+    private (string SystemPrompt, string UserPrompt, Dictionary<int, Guid> CategoryMapping) BuildMessages(
+        IReadOnlyList<string> productNames,
+        IReadOnlyList<ExistingCategory> existingCategories,
+        IProgress<string>? progress = null)
+    {
+        // Автоматически инициализировать пути к промптам, если не установлены
+        EnsurePromptPathsInitialized();
+
+        var productsList = string.Join("\n", productNames);
+
+        // Загружаем пронумерованные категории из файла и строим маппинг
+        var (numberedCategories, categoryMapping) = LoadNumberedCategoriesFromFile(existingCategories);
+        progress?.Report($"  [Classify] Loaded categories from file, mapping: {categoryMapping.Count} entries");
+
+        // Пробуем загрузить System/User промпты из файлов
+        string? systemPrompt = null;
+        string? userPrompt = null;
+
+        if (!string.IsNullOrEmpty(_systemPromptPath) && File.Exists(_systemPromptPath))
+        {
+            try
+            {
+                systemPrompt = File.ReadAllText(_systemPromptPath);
+                systemPrompt = systemPrompt
+                    .Replace("{{CATEGORIES}}", numberedCategories);
+                progress?.Report($"  [Classify] Loaded system prompt from: {_systemPromptPath}");
+            }
+            catch (Exception ex)
+            {
+                progress?.Report($"  [Classify] Failed to load system prompt: {ex.Message}");
+            }
+        }
+
+        if (!string.IsNullOrEmpty(_userPromptPath) && File.Exists(_userPromptPath))
+        {
+            try
+            {
+                userPrompt = File.ReadAllText(_userPromptPath);
+                userPrompt = userPrompt
+                    .Replace("{{PRODUCTS}}", productsList);
+                progress?.Report($"  [Classify] Loaded user prompt from: {_userPromptPath}");
+            }
+            catch (Exception ex)
+            {
+                progress?.Report($"  [Classify] Failed to load user prompt: {ex.Message}");
+            }
+        }
+
+        // Fallback на дефолтные промпты
+        systemPrompt ??= GetDefaultSystemPrompt(numberedCategories);
+        userPrompt ??= GetDefaultUserPrompt(productsList);
+
+        return (systemPrompt, userPrompt, categoryMapping);
+    }
+
+    /// <summary>
+    /// Загружает текст категорий из файла product_categories.txt.
+    /// Строит маппинг номер → Guid на основе поля Number в БД.
+    /// </summary>
+    private (string Text, Dictionary<int, Guid> Mapping) LoadNumberedCategoriesFromFile(
+        IReadOnlyList<ExistingCategory> existingCategories)
+    {
+        // Строим маппинг номер → Guid из существующих категорий в БД (по полю Number)
+        var mapping = existingCategories
+            .Where(c => c.Number.HasValue)
+            .ToDictionary(c => c.Number!.Value, c => c.Id);
+
+        _logger.LogDebug("Built mapping from DB: {Count} categories with Number", mapping.Count);
+
+        // Загружаем текст категорий из файла (для промпта)
+        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var filePath = Path.Combine(appDir, "product_categories.txt");
+
+        if (!File.Exists(filePath))
+        {
+            _logger.LogWarning("Categories file not found: {Path}", filePath);
+            return ("", mapping);
+        }
+
+        var text = File.ReadAllText(filePath);
+        return (text, mapping);
+    }
+
+    private static string GetDefaultSystemPrompt(string categoriesText)
+    {
+        return $@"Ты — эксперт по классификации продуктов в иерархическую систему категорий.
+Основное правило — один товар принадлежит только одной категории.
+
+КРИТИЧЕСКИ ВАЖНО:
+- Каждый продукт из входного списка ОБЯЗАТЕЛЬНО должен быть в ответе
+- Выбирай категорию по НОМЕРУ из списка ниже
+- ПО УМОЛЧАНИЮ продукты — СВЕЖИЕ. Категории ""Заморозка"", ""Замороженные..."" использовать ТОЛЬКО если в названии продукта ЯВНО указано: ""замороженный"", ""заморозка"", ""frozen""
+- Выбирай самый нижний уровень категории (лист дерева)
+- Запрещено изменять названия продуктов — копируй как есть
+
+КАТЕГОРИИ (выбирай по номеру):
+{categoriesText}
+
+ФОРМАТ ОТВЕТА (строго JSON):
+{{""products"": [{{""name"": ""Название продукта"", ""category"": 15}}]}}
+
+category — номер категории из списка (число)";
+    }
+
+    private static string GetDefaultUserPrompt(string productsList)
+    {
+        return $@"ПРОДУКТЫ ДЛЯ КЛАССИФИКАЦИИ:
+{productsList}
+
+Классифицируй ВСЕ продукты из списка. Для каждого укажи номер категории.";
+    }
+
     private string BuildPrompt(
         IReadOnlyList<string> productNames,
         IReadOnlyList<ExistingCategory> existingCategories,
         IProgress<string>? progress = null)
     {
-        // Список продуктов для классификации
-        var productsList = string.Join("\n", productNames);
-
-        // Существующая иерархия категорий (без продуктов)
-        var hierarchyText = BuildHierarchyText(existingCategories);
-
-        // Priority 1: Custom prompt (from settings)
-        if (!string.IsNullOrWhiteSpace(_customPrompt))
-        {
-            progress?.Report($"  [Classify] Using custom prompt ({_customPrompt.Length} chars)");
-            return _customPrompt
-                .Replace("{{EXISTING_HIERARCHY}}", hierarchyText)
-                .Replace("{{PRODUCTS}}", productsList);
-        }
-
-        // Priority 2: Template from file
-        if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
-        {
-            try
-            {
-                _promptTemplate = File.ReadAllText(_promptTemplatePath);
-                progress?.Report($"  [Classify] Loaded template from: {_promptTemplatePath}");
-            }
-            catch (Exception ex)
-            {
-                progress?.Report($"  [Classify] Failed to load template: {ex.Message}");
-                _promptTemplate = null;
-            }
-        }
-
-        if (!string.IsNullOrEmpty(_promptTemplate))
-        {
-            return _promptTemplate
-                .Replace("{{EXISTING_HIERARCHY}}", hierarchyText)
-                .Replace("{{PRODUCTS}}", productsList);
-        }
-
-        // Priority 3: Default prompt (fallback)
-        return $@"Классифицируй продукты и построй иерархию категорий.
-
-СУЩЕСТВУЮЩАЯ ИЕРАРХИЯ КАТЕГОРИЙ:
-{hierarchyText}
-
-ПРОДУКТЫ ДЛЯ КЛАССИФИКАЦИИ:
-{productsList}
-
-ПРАВИЛА:
-1. Каждый продукт из входного списка ДОЛЖЕН быть в ответе с ""product"": true
-2. Используй существующие категории если подходят
-3. Создавай новые категории только если нужно
-4. ЗАПРЕЩЕНО использовать ""Не категоризировано"", ""Другое"", ""Прочее""
-
-ФОРМАТ ОТВЕТА (строго JSON):
-{{""products"":[{{""name"":""Название"",""parent"":null или ""имя-родителя"",""product"":true/false}}]}}
-
-Классифицируй ВСЕ {productNames.Count} продуктов:";
+        // Legacy метод для обратной совместимости
+        var (systemPrompt, userPrompt, _) = BuildMessages(productNames, existingCategories, progress);
+        return systemPrompt + "\n\n" + userPrompt;
     }
 
     /// <summary>
@@ -259,6 +500,7 @@ public class ProductClassificationService : IProductClassificationService
     /// Классифицировать все некатегоризированные продукты и применить результат к БД.
     /// </summary>
     public async Task<ClassificationApplyResult> ClassifyAndApplyAsync(
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -287,14 +529,22 @@ public class ProductClassificationService : IProductClassificationService
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            // 2. Загрузить существующие категории
+            // 2. Синхронизировать номера категорий из файла (если ещё не проставлены)
+            var synced = await SyncCategoryNumbersAsync(cancellationToken);
+            if (synced > 0)
+            {
+                progress?.Report($"  [Classify] Synced {synced} category numbers from file");
+            }
+
+            // 3. Загрузить существующие категории (уже с Number)
             var existingCategories = await GetExistingCategoriesAsync(cancellationToken);
-            progress?.Report($"  [Classify] Existing categories: {existingCategories.Count}");
+            progress?.Report($"  [Classify] Existing categories: {existingCategories.Count}, with Number: {existingCategories.Count(c => c.Number.HasValue)}");
 
             // 3. Вызвать LLM для классификации
             var classificationResult = await ClassifyAsync(
                 productsToClassify,
                 existingCategories,
+                sessionContext,
                 progress,
                 cancellationToken);
 
@@ -360,74 +610,33 @@ public class ProductClassificationService : IProductClassificationService
         {
             Id = c.Id,
             Name = c.Name,
-            ParentName = c.Parent?.Name
+            ParentName = c.Parent?.Name,
+            Number = c.Number
         }).ToList();
     }
 
     /// <summary>
-    /// Применить результат классификации к БД
+    /// Применить результат классификации к БД.
+    /// Использует маппинг номер категории → Guid из результата.
+    /// Создаёт недостающие категории из файла product_categories.txt.
     /// </summary>
     private async Task ApplyClassificationResultAsync(
         ProductClassificationResult classificationResult,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
-        // Построить lookup категорий
-        var categoryLookup = await _dbContext.ProductCategories
-            .ToDictionaryAsync(c => c.Name, c => c, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var categoryMapping = new Dictionary<int, Guid>(classificationResult.CategoryNumberToGuid);
+        progress?.Report($"  [Classify] Category mapping has {categoryMapping.Count} entries");
 
-        // Сначала создаём все категории (product: false)
-        var categoriesToCreate = classificationResult.Products
-            .Where(p => !p.IsProduct)
-            .ToList();
+        // Загружаем иерархию категорий из файла (номер → (название, родительский номер))
+        var hierarchy = LoadDefaultCategoryHierarchy();
+        progress?.Report($"  [Classify] File hierarchy has {hierarchy.Count} categories");
 
-        foreach (var categoryInfo in categoriesToCreate)
-        {
-            if (categoryLookup.ContainsKey(categoryInfo.Name))
-                continue; // Уже существует
+        // Загрузить все категории из БД для создания недостающих
+        var allCategories = await _dbContext.ProductCategories.ToListAsync(cancellationToken);
+        var categoryLookup = allCategories.ToDictionary(c => c.Name, c => c, StringComparer.OrdinalIgnoreCase);
 
-            // Найти родителя если указан
-            Guid? parentId = null;
-            if (!string.IsNullOrWhiteSpace(categoryInfo.Parent))
-            {
-                if (categoryLookup.TryGetValue(categoryInfo.Parent, out var parent))
-                {
-                    parentId = parent.Id;
-                }
-                else
-                {
-                    // Родитель ещё не создан - создадим его
-                    var parentCategory = new ProductCategory { Name = categoryInfo.Parent };
-                    _dbContext.ProductCategories.Add(parentCategory);
-                    await _dbContext.SaveChangesAsync(cancellationToken);
-                    categoryLookup[categoryInfo.Parent] = parentCategory;
-                    _createdCategoryIds.Add(parentCategory.Id);
-                    progress?.Report($"  [Classify] Created parent category: {categoryInfo.Parent}");
-                    parentId = parentCategory.Id;
-                }
-            }
-
-            var newCategory = new ProductCategory
-            {
-                Name = categoryInfo.Name,
-                ParentId = parentId
-            };
-            _dbContext.ProductCategories.Add(newCategory);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            categoryLookup[categoryInfo.Name] = newCategory;
-            _createdCategoryIds.Add(newCategory.Id);
-            progress?.Report($"  [Classify] Created category: {categoryInfo.Name}");
-        }
-
-        // Теперь привязываем продукты к категориям
-        var productsToUpdate = classificationResult.Products
-            .Where(p => p.IsProduct && !string.IsNullOrWhiteSpace(p.Parent))
-            .ToList();
-
-        progress?.Report($"  [Classify] Products to update: {productsToUpdate.Count}");
-        progress?.Report($"  [Classify] Categories in lookup: {string.Join(", ", categoryLookup.Keys)}");
-
-        // Загрузить продукты из БД - используем нормализованные имена (lowercase) для поиска
+        // Загрузить все продукты из БД для обновления
         var allProducts = await _dbContext.Products.ToListAsync(cancellationToken);
         var productLookup = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in allProducts)
@@ -440,39 +649,74 @@ public class ProductClassificationService : IProductClassificationService
         }
 
         progress?.Report($"  [Classify] Products in DB lookup: {productLookup.Count}");
+        progress?.Report($"  [Classify] Products to classify: {classificationResult.Products.Count}");
 
-        foreach (var productInfo in productsToUpdate)
+        var updated = 0;
+        var notFound = 0;
+        var invalidCategory = 0;
+
+        foreach (var productInfo in classificationResult.Products)
         {
             // Нормализуем имя продукта для поиска
             var normalizedProductName = NormalizeProductName(productInfo.Name);
-            progress?.Report($"  [Classify] Processing: '{productInfo.Name}' (normalized: '{normalizedProductName}') -> parent='{productInfo.Parent}'");
 
             if (!productLookup.TryGetValue(normalizedProductName, out var product))
             {
-                progress?.Report($"  [Classify] ERROR: Product not found in DB: '{productInfo.Name}'");
-                // Попробуем найти похожие
-                var similar = productLookup.Keys
-                    .Where(k => k.Contains(normalizedProductName.Split(' ')[0], StringComparison.OrdinalIgnoreCase))
-                    .Take(3);
-                if (similar.Any())
+                // Попробуем найти по оригинальному имени
+                if (!productLookup.TryGetValue(productInfo.Name, out product))
                 {
-                    progress?.Report($"  [Classify]   Similar products: {string.Join(", ", similar)}");
+                    progress?.Report($"  [Classify] WARNING: Product not found in DB: '{productInfo.Name}'");
+                    notFound++;
+                    continue;
                 }
+            }
+
+            // Получаем Guid категории по номеру
+            if (productInfo.CategoryNumber <= 0)
+            {
+                progress?.Report($"  [Classify] WARNING: Invalid category number 0 for '{productInfo.Name}'");
+                invalidCategory++;
                 continue;
             }
 
-            if (!categoryLookup.TryGetValue(productInfo.Parent!, out var category))
+            Guid categoryGuid;
+            if (!categoryMapping.TryGetValue(productInfo.CategoryNumber, out categoryGuid))
             {
-                progress?.Report($"  [Classify] ERROR: Category not found: '{productInfo.Parent}'");
-                continue;
+                // Категория не найдена в маппинге — попробуем создать из файла
+                if (!hierarchy.TryGetValue(productInfo.CategoryNumber, out var categoryInfo))
+                {
+                    progress?.Report($"  [Classify] WARNING: Category number {productInfo.CategoryNumber} not found in file for '{productInfo.Name}'");
+                    invalidCategory++;
+                    continue;
+                }
+
+                // Создаём категорию (и её родителей рекурсивно) по номеру
+                var category = await EnsureCategoryExistsByNumberAsync(
+                    productInfo.CategoryNumber, hierarchy, categoryLookup, progress, cancellationToken);
+                if (category == null)
+                {
+                    progress?.Report($"  [Classify] WARNING: Failed to create category #{productInfo.CategoryNumber} '{categoryInfo.Name}' for '{productInfo.Name}'");
+                    invalidCategory++;
+                    continue;
+                }
+
+                categoryGuid = category.Id;
+                categoryMapping[productInfo.CategoryNumber] = categoryGuid;
+                progress?.Report($"  [Classify] Created category #{productInfo.CategoryNumber}: {categoryInfo.Name}");
             }
 
             var oldCategoryId = product.CategoryId;
-            product.CategoryId = category.Id;
-            progress?.Report($"  [Classify] OK: {normalizedProductName} -> {productInfo.Parent} (old: {oldCategoryId}, new: {category.Id})");
+            product.CategoryId = categoryGuid;
+            updated++;
+
+            if (oldCategoryId != categoryGuid)
+            {
+                progress?.Report($"  [Classify] OK: '{productInfo.Name}' -> category #{productInfo.CategoryNumber} (Guid: {categoryGuid})");
+            }
         }
 
         var changedCount = _dbContext.ChangeTracker.Entries<Product>().Count(e => e.State == EntityState.Modified);
+        progress?.Report($"  [Classify] Summary: updated={updated}, not_found={notFound}, invalid_category={invalidCategory}");
         progress?.Report($"  [Classify] Saving {changedCount} modified products...");
         await _dbContext.SaveChangesAsync(cancellationToken);
         progress?.Report($"  [Classify] Saved successfully");
@@ -539,6 +783,7 @@ public class ProductClassificationService : IProductClassificationService
     /// </summary>
     public async Task<ClassificationApplyResult> ReclassifyCategoryAsync(
         Guid? categoryId,
+        string? customPrompt = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -572,16 +817,38 @@ public class ProductClassificationService : IProductClassificationService
             await _dbContext.SaveChangesAsync(cancellationToken);
             progress?.Report($"  [Reclassify] Reset CategoryId for {products.Count} products");
 
-            // 3. Загрузить существующие категории (для контекста LLM)
+            // 3. Синхронизировать номера категорий из файла (если ещё не проставлены)
+            var synced = await SyncCategoryNumbersAsync(cancellationToken);
+            if (synced > 0)
+            {
+                progress?.Report($"  [Reclassify] Synced {synced} category numbers from file");
+            }
+
+            // 4. Загрузить существующие категории (уже с Number)
             var existingCategories = await GetExistingCategoriesAsync(cancellationToken);
-            progress?.Report($"  [Reclassify] Existing categories: {existingCategories.Count}");
+            progress?.Report($"  [Reclassify] Existing categories: {existingCategories.Count}, with Number: {existingCategories.Count(c => c.Number.HasValue)}");
 
             // 4. Вызвать LLM для классификации
-            var classificationResult = await ClassifyAsync(
-                productNames,
-                existingCategories,
-                progress,
-                cancellationToken);
+            ProductClassificationResult classificationResult;
+            if (!string.IsNullOrWhiteSpace(customPrompt))
+            {
+                // Используем кастомный промпт из диалога редактирования
+                progress?.Report($"  [Reclassify] Using custom prompt ({customPrompt.Length} chars)");
+                classificationResult = await ClassifyWithCustomPromptAsync(
+                    customPrompt,
+                    progress,
+                    cancellationToken);
+            }
+            else
+            {
+                // Используем стандартный промпт
+                classificationResult = await ClassifyAsync(
+                    productNames,
+                    existingCategories,
+                    sessionContext: null,  // ReclassifyCategory вызывается вне CollectAsync — нет сессии
+                    progress,
+                    cancellationToken);
+            }
 
             if (!classificationResult.IsSuccess)
             {
@@ -619,9 +886,6 @@ public class ProductClassificationService : IProductClassificationService
             }
 
             progress?.Report($"  [Reclassify] {result.Message}");
-
-            // Сбросить кастомный промпт после использования
-            _customPrompt = null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -691,6 +955,7 @@ public class ProductClassificationService : IProductClassificationService
     /// Нормализует имя продукта для единообразия:
     /// - Приводит к Title Case (первая буква каждого слова заглавная)
     /// - Заменяет ё на е
+    /// - Унифицирует кавычки (все типы → ")
     /// </summary>
     private static string NormalizeProductName(string name)
     {
@@ -699,6 +964,13 @@ public class ProductClassificationService : IProductClassificationService
 
         // Заменяем ё на е
         name = name.Replace('ё', 'е').Replace('Ё', 'Е');
+
+        // Унифицируем все типы кавычек в обычные двойные
+        name = name
+            .Replace('«', '"').Replace('»', '"')   // Французские кавычки
+            .Replace('"', '"').Replace('"', '"')   // Типографские кавычки
+            .Replace('„', '"')                      // Немецкие кавычки
+            .Replace("\\\"", "\"");                 // Escaped кавычки из JSON
 
         // Title Case: первая буква каждого слова заглавная, остальные строчные
         var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -711,5 +983,235 @@ public class ProductClassificationService : IProductClassificationService
             }
         }
         return string.Join(" ", words);
+    }
+
+    /// <summary>
+    /// Загружает иерархию категорий из файла product_categories.txt.
+    /// Новый формат: "3. --Фрукты, ягоды" (номер, точка, дефисы для уровня, название)
+    /// Возвращает словарь: Number -> (CategoryName, ParentNumber)
+    /// Ключ - номер категории (уникален), чтобы не терять дубликаты имён.
+    /// </summary>
+    private Dictionary<int, (string Name, int? ParentNumber)> LoadDefaultCategoryHierarchy()
+    {
+        if (_defaultCategoryHierarchy != null)
+            return _defaultCategoryHierarchy;
+
+        _defaultCategoryHierarchy = new Dictionary<int, (string, int?)>();
+
+        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var filePath = Path.Combine(appDir, "product_categories.txt");
+
+        if (!File.Exists(filePath))
+        {
+            _logger.LogWarning("Default categories file not found: {Path}", filePath);
+            return _defaultCategoryHierarchy;
+        }
+
+        try
+        {
+            var lines = File.ReadAllLines(filePath);
+            var parentStack = new List<int>(); // Stack of parent numbers at each level
+
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                // Новый формат: "3. --Фрукты, ягоды"
+                var match = System.Text.RegularExpressions.Regex.Match(line, @"^(\d+)\.\s*(-+)(.+)$");
+                if (!match.Success)
+                    continue;
+
+                if (!int.TryParse(match.Groups[1].Value, out var number))
+                    continue;
+
+                var dashes = match.Groups[2].Value;
+                var level = dashes.Length; // Количество дефисов = уровень
+                var categoryName = match.Groups[3].Value.Trim();
+
+                if (string.IsNullOrWhiteSpace(categoryName))
+                    continue;
+
+                // Level 1 = root (no parent), Level 2 = child of level 1, etc.
+                int? parentNumber = null;
+                if (level > 1 && parentStack.Count >= level - 1)
+                {
+                    parentNumber = parentStack[level - 2];
+                }
+
+                _defaultCategoryHierarchy[number] = (categoryName, parentNumber);
+
+                // Update parent stack for this level
+                while (parentStack.Count < level)
+                    parentStack.Add(number);
+
+                if (parentStack.Count >= level)
+                    parentStack[level - 1] = number;
+            }
+
+            _logger.LogDebug("Loaded {Count} default categories from file", _defaultCategoryHierarchy.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load default categories from {Path}", filePath);
+        }
+
+        return _defaultCategoryHierarchy;
+    }
+
+    /// <summary>
+    /// Создаёт категорию с полной цепочкой родителей ПО НОМЕРУ.
+    /// Использует hierarchy: Number → (Name, ParentNumber).
+    /// </summary>
+    private async Task<ProductCategory?> EnsureCategoryExistsByNumberAsync(
+        int categoryNumber,
+        Dictionary<int, (string Name, int? ParentNumber)> hierarchy,
+        Dictionary<string, ProductCategory> categoryLookup,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (!hierarchy.TryGetValue(categoryNumber, out var info))
+            return null;
+
+        var categoryName = info.Name;
+
+        // Сначала ищем в БД по Number (уникальный идентификатор)
+        var existingByNumber = await _dbContext.ProductCategories
+            .FirstOrDefaultAsync(c => c.Number == categoryNumber, cancellationToken);
+        if (existingByNumber != null)
+        {
+            categoryLookup.TryAdd(existingByNumber.Name, existingByNumber);
+            return existingByNumber;
+        }
+
+        // Рекурсивно создать родителя по его номеру
+        Guid? parentId = null;
+        if (info.ParentNumber.HasValue)
+        {
+            var parentCategory = await EnsureCategoryExistsByNumberAsync(
+                info.ParentNumber.Value, hierarchy, categoryLookup, progress, cancellationToken);
+            parentId = parentCategory?.Id;
+        }
+
+        // Создать категорию с уникальным именем (добавляем суффикс если дубликат)
+        var uniqueName = categoryName;
+        if (categoryLookup.ContainsKey(categoryName))
+        {
+            // Для уникальности добавляем номер родителя
+            if (info.ParentNumber.HasValue && hierarchy.TryGetValue(info.ParentNumber.Value, out var parentInfo))
+            {
+                uniqueName = $"{categoryName} ({parentInfo.Name})";
+            }
+            else
+            {
+                uniqueName = $"{categoryName} #{categoryNumber}";
+            }
+        }
+
+        var newCategory = new ProductCategory
+        {
+            Name = uniqueName,
+            ParentId = parentId,
+            Number = categoryNumber
+        };
+
+        _dbContext.ProductCategories.Add(newCategory);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        categoryLookup[uniqueName] = newCategory;
+        _createdCategoryIds.Add(newCategory.Id);
+
+        progress?.Report($"  [Classify] Created category #{categoryNumber}: {uniqueName}" +
+            (parentId.HasValue ? $" (parent: #{info.ParentNumber})" : " (root)"));
+
+        return newCategory;
+    }
+
+    /// <summary>
+    /// Синхронизировать номера категорий из файла product_categories.txt в БД.
+    /// Обновляет поле Number для существующих категорий.
+    /// Для дубликатов имён использует контекст родителя.
+    /// </summary>
+    public async Task<int> SyncCategoryNumbersAsync(CancellationToken cancellationToken = default)
+    {
+        var hierarchy = LoadDefaultCategoryHierarchy();
+        if (hierarchy.Count == 0)
+        {
+            _logger.LogWarning("No categories loaded from file, nothing to sync");
+            return 0;
+        }
+
+        // Строим обратный индекс: Name → List<Number> (для дубликатов имён)
+        var nameToNumbers = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (number, info) in hierarchy)
+        {
+            if (!nameToNumbers.TryGetValue(info.Name, out var list))
+            {
+                list = new List<int>();
+                nameToNumbers[info.Name] = list;
+            }
+            list.Add(number);
+        }
+
+        var categories = await _dbContext.ProductCategories
+            .Include(c => c.Parent)
+            .ToListAsync(cancellationToken);
+        var updated = 0;
+
+        foreach (var category in categories)
+        {
+            if (!nameToNumbers.TryGetValue(category.Name, out var possibleNumbers))
+                continue;
+
+            int? matchedNumber = null;
+
+            if (possibleNumbers.Count == 1)
+            {
+                // Уникальное имя - просто берём номер
+                matchedNumber = possibleNumbers[0];
+            }
+            else
+            {
+                // Дубликат имени - нужно сопоставить по родителю
+                foreach (var num in possibleNumbers)
+                {
+                    var info = hierarchy[num];
+
+                    // Если нет родителя в файле и нет в БД - совпадение
+                    if (!info.ParentNumber.HasValue && category.ParentId == null)
+                    {
+                        matchedNumber = num;
+                        break;
+                    }
+
+                    // Если есть родитель - сравниваем
+                    if (info.ParentNumber.HasValue && category.Parent != null)
+                    {
+                        var parentInfo = hierarchy.GetValueOrDefault(info.ParentNumber.Value);
+                        if (parentInfo.Name != null &&
+                            category.Parent.Name.Equals(parentInfo.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchedNumber = num;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (matchedNumber.HasValue && category.Number != matchedNumber.Value)
+            {
+                category.Number = matchedNumber.Value;
+                updated++;
+                _logger.LogDebug("Synced category '{Name}' -> Number {Number}", category.Name, matchedNumber.Value);
+            }
+        }
+
+        if (updated > 0)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Synced {Count} category numbers from file", updated);
+        }
+
+        return updated;
     }
 }

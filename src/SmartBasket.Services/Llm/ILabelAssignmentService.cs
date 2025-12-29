@@ -46,14 +46,9 @@ public class BatchLabelAssignmentResult
 public interface ILabelAssignmentService
 {
     /// <summary>
-    /// Установить путь к файлу шаблона prompt
+    /// Установить пути к файлам промптов (system и user)
     /// </summary>
-    void SetPromptTemplatePath(string path);
-
-    /// <summary>
-    /// Установить кастомный prompt напрямую (приоритет над файлом)
-    /// </summary>
-    void SetCustomPrompt(string? prompt);
+    void SetPromptPaths(string systemPath, string userPath);
 
     /// <summary>
     /// Назначить метки для товара (одиночный вызов)
@@ -61,12 +56,14 @@ public interface ILabelAssignmentService
     /// <param name="itemName">Название товара</param>
     /// <param name="productName">Название продукта (категории)</param>
     /// <param name="availableLabels">Список доступных меток</param>
+    /// <param name="sessionContext">Контекст сессии для кэширования токенов (опционально)</param>
     /// <param name="progress">Отчёт о прогрессе</param>
     /// <param name="cancellationToken">Токен отмены</param>
     Task<LabelAssignmentResult> AssignLabelsAsync(
         string itemName,
         string productName,
         IReadOnlyList<string> availableLabels,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 
@@ -75,11 +72,13 @@ public interface ILabelAssignmentService
     /// </summary>
     /// <param name="items">Список товаров для классификации</param>
     /// <param name="availableLabels">Список доступных меток</param>
+    /// <param name="sessionContext">Контекст сессии для кэширования токенов (опционально)</param>
     /// <param name="progress">Отчёт о прогрессе</param>
     /// <param name="cancellationToken">Токен отмены</param>
     Task<BatchLabelAssignmentResult> AssignLabelsBatchAsync(
         IReadOnlyList<BatchItemInput> items,
         IReadOnlyList<string> availableLabels,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default);
 }

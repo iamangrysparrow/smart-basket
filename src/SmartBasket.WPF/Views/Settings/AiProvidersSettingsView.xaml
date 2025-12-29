@@ -126,6 +126,7 @@
                             <ComboBoxItem Content="Ollama (локальный)" Tag="{x:Static core:AiProviderType.Ollama}"/>
                             <ComboBoxItem Content="YandexGPT" Tag="{x:Static core:AiProviderType.YandexGPT}"/>
                             <ComboBoxItem Content="Yandex Agent (AI Studio)" Tag="{x:Static core:AiProviderType.YandexAgent}"/>
+                            <ComboBoxItem Content="GigaChat (Sber)" Tag="{x:Static core:AiProviderType.GigaChat}"/>
                             <ComboBoxItem Content="OpenAI / OpenAI-compatible" Tag="{x:Static core:AiProviderType.OpenAI}"/>
                         </ComboBox>
 
@@ -159,6 +160,15 @@
                             <ComboBoxItem Content="gpt-4-turbo"/>
                             <ComboBoxItem Content="gpt-3.5-turbo"/>
                         </ComboBox>
+                        <!-- GigaChat models -->
+                        <ComboBox Grid.Row="2" Grid.Column="1" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEditable="True" FontSize="12" Padding="4,3" Margin="0,0,0,6"
+                                  Visibility="{Binding IsGigaChat, Converter={StaticResource BoolToVis}}">
+                            <ComboBoxItem Content="GigaChat" ToolTip="Базовая модель"/>
+                            <ComboBoxItem Content="GigaChat-Pro" ToolTip="Продвинутая модель"/>
+                            <ComboBoxItem Content="GigaChat-Max" ToolTip="Максимальная модель"/>
+                            <ComboBoxItem Content="GigaChat-Pro-preview" ToolTip="GigaChat Pro (ранний доступ)"/>
+                        </ComboBox>
                     </Grid>
 
                     <!-- Connection Settings -->
@@ -169,6 +179,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -204,6 +215,16 @@
                                  Style="{StaticResource TextInput}" Margin="0,0,0,6"
                                  ToolTip="ID агента из Yandex AI Studio (например: fvtp92o93d44ke9oun70)"
                                  Visibility="{Binding ShowAgentId, Converter={StaticResource BoolToVis}}"/>
+
+                        <!-- Scope (GigaChat) -->
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Scope" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                                   Visibility="{Binding ShowGigaChatScope, Converter={StaticResource BoolToVis}}"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1"
+                                  ItemsSource="{Binding GigaChatScopeOptions}"
+                                  SelectedItem="{Binding GigaChatScope}"
+                                  FontSize="12" Padding="4,3" Margin="0,0,0,6"
+                                  ToolTip="PERS - физлица, B2B - юрлица (пакеты), CORP - юрлица (pay-as-you-go)"
+                                  Visibility="{Binding ShowGigaChatScope, Converter={StaticResource BoolToVis}}"/>
                     </Grid>
 
                     <!-- Advanced Settings -->

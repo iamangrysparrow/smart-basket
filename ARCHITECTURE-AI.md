@@ -8,7 +8,7 @@
 
 ---
 
-Документация по интеграции с LLM провайдерами (Ollama, YandexGPT, YandexAgent) для обработки чеков, классификации товаров и AI-чата с поддержкой Tool Calling.
+Документация по интеграции с LLM провайдерами (Ollama, YandexGPT, YandexAgent, GigaChat) для обработки чеков, классификации товаров и AI-чата с поддержкой Tool Calling.
 
 ## LLM Providers Architecture
 
@@ -21,20 +21,21 @@
 │  SupportsConversationReset          - поддержка сброса диалога          │
 │  SupportsTools                      - поддержка native tool calling     │
 │  ResetConversation()                - сброс истории (для stateful API)  │
+│  Usage: LlmTokenUsage               - статистика токенов                │
 └─────────────────────────────────────────────────────────────────────────┘
-              ▲                    ▲                       ▲
-              │                    │                       │
-┌─────────────┴─────────┐ ┌───────┴────────┐ ┌────────────┴────────────┐
-│  OllamaLlmProvider    │ │ YandexGpt      │ │ YandexAgentLlmProvider  │
-│                       │ │ LlmProvider    │ │                         │
-│  /api/chat            │ │                │ │ /v1/responses           │
-│  Native tools         │ │ /completion    │ │ Native function_call    │
-│  + Fallback parsing   │ │ messages[]     │ │ previous_response_id    │
-│                       │ │                │ │                         │
-│  SupportsTools: true  │ │ SupportsTools: │ │ SupportsTools: true     │
-│  (для qwen2.5, etc.)  │ │ false          │ │ (AI Studio agents)      │
-│                       │ │ (fallback)     │ │                         │
-└───────────────────────┘ └────────────────┘ └─────────────────────────┘
+       ▲              ▲                  ▲                   ▲
+       │              │                  │                   │
+┌──────┴──────┐ ┌─────┴─────┐ ┌─────────┴─────────┐ ┌───────┴───────┐
+│ Ollama      │ │ YandexGPT │ │ YandexAgent       │ │ GigaChat      │
+│ LlmProvider │ │ LlmProvider│ │ LlmProvider       │ │ LlmProvider   │
+│             │ │           │ │                   │ │               │
+│ /api/chat   │ │ OpenAI-   │ │ /v1/responses     │ │ Sber API      │
+│ Native tools│ │ compatible│ │ Native function   │ │ Native tools  │
+│ +Fallback   │ │ +Fallback │ │ call +Fallback    │ │ SSE streaming │
+│             │ │           │ │                   │ │               │
+│ Supports    │ │ Supports  │ │ SupportsTools:    │ │ SupportsTools:│
+│ Tools: true │ │ Tools:true│ │ true              │ │ true          │
+└─────────────┘ └───────────┘ └───────────────────┘ └───────────────┘
 ```
 
 ## Tool Calling Architecture
@@ -355,8 +356,9 @@ if (IsDateString(value))
 | Провайдер | API Endpoint | SupportsTools | Метод tool calling |
 |-----------|--------------|---------------|-------------------|
 | Ollama | `/api/chat` | `true` (для совместимых моделей) | Native + Fallback parsing |
-| YandexGPT | `/completion` | `false` | Prompt injection + Fallback parsing + Message conversion |
+| YandexGPT | `/v1/chat/completions` | `true` | OpenAI-compatible + Fallback parsing |
 | YandexAgent | `/v1/responses` | `true` | Native function calling API |
+| GigaChat | `/api/v1/chat/completions` | `true` | Native function_call + SSE streaming |
 
 ### YandexGPT Message Conversion
 
@@ -811,4 +813,72 @@ dotnet run --project SmartBasket.CLI -- test-query
 
 ---
 
-*Последнее обновление: 21.12.2025*
+## Token Usage Tracking
+
+Все AI провайдеры автоматически логируют использование токенов в БД через `ITokenUsageService`.
+
+### Архитектура
+
+```
+┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│  LlmProvider    │────▶│  ITokenUsageService │────▶│   TokenUsage    │
+│  (любой)        │     │                     │     │   (DB Table)    │
+└─────────────────┘     └─────────────────────┘     └─────────────────┘
+```
+
+### Поля LlmTokenUsage
+
+```csharp
+public record LlmTokenUsage(
+    int PromptTokens,           // Токены промпта (входные)
+    int CompletionTokens,       // Токены ответа (выходные)
+    int? PrecachedPromptTokens, // Кэшированные токены (GigaChat)
+    int? ReasoningTokens,       // Токены на размышление (YandexGPT reasoning)
+    int TotalTokens             // Итоговое количество
+);
+```
+
+### Таблица TokenUsage
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| Id | int | PK |
+| Provider | string(50) | Ollama, YandexGPT, YandexAgent, GigaChat |
+| Model | string(100) | Имя модели или AgentId |
+| DateTime | timestamp | UTC время запроса |
+| RequestId | string(50)? | ID запроса (опционально) |
+| SessionId | string(50)? | ID сессии (опционально) |
+| AiFunction | string(50) | Chat, Parsing, Classification, etc. |
+| PromptTokens | int | Входные токены |
+| CompletionTokens | int | Выходные токены |
+| PrecachedPromptTokens | int? | Кэшированные (GigaChat) |
+| ReasoningTokens | int? | Reasoning (YandexGPT) |
+| TotalTokens | int | Итого |
+
+### Поддержка провайдеров
+
+| Провайдер | Парсинг usage | Специфичные поля |
+|-----------|---------------|------------------|
+| Ollama | `prompt_eval_count`, `eval_count` из JSON | — |
+| YandexGPT | `usage.prompt_tokens`, `usage.completion_tokens` | `reasoning_tokens` |
+| YandexAgent | `usage.input_tokens`, `usage.output_tokens` | — |
+| GigaChat | `usage.prompt_tokens`, `usage.completion_tokens` | `precached_prompt_tokens` |
+
+### AiFunctionNames
+
+```csharp
+public static class AiFunctionNames
+{
+    public const string Chat = "Chat";
+    public const string Classification = "Classification";
+    public const string Labels = "Labels";
+    public const string Parsing = "Parsing";
+    public const string Shopping = "Shopping";
+    public const string ShoppingChat = "ShoppingChat";
+    public const string Extraction = "Extraction";
+}
+```
+
+---
+
+*Последнее обновление: 28.12.2025*

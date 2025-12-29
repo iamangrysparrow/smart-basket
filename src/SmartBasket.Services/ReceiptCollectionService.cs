@@ -69,6 +69,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
     private readonly ILabelAssignmentService _labelAssignmentService;
     private readonly ILabelService _labelService;
     private readonly IUnitConversionService _unitConversionService;
+    private readonly IAiSessionManager _sessionManager;
     private readonly SmartBasketDbContext _dbContext;
     private readonly AppSettings _settings;
     private readonly ILogger<ReceiptCollectionService> _logger;
@@ -81,6 +82,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         ILabelAssignmentService labelAssignmentService,
         ILabelService labelService,
         IUnitConversionService unitConversionService,
+        IAiSessionManager sessionManager,
         SmartBasketDbContext dbContext,
         AppSettings settings,
         ILogger<ReceiptCollectionService> logger)
@@ -92,6 +94,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         _labelAssignmentService = labelAssignmentService ?? throw new ArgumentNullException(nameof(labelAssignmentService));
         _labelService = labelService ?? throw new ArgumentNullException(nameof(labelService));
         _unitConversionService = unitConversionService ?? throw new ArgumentNullException(nameof(unitConversionService));
+        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -104,8 +107,12 @@ public class ReceiptCollectionService : IReceiptCollectionService
     {
         var result = new CollectionResult();
 
-        // Setup custom prompts from settings
-        SetupCustomPrompts(progress);
+        // Создаём единую сессию для всех AI операций в рамках этого сбора
+        // Это позволяет провайдерам кэшировать токены:
+        // - GigaChat: X-Session-ID header
+        // - YandexAgent: previous_response_id
+        var sessionContext = _sessionManager.CreateSession("receipt-collection");
+        progress?.Report($"[Session] Created AI session: {sessionContext.SessionId}");
 
         // 1. Получить источники
         IReadOnlyList<IReceiptSource> sources;
@@ -218,7 +225,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
                             {
                                 progress?.Report($"  [Stage 1] Extracting products from {newItemNames.Count} NEW items (skipping {existingItemNames.Count} existing)...");
                                 extraction = await _extractionService.ExtractAsync(
-                                    newItemNames, existingProductNames, unitOfMeasures, progress, cancellationToken);
+                                    newItemNames, existingProductNames, unitOfMeasures, sessionContext, progress, cancellationToken);
                             }
                             catch (Exception ex)
                             {
@@ -244,7 +251,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
                         }
 
                         // Сохранение чека + создание Products и Items
-                        var receipt = await SaveReceiptAsync(raw, parsed, extraction, progress, cancellationToken);
+                        var receipt = await SaveReceiptAsync(raw, parsed, extraction, sessionContext, progress, cancellationToken);
                         result.SavedReceipts.Add(receipt);
                         result.ReceiptsSaved++;
 
@@ -289,7 +296,8 @@ public class ReceiptCollectionService : IReceiptCollectionService
             {
                 progress?.Report($"");
                 progress?.Report($"=== Classifying uncategorized products ===");
-                var classificationResult = await _classificationService.ClassifyAndApplyAsync(progress, cancellationToken);
+
+                var classificationResult = await _classificationService.ClassifyAndApplyAsync(sessionContext, progress, cancellationToken);
                 if (classificationResult.IsSuccess)
                 {
                     progress?.Report($"Classification complete: {classificationResult.Message}");
@@ -369,6 +377,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         RawReceipt raw,
         ParsedReceipt parsed,
         ProductExtractionResult extraction,
+        LlmSessionContext? sessionContext,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -388,7 +397,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Обработать Products и Items
-        await ProcessReceiptItemsAsync(receipt, parsed, extraction, progress, cancellationToken);
+        await ProcessReceiptItemsAsync(receipt, parsed, extraction, sessionContext, progress, cancellationToken);
 
         return receipt;
     }
@@ -400,6 +409,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
         Receipt receipt,
         ParsedReceipt parsed,
         ProductExtractionResult extraction,
+        LlmSessionContext? sessionContext,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -559,13 +569,14 @@ public class ReceiptCollectionService : IReceiptCollectionService
         // Назначить метки новым товарам
         if (newItems.Count > 0)
         {
-            await AssignLabelsAsync(newItems, existingProducts, progress, cancellationToken);
+            await AssignLabelsAsync(newItems, existingProducts, sessionContext, progress, cancellationToken);
         }
     }
 
     private async Task AssignLabelsAsync(
         List<Item> items,
         Dictionary<string, Product> productLookup,
+        LlmSessionContext? sessionContext,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -603,6 +614,7 @@ public class ReceiptCollectionService : IReceiptCollectionService
             var result = await _labelAssignmentService.AssignLabelsBatchAsync(
                 batchItems,
                 availableLabels.Keys.ToList(),
+                sessionContext,
                 progress,
                 cancellationToken);
 
@@ -686,59 +698,4 @@ public class ReceiptCollectionService : IReceiptCollectionService
         return string.Join(" ", words);
     }
 
-    /// <summary>
-    /// Настраивает кастомные промпты из конфигурации для каждой операции
-    /// </summary>
-    private void SetupCustomPrompts(IProgress<string>? progress)
-    {
-        var ops = _settings.AiOperations;
-
-        // ProductExtraction prompt (Stage 1)
-        if (!string.IsNullOrWhiteSpace(ops.ProductExtraction))
-        {
-            var customPrompt = ops.GetCustomPrompt("ProductExtraction", ops.ProductExtraction);
-            if (!string.IsNullOrWhiteSpace(customPrompt))
-            {
-                _extractionService.SetCustomPrompt(customPrompt);
-                progress?.Report($"  [Setup] Custom prompt for ProductExtraction/{ops.ProductExtraction}");
-                _logger.LogDebug("Custom prompt loaded for ProductExtraction: {ProviderKey}", ops.ProductExtraction);
-            }
-            else
-            {
-                _extractionService.SetCustomPrompt(null);
-            }
-        }
-
-        // Classification prompt
-        if (!string.IsNullOrWhiteSpace(ops.Classification))
-        {
-            var customPrompt = ops.GetCustomPrompt("Classification", ops.Classification);
-            if (!string.IsNullOrWhiteSpace(customPrompt))
-            {
-                _classificationService.SetCustomPrompt(customPrompt);
-                progress?.Report($"  [Setup] Custom prompt for Classification/{ops.Classification}");
-                _logger.LogDebug("Custom prompt loaded for Classification: {ProviderKey}", ops.Classification);
-            }
-            else
-            {
-                _classificationService.SetCustomPrompt(null);
-            }
-        }
-
-        // Labels prompt
-        if (!string.IsNullOrWhiteSpace(ops.Labels))
-        {
-            var customPrompt = ops.GetCustomPrompt("Labels", ops.Labels);
-            if (!string.IsNullOrWhiteSpace(customPrompt))
-            {
-                _labelAssignmentService.SetCustomPrompt(customPrompt);
-                progress?.Report($"  [Setup] Custom prompt for Labels/{ops.Labels}");
-                _logger.LogDebug("Custom prompt loaded for Labels: {ProviderKey}", ops.Labels);
-            }
-            else
-            {
-                _labelAssignmentService.SetCustomPrompt(null);
-            }
-        }
-    }
 }

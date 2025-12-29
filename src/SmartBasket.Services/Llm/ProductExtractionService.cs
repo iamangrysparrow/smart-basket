@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Extensions.Logging;
 using SmartBasket.Core.Configuration;
 
@@ -12,9 +13,9 @@ public class ProductExtractionService : IProductExtractionService
     private readonly IAiProviderFactory _providerFactory;
     private readonly IResponseParser _responseParser;
     private readonly ILogger<ProductExtractionService> _logger;
-    private string? _promptTemplate;
-    private string? _promptTemplatePath;
-    private string? _customPrompt;
+    private string? _systemPromptPath;
+    private string? _userPromptPath;
+    private bool _promptPathsInitialized;
 
     public ProductExtractionService(
         IAiProviderFactory providerFactory,
@@ -26,22 +27,45 @@ public class ProductExtractionService : IProductExtractionService
         _logger = logger;
     }
 
-    public void SetPromptTemplatePath(string path)
+    public void SetPromptPaths(string systemPath, string userPath)
     {
-        _promptTemplatePath = path;
-        _promptTemplate = null;
+        _systemPromptPath = systemPath;
+        _userPromptPath = userPath;
+        _promptPathsInitialized = true;
+        _logger.LogDebug("Prompt paths set: system={SystemPath}, user={UserPath}", systemPath, userPath);
     }
 
-    public void SetCustomPrompt(string? prompt)
+    /// <summary>
+    /// Инициализировать пути к файлам промптов из директории приложения
+    /// </summary>
+    private void EnsurePromptPathsInitialized()
     {
-        _customPrompt = prompt;
-        _logger.LogDebug("Custom prompt set: {HasPrompt}", !string.IsNullOrWhiteSpace(prompt));
+        if (_promptPathsInitialized) return;
+
+        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var systemPath = Path.Combine(appDir, "prompt_extract_products_system.txt");
+        var userPath = Path.Combine(appDir, "prompt_extract_products_user.txt");
+
+        if (File.Exists(systemPath))
+        {
+            _systemPromptPath = systemPath;
+            _logger.LogDebug("Auto-detected system prompt: {Path}", systemPath);
+        }
+
+        if (File.Exists(userPath))
+        {
+            _userPromptPath = userPath;
+            _logger.LogDebug("Auto-detected user prompt: {Path}", userPath);
+        }
+
+        _promptPathsInitialized = true;
     }
 
     public async Task<ProductExtractionResult> ExtractAsync(
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string>? existingProducts = null,
         IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures = null,
+        LlmSessionContext? sessionContext = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -76,17 +100,27 @@ public class ProductExtractionService : IProductExtractionService
                 progress?.Report($"  [Extract] Existing products provided: {existingProducts.Count}");
             }
 
-            var prompt = BuildPrompt(itemNames, existingProducts, unitOfMeasures, progress);
-            progress?.Report($"  [Extract] Prompt ready: {prompt.Length} chars");
-            progress?.Report($"  [Extract] === PROMPT START ===");
-            progress?.Report(prompt);
-            progress?.Report($"  [Extract] === PROMPT END ===");
+            var (systemPrompt, userPrompt) = BuildMessages(itemNames, existingProducts, unitOfMeasures, progress);
+            progress?.Report($"  [Extract] System prompt: {systemPrompt.Length} chars, User prompt: {userPrompt.Length} chars");
+            progress?.Report($"  [Extract] === SYSTEM PROMPT ===");
+            progress?.Report(systemPrompt);
+            progress?.Report($"  [Extract] === USER PROMPT ===");
+            progress?.Report(userPrompt);
+            progress?.Report($"  [Extract] === END ===");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             progress?.Report($"  [Extract] Sending request via {provider.Name}...");
 
-            var llmResult = await provider.GenerateAsync(
-                prompt,
+            var messages = new List<LlmChatMessage>
+            {
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
+            };
+
+            var llmResult = await provider.ChatAsync(
+                messages,
+                tools: null,
+                sessionContext: sessionContext,
                 progress: progress,
                 cancellationToken: cancellationToken);
 
@@ -138,55 +172,56 @@ public class ProductExtractionService : IProductExtractionService
         return result;
     }
 
-    private string BuildPrompt(
+    private (string SystemPrompt, string UserPrompt) BuildMessages(
         IReadOnlyList<string> itemNames,
         IReadOnlyList<string>? existingProducts,
         IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures,
         IProgress<string>? progress = null)
     {
+        // Автоматически инициализировать пути к промптам, если не установлены
+        EnsurePromptPathsInitialized();
+
         var itemsList = string.Join("\n", itemNames.Select((item, idx) => $"{idx + 1}. {item}"));
         var productsList = existingProducts != null && existingProducts.Count > 0
             ? string.Join("\n", existingProducts.Select(p => $"- {p}"))
             : "(нет существующих продуктов)";
 
-        // Формируем справочник единиц измерения
         var unitsList = BuildUnitsReference(unitOfMeasures);
 
-        // Priority 1: Custom prompt (from settings)
-        if (!string.IsNullOrWhiteSpace(_customPrompt))
-        {
-            progress?.Report($"  [Extract] Using custom prompt ({_customPrompt.Length} chars)");
-            return _customPrompt
-                .Replace("{{ITEMS}}", itemsList)
-                .Replace("{{PRODUCTS}}", productsList)
-                .Replace("{{UNITS}}", unitsList);
-        }
+        // Load from files
+        string systemPrompt;
+        string userPrompt;
 
-        // Priority 2: Template from file
-        if (!string.IsNullOrEmpty(_promptTemplatePath) && File.Exists(_promptTemplatePath))
+        if (!string.IsNullOrEmpty(_systemPromptPath) && File.Exists(_systemPromptPath) &&
+            !string.IsNullOrEmpty(_userPromptPath) && File.Exists(_userPromptPath))
         {
             try
             {
-                _promptTemplate = File.ReadAllText(_promptTemplatePath);
-                progress?.Report($"  [Extract] Loaded template from: {_promptTemplatePath}");
+                systemPrompt = File.ReadAllText(_systemPromptPath);
+                userPrompt = File.ReadAllText(_userPromptPath)
+                    .Replace("{{ITEMS}}", itemsList)
+                    .Replace("{{PRODUCTS}}", productsList)
+                    .Replace("{{UNITS}}", unitsList);
+                progress?.Report($"  [Extract] Loaded prompts from files");
             }
             catch (Exception ex)
             {
-                progress?.Report($"  [Extract] Failed to load template: {ex.Message}");
-                _promptTemplate = null;
+                progress?.Report($"  [Extract] Failed to load prompts: {ex.Message}, using defaults");
+                (systemPrompt, userPrompt) = GetDefaultPrompts(itemsList, productsList, unitsList);
             }
         }
-
-        if (!string.IsNullOrEmpty(_promptTemplate))
+        else
         {
-            return _promptTemplate
-                .Replace("{{ITEMS}}", itemsList)
-                .Replace("{{PRODUCTS}}", productsList)
-                .Replace("{{UNITS}}", unitsList);
+            progress?.Report($"  [Extract] Prompt files not configured, using defaults");
+            (systemPrompt, userPrompt) = GetDefaultPrompts(itemsList, productsList, unitsList);
         }
 
-        // Priority 3: Default prompt (fallback)
-        return $@"Выдели продукты из товаров и определи базовую единицу измерения.
+        return (systemPrompt, userPrompt);
+    }
+
+    private static (string System, string User) GetDefaultPrompts(string itemsList, string productsList, string unitsList)
+    {
+        var system = @"Ты — эксперт по нормализации названий товаров в стандартизированные продукты.
 
 Правила выделения продукта:
 - Удали бренды, торговые марки, производителей
@@ -196,9 +231,6 @@ public class ProductExtractionService : IProductExtractionService
 - Сохрани жирность для молочных продуктов (10%, 2.5%)
 - Сохрани вкусовые добавки
 
-Справочник единиц измерения:
-{unitsList}
-
 Правила определения base_unit:
 - Для весовых продуктов (овощи, фрукты, мясо, крупы): кг
 - Для жидкостей (молоко, соки, напитки, масло): л
@@ -206,16 +238,24 @@ public class ProductExtractionService : IProductExtractionService
 - Для тканей, верёвок: м
 - Для плитки, напольных покрытий: м²
 
-Список существующих продуктов (используй при совпадении):
+Формат ответа (строго JSON):
+{""items"":[{""name"":""название товара"",""product"":""продукт"",""base_unit"":""кг""}]}";
+
+        var user = $@"Справочник единиц измерения:
+{unitsList}
+
+Список продуктов, которые уже используются:
 {productsList}
 
-ТОВАРЫ:
+При назначении товару продукта, проверь, есть ли уже подходящий продукт в списке.
+Если есть, то используй этот продукт.
+
+Список товаров:
 {itemsList}
 
-ФОРМАТ ОТВЕТА (строго JSON):
-{{""items"":[{{""name"":""название товара"",""product"":""продукт"",""base_unit"":""кг""}}]}}
+Выдели продукты из товаров.";
 
-Выдели продукты:";
+        return (system, user);
     }
 
     private static string BuildUnitsReference(IReadOnlyList<UnitOfMeasureInfo>? unitOfMeasures)

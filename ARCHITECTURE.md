@@ -138,9 +138,10 @@ AiProviderConfig
 **Реализации:**
 | Provider | API | Streaming |
 |----------|-----|-----------|
-| `OllamaLlmProvider` | Ollama `/api/generate` | ✓ NDJSON |
-| `YandexGptLlmProvider` | Foundation Models API | ✓ NDJSON |
+| `OllamaLlmProvider` | Ollama `/api/generate`, `/api/chat` | ✓ NDJSON |
+| `YandexGptLlmProvider` | Foundation Models API (OpenAI-compatible) | ✓ SSE |
 | `YandexAgentLlmProvider` | REST Assistant API | ✓ SSE |
+| `GigaChatLlmProvider` | GigaChat API (Sber) | ✓ SSE |
 
 **Парсинг ответов:**
 - `IResponseParser` — унифицированное извлечение JSON из LLM ответов
@@ -281,6 +282,7 @@ AiProviderConfig
 | **Receipt** | Чек: Shop, Date, Total, Status. |
 | **Label** | Пользовательская метка. |
 | **EmailHistory** | Дедупликация обработанных писем. |
+| **TokenUsage** | Статистика использования токенов AI провайдеров. |
 
 ---
 
@@ -383,9 +385,10 @@ EF Core DbContext. PostgreSQL / SQLite.
 - `ReceiptTextParserFactory`
 
 **AI/LLM:**
-- `ILlmProvider`, `OllamaLlmProvider`, `YandexGptLlmProvider`, `YandexAgentLlmProvider`
+- `ILlmProvider`, `OllamaLlmProvider`, `YandexGptLlmProvider`, `YandexAgentLlmProvider`, `GigaChatLlmProvider`
 - `IAiProviderFactory`
 - `IResponseParser` — унифицированный парсинг JSON из LLM ответов
+- `ITokenUsageService` — логирование использования токенов в БД
 
 **Chat:**
 - `IChatService`, `ChatService` — чат с поддержкой Tool Calling

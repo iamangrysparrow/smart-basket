@@ -25,6 +25,7 @@ public partial class AiProviderViewModel : ObservableObject
         AgentId = config.AgentId ?? string.Empty;
         ReasoningMode = config.ReasoningMode;
         ReasoningEffort = config.ReasoningEffort;
+        GigaChatScope = config.GigaChatScope;
     }
 
     private string _originalKey = string.Empty;
@@ -55,11 +56,13 @@ public partial class AiProviderViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsYandexGpt))]
     [NotifyPropertyChangedFor(nameof(IsYandexAgent))]
     [NotifyPropertyChangedFor(nameof(IsOpenAi))]
+    [NotifyPropertyChangedFor(nameof(IsGigaChat))]
     [NotifyPropertyChangedFor(nameof(ShowBaseUrl))]
     [NotifyPropertyChangedFor(nameof(ShowApiKey))]
     [NotifyPropertyChangedFor(nameof(ShowFolderId))]
     [NotifyPropertyChangedFor(nameof(ShowAgentId))]
     [NotifyPropertyChangedFor(nameof(ShowModel))]
+    [NotifyPropertyChangedFor(nameof(ShowGigaChatScope))]
     private AiProviderType _provider = AiProviderType.Ollama;
 
     [ObservableProperty]
@@ -92,18 +95,23 @@ public partial class AiProviderViewModel : ObservableObject
     [ObservableProperty]
     private ReasoningEffort _reasoningEffort = ReasoningEffort.Medium;
 
+    [ObservableProperty]
+    private GigaChatScope _gigaChatScope = GigaChatScope.PERS;
+
     // Helper properties for UI visibility
     public bool IsOllama => Provider == AiProviderType.Ollama;
     public bool IsYandexGpt => Provider == AiProviderType.YandexGPT;
     public bool IsYandexAgent => Provider == AiProviderType.YandexAgent;
     public bool IsOpenAi => Provider == AiProviderType.OpenAI;
+    public bool IsGigaChat => Provider == AiProviderType.GigaChat;
 
     public bool ShowBaseUrl => IsOllama || IsOpenAi;
-    public bool ShowApiKey => IsYandexGpt || IsYandexAgent || IsOpenAi;
+    public bool ShowApiKey => IsYandexGpt || IsYandexAgent || IsOpenAi || IsGigaChat;
     public bool ShowFolderId => IsYandexGpt || IsYandexAgent;
     public bool ShowAgentId => IsYandexAgent;
     public bool ShowModel => !IsYandexAgent;
     public bool ShowReasoning => IsYandexAgent;
+    public bool ShowGigaChatScope => IsGigaChat;
 
     /// <summary>
     /// Включён ли режим рассуждений (для биндинга чекбокса)
@@ -123,6 +131,12 @@ public partial class AiProviderViewModel : ObservableObject
     /// </summary>
     public static IReadOnlyList<ReasoningEffort> ReasoningEffortOptions { get; } =
         [ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High];
+
+    /// <summary>
+    /// Доступные scope для GigaChat
+    /// </summary>
+    public static IReadOnlyList<GigaChatScope> GigaChatScopeOptions { get; } =
+        [GigaChatScope.PERS, GigaChatScope.B2B, GigaChatScope.CORP];
 
     public bool IsNew => string.IsNullOrEmpty(_originalKey);
 
@@ -155,7 +169,8 @@ public partial class AiProviderViewModel : ObservableObject
             FolderId = string.IsNullOrWhiteSpace(FolderId) ? null : FolderId,
             AgentId = string.IsNullOrWhiteSpace(AgentId) ? null : AgentId,
             ReasoningMode = ReasoningMode,
-            ReasoningEffort = ReasoningEffort
+            ReasoningEffort = ReasoningEffort,
+            GigaChatScope = GigaChatScope
         };
     }
 }
