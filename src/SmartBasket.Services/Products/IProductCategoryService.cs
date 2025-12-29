@@ -61,4 +61,15 @@ public interface IProductCategoryService
     /// Get statistics
     /// </summary>
     Task<(int TotalCategories, int TotalProducts, int TotalItems)> GetStatisticsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Получить полный путь категории от корня до листа.
+    /// Формат: "Корневая \ Родительская \ Текущая"
+    /// </summary>
+    Task<string?> GetCategoryPathAsync(Guid categoryId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Получить полный путь категории для продукта.
+    /// </summary>
+    Task<string?> GetProductCategoryPathAsync(Guid productId, CancellationToken ct = default);
 }

@@ -49,4 +49,11 @@ public class BasketOperation
     /// </summary>
     [JsonPropertyName("category")]
     public string? Category { get; set; }
+
+    /// <summary>
+    /// Полный путь категории от корня до листа.
+    /// Формат: "Корневая \ Родительская \ Текущая"
+    /// </summary>
+    [JsonPropertyName("category_path")]
+    public string? CategoryPath { get; set; }
 }

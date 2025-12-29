@@ -36,6 +36,7 @@ public interface IProductSelectorService
     /// <param name="searchResults">Результаты поиска в магазине</param>
     /// <param name="storeId">ID магазина</param>
     /// <param name="storeName">Название магазина</param>
+    /// <param name="llmSessionId">ID сессии LLM для кэширования токенов</param>
     /// <param name="progress">Progress для отображения в UI</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Результат выбора AI</returns>
@@ -44,6 +45,7 @@ public interface IProductSelectorService
         List<ProductSearchResult> searchResults,
         string storeId,
         string storeName,
+        string? llmSessionId = null,
         IProgress<ChatProgress>? progress = null,
         CancellationToken ct = default);
 }

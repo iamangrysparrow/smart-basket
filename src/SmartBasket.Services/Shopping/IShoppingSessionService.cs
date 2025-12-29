@@ -60,7 +60,12 @@ public interface IShoppingSessionService
     /// <summary>
     /// Добавить товар в черновик
     /// </summary>
-    void AddItem(string name, decimal quantity, string unit, string? category = null);
+    /// <param name="name">Название товара</param>
+    /// <param name="quantity">Количество</param>
+    /// <param name="unit">Единица измерения</param>
+    /// <param name="category">Категория (короткое имя)</param>
+    /// <param name="categoryPath">Полный путь категории (например: "Чай, кофе \ Чай \ Черный чай")</param>
+    void AddItem(string name, decimal quantity, string unit, string? category = null, string? categoryPath = null);
 
     /// <summary>
     /// Удалить товар из черновика по имени (частичное совпадение)

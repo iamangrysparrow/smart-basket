@@ -529,7 +529,7 @@ public class GigaChatLlmProvider : ILlmProvider
                 if (delta?.FunctionCall != null && !string.IsNullOrEmpty(delta.FunctionCall.Name))
                 {
                     var argsJson = delta.FunctionCall.Arguments != null
-                        ? JsonSerializer.Serialize(delta.FunctionCall.Arguments)
+                        ? JsonSerializer.Serialize(delta.FunctionCall.Arguments, LlmJsonOptions.ForLogging)
                         : "{}";
 
                     toolCalls.Add(new LlmToolCall
@@ -552,7 +552,7 @@ public class GigaChatLlmProvider : ILlmProvider
                     {
                         var fc = choice.Message.FunctionCall;
                         var argsJson = fc.Arguments != null
-                            ? JsonSerializer.Serialize(fc.Arguments)
+                            ? JsonSerializer.Serialize(fc.Arguments, LlmJsonOptions.ForLogging)
                             : "{}";
 
                         // Обновляем или добавляем tool call

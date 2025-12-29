@@ -35,11 +35,13 @@ public interface IProductMatcherOperation
     /// <param name="draftItem">Позиция из списка покупок</param>
     /// <param name="candidates">Результаты поиска в магазине</param>
     /// <param name="purchaseHistory">История покупок этого товара (для учёта предпочтений)</param>
+    /// <param name="llmSessionId">ID сессии LLM для кэширования токенов</param>
     /// <param name="ct">Токен отмены</param>
     /// <returns>Результат выбора с обоснованием и альтернативами</returns>
     Task<ProductSelectionResult> SelectProductAsync(
         DraftItem draftItem,
         List<ProductSearchResult> candidates,
         List<string>? purchaseHistory = null,
+        string? llmSessionId = null,
         CancellationToken ct = default);
 }

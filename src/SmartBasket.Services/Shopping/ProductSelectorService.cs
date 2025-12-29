@@ -31,12 +31,13 @@ public class ProductSelectorService : IProductSelectorService
         List<ProductSearchResult> searchResults,
         string storeId,
         string storeName,
+        string? llmSessionId = null,
         IProgress<ChatProgress>? progress = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation(
-            "[ProductSelectorService] Selecting product for '{DraftItem}' from {Count} results in {Store}",
-            draftItem.Name, searchResults.Count, storeName);
+            "[ProductSelectorService] Selecting product for '{DraftItem}' from {Count} results in {Store} (session: {Session})",
+            draftItem.Name, searchResults.Count, storeName, llmSessionId ?? "none");
 
         // Если нет результатов — сразу возвращаем null
         if (searchResults.Count == 0)
@@ -78,9 +79,15 @@ public class ProductSelectorService : IProductSelectorService
             // Один прямой вызов LLM
             _logger.LogInformation("[ProductSelectorService] Calling LLM ({Provider})...", provider.Name);
 
+            // Создаём sessionContext для кэширования токенов
+            var sessionContext = !string.IsNullOrEmpty(llmSessionId)
+                ? new LlmSessionContext { SessionId = llmSessionId, OperationType = "shopping" }
+                : null;
+
             var result = await provider.ChatAsync(
                 messages,
                 new[] { selectProductTool },
+                sessionContext: sessionContext,
                 progress: null, // Не используем streaming для этой операции
                 cancellationToken: ct);
 
@@ -257,7 +264,7 @@ public class ProductSelectorService : IProductSelectorService
                         }
                     }
                 },
-                required = new[] { "draft_item_id", "quantity", "reasoning" }
+                required = new[] { "draft_item_id", "selected_product_id", "quantity", "reasoning" }
             });
     }
 

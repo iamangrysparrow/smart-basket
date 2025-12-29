@@ -174,7 +174,7 @@ public class ShoppingSessionService : IShoppingSessionService
         return Task.FromResult(_currentSession);
     }
 
-    public void AddItem(string name, decimal quantity, string unit, string? category = null)
+    public void AddItem(string name, decimal quantity, string unit, string? category = null, string? categoryPath = null)
     {
         if (_currentSession == null)
         {
@@ -198,13 +198,14 @@ public class ShoppingSessionService : IShoppingSessionService
             Quantity = quantity,
             Unit = unit,
             Category = category,
+            CategoryPath = categoryPath,
             Source = DraftItemSource.Manual
         };
 
         _currentSession.DraftItems.Add(item);
 
-        _logger.LogInformation("[ShoppingSession] Added item: {Name} {Qty} {Unit} [{Category}]",
-            name, quantity, unit, category ?? "без категории");
+        _logger.LogInformation("[ShoppingSession] Added item: {Name} {Qty} {Unit} [{Category}] (path: {CategoryPath})",
+            name, quantity, unit, category ?? "без категории", categoryPath ?? "-");
 
         ItemAdded?.Invoke(this, item);
     }
@@ -405,6 +406,7 @@ public class ShoppingSessionService : IShoppingSessionService
                             results,
                             storeId,
                             config.StoreName,
+                            _currentSession.LlmSessionId,
                             aiProgress,
                             ct);
 

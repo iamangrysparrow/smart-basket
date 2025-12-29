@@ -11,17 +11,23 @@ namespace SmartBasket.Services.Shopping.Operations;
 
 /// <summary>
 /// Реализация операции выбора товара из результатов поиска.
-/// Поддерживает два режима:
+/// Поддерживает три режима:
 /// 1. YandexAgent с prompt.variables — эффективнее по токенам
-/// 2. Tool calling для других провайдеров (Ollama, etc.)
+/// 2. Tool calling для провайдеров с поддержкой tools (Ollama, GigaChat с functions)
+/// 3. JSON response для провайдеров без tool calling (GigaChat-Lite, YandexGPT)
 /// </summary>
 public class ProductMatcherOperation : IProductMatcherOperation
 {
     private readonly IAiProviderFactory _providerFactory;
     private readonly ILogger<ProductMatcherOperation> _logger;
 
-    private static string? _promptTemplate;
-    private const string PromptFileName = "prompt_shopping_select_product.txt";
+    private const string SystemPromptFileName = "prompt_shopping_select_product_system.txt";
+    private const string UserPromptFileName = "prompt_shopping_select_product_user.txt";
+    private const string OperationName = "ProductMatcher";
+
+    // Кэш для промптов (только для файловых, кастомные всегда читаются из настроек)
+    private static string? _cachedSystemPromptFile;
+    private static string? _cachedUserPromptFile;
 
     public ProductMatcherOperation(
         IAiProviderFactory providerFactory,
@@ -35,11 +41,12 @@ public class ProductMatcherOperation : IProductMatcherOperation
         DraftItem draftItem,
         List<ProductSearchResult> candidates,
         List<string>? purchaseHistory = null,
+        string? llmSessionId = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation(
-            "[ProductMatcherOperation] Selecting for '{DraftItem}' from {Count} candidates",
-            draftItem.Name, candidates.Count);
+            "[ProductMatcherOperation] Selecting for '{DraftItem}' from {Count} candidates (session: {Session})",
+            draftItem.Name, candidates.Count, llmSessionId ?? "none");
 
         // Если нет кандидатов — сразу возвращаем неуспех
         if (candidates.Count == 0)
@@ -56,11 +63,16 @@ public class ProductMatcherOperation : IProductMatcherOperation
         {
             // Получаем провайдер для ProductMatcher
             var provider = _providerFactory.GetProviderForOperation(AiOperation.ProductMatcher);
+            var providerKey = _providerFactory.GetProviderKeyForOperation(AiOperation.ProductMatcher);
 
             // Fallback на Shopping провайдер если ProductMatcher не настроен
-            provider ??= _providerFactory.GetProviderForOperation(AiOperation.Shopping);
-
             if (provider == null)
+            {
+                provider = _providerFactory.GetProviderForOperation(AiOperation.Shopping);
+                providerKey = _providerFactory.GetProviderKeyForOperation(AiOperation.Shopping);
+            }
+
+            if (provider == null || string.IsNullOrEmpty(providerKey))
             {
                 _logger.LogError("[ProductMatcherOperation] No provider configured");
                 return new ProductSelectionResult(
@@ -70,14 +82,17 @@ public class ProductMatcherOperation : IProductMatcherOperation
                     false);
             }
 
+            _logger.LogInformation("[ProductMatcherOperation] Using provider: {Provider}, key: {Key}",
+                provider.Name, providerKey);
+
             // Выбираем режим работы в зависимости от провайдера
             if (provider is YandexAgentLlmProvider yandexAgent)
             {
-                return await SelectWithYandexAgentAsync(yandexAgent, draftItem, candidates, purchaseHistory, ct);
+                return await SelectWithYandexAgentAsync(yandexAgent, draftItem, candidates, purchaseHistory, llmSessionId, ct);
             }
             else
             {
-                return await SelectWithToolCallingAsync(provider, draftItem, candidates, purchaseHistory, ct);
+                return await SelectWithChatAsync(provider, providerKey, draftItem, candidates, purchaseHistory, llmSessionId, ct);
             }
         }
         catch (OperationCanceledException)
@@ -104,6 +119,7 @@ public class ProductMatcherOperation : IProductMatcherOperation
         DraftItem draftItem,
         List<ProductSearchResult> candidates,
         List<string>? purchaseHistory,
+        string? llmSessionId,
         CancellationToken ct)
     {
         _logger.LogInformation("[ProductMatcherOperation] Using YandexAgent with variables");
@@ -133,36 +149,66 @@ public class ProductMatcherOperation : IProductMatcherOperation
     }
 
     /// <summary>
-    /// Выбор товара через Tool Calling (для Ollama и др.)
+    /// Выбор товара через ChatAsync (с tool calling или без)
     /// </summary>
-    private async Task<ProductSelectionResult> SelectWithToolCallingAsync(
+    private async Task<ProductSelectionResult> SelectWithChatAsync(
         ILlmProvider provider,
+        string providerKey,
         DraftItem draftItem,
         List<ProductSearchResult> candidates,
         List<string>? purchaseHistory,
+        string? llmSessionId,
         CancellationToken ct)
     {
-        _logger.LogInformation("[ProductMatcherOperation] Using Tool Calling ({Provider})", provider.Name);
+        // Формируем промпты (из настроек или файлов)
+        var (systemPrompt, userPrompt) = LoadPrompts(providerKey, draftItem, candidates, purchaseHistory);
 
-        // Формируем полный промпт
-        var prompt = BuildPrompt(draftItem, candidates, purchaseHistory);
-
-        _logger.LogDebug("[ProductMatcherOperation] Prompt ({Length} chars):\n{Prompt}",
-            prompt.Length, prompt);
-
-        // Tool definition
-        var tool = CreateSelectProductToolDefinition();
+        _logger.LogInformation("[ProductMatcherOperation] Provider: {Provider}, SupportsTools: {SupportsTools}",
+            provider.Name, provider.SupportsTools);
+        _logger.LogDebug("[ProductMatcherOperation] System prompt ({SysLen} chars):\n{SystemPrompt}",
+            systemPrompt.Length, systemPrompt);
+        _logger.LogDebug("[ProductMatcherOperation] User prompt ({UserLen} chars):\n{UserPrompt}",
+            userPrompt.Length, userPrompt);
 
         var messages = new List<LlmChatMessage>
         {
-            new() { Role = "user", Content = prompt }
+            new() { Role = "system", Content = systemPrompt },
+            new() { Role = "user", Content = userPrompt }
         };
 
-        var result = await provider.ChatAsync(
-            messages,
-            new[] { tool },
-            progress: null,
-            cancellationToken: ct);
+        // Создаём sessionContext для кэширования токенов
+        var sessionContext = !string.IsNullOrEmpty(llmSessionId)
+            ? new LlmSessionContext { SessionId = llmSessionId, OperationType = "shopping" }
+            : null;
+
+        // Определяем режим: с tool calling или без
+        // Для GigaChat-Lite и YandexGPT без tools используем JSON response mode
+        var useToolCalling = provider.SupportsTools;
+
+        LlmGenerationResult result;
+        if (useToolCalling)
+        {
+            _logger.LogInformation("[ProductMatcherOperation] Using Tool Calling mode");
+            var tool = CreateSelectProductToolDefinition();
+
+            result = await provider.ChatAsync(
+                messages,
+                new[] { tool },
+                sessionContext: sessionContext,
+                progress: null,
+                cancellationToken: ct);
+        }
+        else
+        {
+            _logger.LogInformation("[ProductMatcherOperation] Using JSON response mode (no tools)");
+
+            result = await provider.ChatAsync(
+                messages,
+                tools: null,
+                sessionContext: sessionContext,
+                progress: null,
+                cancellationToken: ct);
+        }
 
         if (!result.IsSuccess)
         {
@@ -174,52 +220,230 @@ public class ProductMatcherOperation : IProductMatcherOperation
                 false);
         }
 
-        // Проверяем tool call
-        if (!result.HasToolCalls)
+        // Сначала пробуем распарсить как tool call
+        if (result.HasToolCalls)
         {
-            _logger.LogWarning("[ProductMatcherOperation] LLM did not call tool. Response: {Response}",
-                result.Response);
-
-            // Попробуем распарсить как JSON (модель могла вернуть JSON без tool call)
-            if (!string.IsNullOrEmpty(result.Response))
+            var selectCall = result.ToolCalls!.FirstOrDefault(t => t.Name == "select_product");
+            if (selectCall != null)
             {
-                var jsonResult = ParseJsonResponse(result.Response, candidates, draftItem);
-                if (jsonResult.Success)
-                    return jsonResult;
+                _logger.LogInformation("[ProductMatcherOperation] Got tool call response");
+                return ParseResult(selectCall.Arguments, candidates, draftItem);
             }
-
-            // Fallback: выбираем первый доступный товар
-            var firstInStock = candidates.FirstOrDefault(c => c.InStock);
-            if (firstInStock != null)
-            {
-                return new ProductSelectionResult(
-                    firstInStock,
-                    "Выбран первый доступный товар (AI не дал выбор)",
-                    candidates.Where(c => c.InStock && c != firstInStock).Take(3).ToList(),
-                    true,
-                    1);
-            }
-
-            return new ProductSelectionResult(
-                null,
-                "AI не смог выбрать товар",
-                new List<ProductSearchResult>(),
-                false);
+            _logger.LogWarning("[ProductMatcherOperation] Wrong tool called: {Tools}",
+                string.Join(", ", result.ToolCalls.Select(t => t.Name)));
         }
 
-        // Парсим результат tool call
-        var selectCall = result.ToolCalls!.FirstOrDefault(t => t.Name == "select_product");
-        if (selectCall == null)
+        // Пробуем распарсить как JSON из текстового ответа
+        if (!string.IsNullOrEmpty(result.Response))
         {
-            _logger.LogWarning("[ProductMatcherOperation] Wrong tool called");
-            return new ProductSelectionResult(
-                null,
-                "AI вызвал неправильный инструмент",
-                new List<ProductSearchResult>(),
-                false);
+            _logger.LogInformation("[ProductMatcherOperation] Parsing JSON from text response");
+            var jsonResult = ParseJsonResponse(result.Response, candidates, draftItem);
+            if (jsonResult.Success)
+                return jsonResult;
         }
 
-        return ParseResult(selectCall.Arguments, candidates, draftItem);
+        // Fallback: выбираем первый доступный товар
+        _logger.LogWarning("[ProductMatcherOperation] AI did not return valid selection. Response: {Response}",
+            result.Response);
+        var firstInStock = candidates.FirstOrDefault(c => c.InStock);
+        if (firstInStock != null)
+        {
+            return new ProductSelectionResult(
+                firstInStock,
+                "Выбран первый доступный товар (AI не дал выбор)",
+                candidates.Where(c => c.InStock && c != firstInStock).Take(3).ToList(),
+                true,
+                1);
+        }
+
+        return new ProductSelectionResult(
+            null,
+            "AI не смог выбрать товар",
+            new List<ProductSearchResult>(),
+            false);
+    }
+
+    /// <summary>
+    /// Загружает промпты с приоритетом:
+    /// 1. Кастомные из настроек (AiOperations.Prompts)
+    /// 2. Из файлов prompt_shopping_select_product_*.txt
+    /// 3. Fallback hardcoded
+    /// </summary>
+    private (string SystemPrompt, string UserPrompt) LoadPrompts(
+        string providerKey,
+        DraftItem draftItem,
+        List<ProductSearchResult> candidates,
+        List<string>? purchaseHistory)
+    {
+        var aiOps = _providerFactory.AiOperations;
+
+        // 1. Пробуем загрузить кастомные промпты из настроек
+        var customSystemPrompt = aiOps.GetSystemPrompt(OperationName, providerKey);
+        var customUserPrompt = aiOps.GetUserPrompt(OperationName, providerKey);
+
+        string systemPrompt;
+        string userPromptTemplate;
+
+        if (!string.IsNullOrWhiteSpace(customSystemPrompt))
+        {
+            _logger.LogInformation("[ProductMatcherOperation] Using custom system prompt from settings");
+            systemPrompt = customSystemPrompt;
+        }
+        else
+        {
+            // 2. Пробуем загрузить из файла
+            systemPrompt = LoadSystemPromptFromFile();
+        }
+
+        if (!string.IsNullOrWhiteSpace(customUserPrompt))
+        {
+            _logger.LogInformation("[ProductMatcherOperation] Using custom user prompt from settings");
+            userPromptTemplate = customUserPrompt;
+        }
+        else
+        {
+            // 2. Пробуем загрузить из файла
+            userPromptTemplate = LoadUserPromptFromFile();
+        }
+
+        // Подставляем плейсхолдеры в user prompt
+        var userPrompt = BuildUserPrompt(userPromptTemplate, draftItem, candidates, purchaseHistory);
+
+        return (systemPrompt, userPrompt);
+    }
+
+    private string LoadSystemPromptFromFile()
+    {
+        if (_cachedSystemPromptFile != null)
+            return _cachedSystemPromptFile;
+
+        var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+        var promptPath = Path.Combine(exeDir, SystemPromptFileName);
+
+        if (File.Exists(promptPath))
+        {
+            _cachedSystemPromptFile = File.ReadAllText(promptPath);
+            _logger.LogDebug("[ProductMatcherOperation] Loaded system prompt from file: {Path}", promptPath);
+            return _cachedSystemPromptFile;
+        }
+
+        _logger.LogWarning("[ProductMatcherOperation] System prompt file not found: {Path}, using fallback", promptPath);
+        _cachedSystemPromptFile = GetFallbackSystemPrompt();
+        return _cachedSystemPromptFile;
+    }
+
+    private string LoadUserPromptFromFile()
+    {
+        if (_cachedUserPromptFile != null)
+            return _cachedUserPromptFile;
+
+        var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+        var promptPath = Path.Combine(exeDir, UserPromptFileName);
+
+        if (File.Exists(promptPath))
+        {
+            _cachedUserPromptFile = File.ReadAllText(promptPath);
+            _logger.LogDebug("[ProductMatcherOperation] Loaded user prompt from file: {Path}", promptPath);
+            return _cachedUserPromptFile;
+        }
+
+        _logger.LogWarning("[ProductMatcherOperation] User prompt file not found: {Path}, using fallback", promptPath);
+        _cachedUserPromptFile = GetFallbackUserPrompt();
+        return _cachedUserPromptFile;
+    }
+
+    private static string GetFallbackSystemPrompt()
+    {
+        return """
+            Ты — эксперт по выбору товаров из результатов поиска интернет-магазинов.
+
+            ## Твоя задача
+            1. ФИЛЬТРУЙ нерелевантные товары (паста томатная != томаты, кефир != молоко)
+            2. Выбери товар с лучшим соотношением цена/объём
+            3. Рассчитай количество упаковок для требуемого объёма
+            4. Предложи 2-3 альтернативы
+            5. Если ничего не подходит — selected_product_id = null
+
+            ## ОТВЕТ
+            Верни ТОЛЬКО JSON (без markdown, без ```):
+            {
+              "selected_product_id": "id товара или null",
+              "quantity": 4,
+              "reasoning": "Причина выбора",
+              "alternatives": [{"product_id": "id1", "quantity": 2, "reasoning": "причина"}]
+            }
+            """;
+    }
+
+    private static string GetFallbackUserPrompt()
+    {
+        return """
+            ## Что ищет пользователь
+            Название: {{DRAFT_ITEM_NAME}}
+            Требуемое количество: {{DRAFT_ITEM_QUANTITY}} {{DRAFT_ITEM_UNIT}}
+            {{DRAFT_ITEM_CATEGORY}}
+
+            {{PURCHASE_HISTORY}}
+
+            ## Результаты поиска в магазине
+            {{SEARCH_RESULTS}}
+
+            Выбери лучший товар из результатов поиска.
+            """;
+    }
+
+    /// <summary>
+    /// Подставляет плейсхолдеры в user prompt
+    /// </summary>
+    private string BuildUserPrompt(
+        string template,
+        DraftItem draftItem,
+        List<ProductSearchResult> candidates,
+        List<string>? purchaseHistory)
+    {
+        // Формируем результаты поиска
+        var searchResultsSb = new StringBuilder();
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            var c = candidates[i];
+            searchResultsSb.AppendLine($"[{i + 1}] {{");
+            searchResultsSb.AppendLine($"  \"Id\": \"{c.Id}\",");
+            searchResultsSb.AppendLine($"  \"Name\": \"{c.Name}\",");
+            searchResultsSb.AppendLine($"  \"Price\": {c.Price:0.##},");
+            searchResultsSb.AppendLine($"  \"Unit\": \"{c.Unit}\",");
+            searchResultsSb.AppendLine($"  \"Quantity\": {c.Quantity:0.##},");
+            searchResultsSb.AppendLine($"  \"InStock\": {(c.InStock ? "true" : "false")}");
+            searchResultsSb.AppendLine("}");
+        }
+
+        // История покупок
+        var historySection = "";
+        if (purchaseHistory != null && purchaseHistory.Count > 0)
+        {
+            var historySb = new StringBuilder();
+            historySb.AppendLine("## История покупок этого товара:");
+            foreach (var item in purchaseHistory.Take(5))
+            {
+                historySb.AppendLine($"- {item}");
+            }
+            historySection = historySb.ToString();
+        }
+
+        // Категория — приоритет: CategoryPath (полный путь), затем Category (короткое имя)
+        var categoryValue = !string.IsNullOrEmpty(draftItem.CategoryPath)
+            ? draftItem.CategoryPath
+            : draftItem.Category ?? "";
+
+        // Подставляем плейсхолдеры
+        var prompt = template
+            .Replace("{{DRAFT_ITEM_NAME}}", draftItem.Name)
+            .Replace("{{DRAFT_ITEM_QUANTITY}}", draftItem.Quantity.ToString("0.##"))
+            .Replace("{{DRAFT_ITEM_UNIT}}", draftItem.Unit ?? "шт")
+            .Replace("{{DRAFT_ITEM_CATEGORY}}", categoryValue)
+            .Replace("{{PURCHASE_HISTORY}}", historySection)
+            .Replace("{{SEARCH_RESULTS}}", searchResultsSb.ToString().TrimEnd());
+
+        return prompt;
     }
 
     /// <summary>
@@ -247,8 +471,10 @@ public class ProductMatcherOperation : IProductMatcherOperation
             historyText = string.Join(", ", purchaseHistory.Take(5));
         }
 
-        // Категория
-        var category = draftItem.Category ?? "";
+        // Категория — приоритет: CategoryPath (полный путь), затем Category (короткое имя)
+        var category = !string.IsNullOrEmpty(draftItem.CategoryPath)
+            ? draftItem.CategoryPath
+            : draftItem.Category ?? "";
 
         return new Dictionary<string, string>
         {
@@ -259,105 +485,6 @@ public class ProductMatcherOperation : IProductMatcherOperation
             { "PURCHASE_HISTORY", historyText },
             { "SEARCH_RESULTS", searchResultsSb.ToString().TrimEnd() }
         };
-    }
-
-    /// <summary>
-    /// Формирует полный промпт для Tool Calling режима
-    /// </summary>
-    private string BuildPrompt(
-        DraftItem draftItem,
-        List<ProductSearchResult> candidates,
-        List<string>? purchaseHistory)
-    {
-        // Загружаем шаблон из файла
-        var template = LoadPromptTemplate();
-
-        // Формируем результаты поиска в JSON формате
-        var searchResultsSb = new StringBuilder();
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            var c = candidates[i];
-            searchResultsSb.AppendLine($"[{i + 1}] {{");
-            searchResultsSb.AppendLine($"  \"Id\": \"{c.Id}\",");
-            searchResultsSb.AppendLine($"  \"Name\": \"{c.Name}\",");
-            searchResultsSb.AppendLine($"  \"Price\": {c.Price:0.##},");
-            searchResultsSb.AppendLine($"  \"Unit\": \"{c.Unit}\",");
-            searchResultsSb.AppendLine($"  \"Quantity\": {c.Quantity:0.##},");
-            searchResultsSb.AppendLine($"  \"InStock\": {(c.InStock ? "true" : "false")}");
-            searchResultsSb.AppendLine("}");
-            searchResultsSb.AppendLine();
-        }
-
-        // История покупок
-        var historySection = "";
-        if (purchaseHistory != null && purchaseHistory.Count > 0)
-        {
-            var historySb = new StringBuilder();
-            historySb.AppendLine("## История покупок этого товара:");
-            foreach (var item in purchaseHistory.Take(5))
-            {
-                historySb.AppendLine($"- {item}");
-            }
-            historySection = historySb.ToString();
-        }
-
-        // Категория
-        var categorySection = !string.IsNullOrEmpty(draftItem.Category)
-            ? $"Категория: {draftItem.Category}"
-            : "";
-
-        // Подставляем плейсхолдеры
-        var prompt = template
-            .Replace("{{DRAFT_ITEM_NAME}}", draftItem.Name)
-            .Replace("{{DRAFT_ITEM_QUANTITY}}", draftItem.Quantity.ToString("0.##"))
-            .Replace("{{DRAFT_ITEM_UNIT}}", draftItem.Unit ?? "шт")
-            .Replace("{{DRAFT_ITEM_CATEGORY}}", categorySection)
-            .Replace("{{PURCHASE_HISTORY}}", historySection)
-            .Replace("{{SEARCH_RESULTS}}", searchResultsSb.ToString().TrimEnd());
-
-        return prompt;
-    }
-
-    private static string LoadPromptTemplate()
-    {
-        if (_promptTemplate != null)
-            return _promptTemplate;
-
-        // Ищем файл рядом с exe
-        var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-        var promptPath = Path.Combine(exeDir, PromptFileName);
-
-        if (File.Exists(promptPath))
-        {
-            _promptTemplate = File.ReadAllText(promptPath);
-            return _promptTemplate;
-        }
-
-        // Fallback: встроенный промпт
-        _promptTemplate = GetFallbackPrompt();
-        return _promptTemplate;
-    }
-
-    private static string GetFallbackPrompt()
-    {
-        return """
-            Выбери лучший товар из результатов поиска.
-
-            ## Что нужно купить
-            Название: {{DRAFT_ITEM_NAME}}
-            Количество: {{DRAFT_ITEM_QUANTITY}} {{DRAFT_ITEM_UNIT}}
-            {{DRAFT_ITEM_CATEGORY}}
-
-            ## Результаты поиска
-            {{SEARCH_RESULTS}}
-
-            ## Инструкции
-            1. Выбери товар, соответствующий запросу (фильтруй нерелевантные)
-            2. Рассчитай количество упаковок: ceil(требуемое / фасовка)
-            3. Если ничего не подходит — selected_product_id = null
-
-            Вызови инструмент select_product.
-            """;
     }
 
     /// <summary>
@@ -460,6 +587,13 @@ public class ProductMatcherOperation : IProductMatcherOperation
             {
                 return trimmed.Substring(afterStart, codeBlockEnd - afterStart).Trim();
             }
+        }
+
+        // Пробуем найти JSON где угодно в тексте
+        var jsonStart = trimmed.IndexOf('{');
+        if (jsonStart >= 0)
+        {
+            return ExtractJson(trimmed[jsonStart..]);
         }
 
         return null;

@@ -56,13 +56,13 @@ public record ChatErrorProgress(string Error)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Начат поиск товара в магазине
+/// Начат поиск товара в магазине (внутреннее событие, используется для агрегации)
 /// </summary>
 public record SearchStartedProgress(string ProductName, string StoreName, string StoreColor)
     : WorkflowProgress(DateTime.UtcNow);
 
 /// <summary>
-/// Поиск завершён успешно
+/// Поиск завершён успешно (внутреннее событие, используется для агрегации)
 /// </summary>
 public record SearchCompletedProgress(
     string ProductName,
@@ -73,7 +73,7 @@ public record SearchCompletedProgress(
     : WorkflowProgress(DateTime.UtcNow);
 
 /// <summary>
-/// Поиск завершён с ошибкой
+/// Поиск завершён с ошибкой (внутреннее событие, используется для агрегации)
 /// </summary>
 public record SearchFailedProgress(
     string ProductName,
@@ -81,6 +81,21 @@ public record SearchFailedProgress(
     string StoreColor,
     string Error)
     : WorkflowProgress(DateTime.UtcNow);
+
+/// <summary>
+/// Агрегированный прогресс поиска в магазине — ОДИН на магазин (для UI).
+/// Генерируется в ViewModel из SearchStarted/Completed/Failed событий.
+/// </summary>
+public record SearchProgressEvent(
+    string StoreName,
+    string StoreColor,
+    int CompletedCount,
+    int TotalCount)
+    : WorkflowProgress(DateTime.UtcNow)
+{
+    public int ProgressPercent => TotalCount > 0 ? CompletedCount * 100 / TotalCount : 0;
+    public bool IsCompleted => CompletedCount >= TotalCount;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ЭТАП 3: Выбор товаров (AI выбирает лучший вариант)

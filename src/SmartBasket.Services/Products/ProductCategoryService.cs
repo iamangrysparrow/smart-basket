@@ -186,4 +186,54 @@ public class ProductCategoryService : IProductCategoryService
 
         return (categories, products, items);
     }
+
+    public async Task<string?> GetCategoryPathAsync(Guid categoryId, CancellationToken ct = default)
+    {
+        var category = await _db.ProductCategories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == categoryId, ct)
+            .ConfigureAwait(false);
+
+        if (category == null)
+            return null;
+
+        // Собираем путь от текущей категории до корня
+        var path = new List<string> { category.Name };
+        var currentParentId = category.ParentId;
+
+        // Защита от циклов — максимум 10 уровней вложенности
+        var maxDepth = 10;
+        var depth = 0;
+
+        while (currentParentId.HasValue && depth < maxDepth)
+        {
+            var parent = await _db.ProductCategories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == currentParentId.Value, ct)
+                .ConfigureAwait(false);
+
+            if (parent == null)
+                break;
+
+            path.Insert(0, parent.Name); // Добавляем в начало
+            currentParentId = parent.ParentId;
+            depth++;
+        }
+
+        // Формируем путь: "Корневая \ Родительская \ Текущая"
+        return string.Join(" \\ ", path);
+    }
+
+    public async Task<string?> GetProductCategoryPathAsync(Guid productId, CancellationToken ct = default)
+    {
+        var product = await _db.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == productId, ct)
+            .ConfigureAwait(false);
+
+        if (product?.CategoryId == null)
+            return null;
+
+        return await GetCategoryPathAsync(product.CategoryId.Value, ct).ConfigureAwait(false);
+    }
 }

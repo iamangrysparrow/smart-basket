@@ -1,7 +1,7 @@
 ## Что ищет пользователь
 Название: {{DRAFT_ITEM_NAME}}
 Требуемое количество: {{DRAFT_ITEM_QUANTITY}} {{DRAFT_ITEM_UNIT}}
-{{DRAFT_ITEM_CATEGORY}}
+Категория продукта: {{DRAFT_ITEM_CATEGORY}}
 
 {{PURCHASE_HISTORY}}
 

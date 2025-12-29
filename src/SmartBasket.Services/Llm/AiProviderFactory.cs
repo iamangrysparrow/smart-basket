@@ -59,6 +59,16 @@ public interface IAiProviderFactory
     /// Получить список доступных провайдеров (ключей)
     /// </summary>
     IReadOnlyList<string> GetAvailableProviders();
+
+    /// <summary>
+    /// Получить конфигурацию AI операций (для доступа к кастомным промптам)
+    /// </summary>
+    AiOperationsConfig AiOperations { get; }
+
+    /// <summary>
+    /// Получить ключ провайдера для операции
+    /// </summary>
+    string? GetProviderKeyForOperation(AiOperation operation);
 }
 
 /// <summary>
@@ -71,6 +81,8 @@ public class AiProviderFactory : IAiProviderFactory
     private readonly ILoggerFactory _loggerFactory;
     private readonly ITokenUsageService _tokenUsageService;
     private readonly Dictionary<string, ILlmProvider> _providersCache = new();
+
+    public AiOperationsConfig AiOperations => _settings.AiOperations;
 
     public AiProviderFactory(
         AppSettings settings,
@@ -123,6 +135,20 @@ public class AiProviderFactory : IAiProviderFactory
     public IReadOnlyList<string> GetAvailableProviders()
     {
         return _settings.AiProviders.Select(p => p.Key).ToList();
+    }
+
+    public string? GetProviderKeyForOperation(AiOperation operation)
+    {
+        return operation switch
+        {
+            AiOperation.ProductExtraction => _settings.AiOperations.ProductExtraction,
+            AiOperation.Classification => _settings.AiOperations.Classification,
+            AiOperation.Labels => _settings.AiOperations.Labels,
+            AiOperation.Chat => _settings.AiOperations.Chat,
+            AiOperation.Shopping => _settings.AiOperations.Shopping,
+            AiOperation.ProductMatcher => _settings.AiOperations.ProductMatcher,
+            _ => null
+        };
     }
 
     private ILlmProvider CreateProvider(AiProviderConfig config)

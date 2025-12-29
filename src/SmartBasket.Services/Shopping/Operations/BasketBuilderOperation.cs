@@ -111,8 +111,9 @@ public class BasketBuilderOperation : IBasketBuilderOperation
 
                 try
                 {
+                    var llmSessionId = _sessionService.CurrentSession?.LlmSessionId;
                     selectionResult = await _productMatcher.SelectProductAsync(
-                        item, searchResults, ct: ct);
+                        item, searchResults, llmSessionId: llmSessionId, ct: ct);
                 }
                 catch (Exception ex)
                 {

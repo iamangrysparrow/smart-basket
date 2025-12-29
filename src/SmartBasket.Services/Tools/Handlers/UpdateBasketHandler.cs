@@ -69,6 +69,11 @@ public class UpdateBasketHandler : IToolHandler
                                 {
                                     type = "string",
                                     description = "Категория товара для группировки (например: Молочные продукты, Овощи, Хлеб)"
+                                },
+                                category_path = new
+                                {
+                                    type = "string",
+                                    description = "Полный путь категории от корня до листа через ' \\ ' (например: 'Чай, кофе \\ Чай \\ Черный чай')"
                                 }
                             },
                             required = new[] { "action", "name" }
@@ -110,17 +115,18 @@ public class UpdateBasketHandler : IToolHandler
                 var quantity = op.Quantity ?? 1;
                 var unit = op.Unit ?? "шт";
                 var category = op.Category;
+                var categoryPath = op.CategoryPath;
 
                 switch (action)
                 {
                     case "add":
                         if (_sessionService.CurrentSession != null)
                         {
-                            _sessionService.AddItem(name, quantity, unit, category);
+                            _sessionService.AddItem(name, quantity, unit, category, categoryPath);
                         }
                         results.Add($"✓ Добавлено: {name} {quantity} {unit}" + (category != null ? $" [{category}]" : ""));
-                        _logger.LogInformation("[UpdateBasketHandler] ADD: {Name} {Qty} {Unit} [{Category}]",
-                            name, quantity, unit, category ?? "без категории");
+                        _logger.LogInformation("[UpdateBasketHandler] ADD: {Name} {Qty} {Unit} [{Category}] (path: {Path})",
+                            name, quantity, unit, category ?? "без категории", categoryPath ?? "-");
                         break;
 
                     case "remove":

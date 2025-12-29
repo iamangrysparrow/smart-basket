@@ -16,6 +16,19 @@ public class ShoppingSession
     public string? ConversationId { get; set; }
 
     /// <summary>
+    /// ID сессии для LLM провайдеров (кэширование токенов).
+    /// Формат: shopping-{yyyyMMdd-HHmmss}-{shortGuid}
+    /// </summary>
+    public string LlmSessionId { get; set; } = GenerateLlmSessionId();
+
+    private static string GenerateLlmSessionId()
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var shortGuid = Guid.NewGuid().ToString("N")[..8];
+        return $"shopping-{timestamp}-{shortGuid}";
+    }
+
+    /// <summary>
     /// Черновик списка покупок (этап 1)
     /// </summary>
     public List<DraftItem> DraftItems { get; set; } = new();

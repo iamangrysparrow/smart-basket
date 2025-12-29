@@ -15,10 +15,6 @@ public enum WorkflowEventType
     AiMessage,
     ToolCall,
     ToolResult,
-    SearchStarted,
-    SearchCompleted,
-    SearchFailed,
-    ProductSelectionStarted,
     ProductSelectionCompleted,
     ProductSelectionFailed,
     SystemMessage,
@@ -60,7 +56,7 @@ public partial class WorkflowEvent : ObservableObject
     [ObservableProperty]
     private bool _toolSuccess;
 
-    // === Search ===
+    // === Search Progress ===
 
     [ObservableProperty]
     private string? _storeName;
@@ -68,13 +64,38 @@ public partial class WorkflowEvent : ObservableObject
     [ObservableProperty]
     private string? _storeColor;
 
+    /// <summary>Количество завершённых поисков</summary>
+    [ObservableProperty]
+    private int _completedCount;
+
+    /// <summary>Общее количество товаров для поиска</summary>
+    [ObservableProperty]
+    private int _totalCount;
+
+    /// <summary>Процент завершения (0-100)</summary>
+    public int ProgressPercent => TotalCount > 0 ? CompletedCount * 100 / TotalCount : 0;
+
+    /// <summary>Поиск завершён</summary>
+    public bool IsSearchCompleted => CompletedCount >= TotalCount && TotalCount > 0;
+
+    /// <summary>
+    /// Публичный метод для уведомления UI об изменении вычисляемых свойств.
+    /// Вызывается извне при обновлении CompletedCount/TotalCount.
+    /// </summary>
+    public void NotifyProgressChanged()
+    {
+        OnPropertyChanged(nameof(ProgressPercent));
+        OnPropertyChanged(nameof(IsSearchCompleted));
+    }
+
+    // === ProductSelection ===
+
     [ObservableProperty]
     private string? _productName;
 
+    /// <summary>Эмодзи товара (из ProductEmoji)</summary>
     [ObservableProperty]
-    private int _searchResultCount;
-
-    // === ProductSelection ===
+    private string _productEmoji = "📦";
 
     [ObservableProperty]
     private ProductSearchResult? _selectedProduct;
@@ -84,6 +105,26 @@ public partial class WorkflowEvent : ObservableObject
 
     [ObservableProperty]
     private List<ProductSearchResult>? _alternatives;
+
+    /// <summary>Количество единиц товара (из AI выбора)</summary>
+    [ObservableProperty]
+    private int _quantity = 1;
+
+    /// <summary>Общая стоимость (цена × количество)</summary>
+    public decimal LineTotal => (SelectedProduct?.Price ?? 0) * Quantity;
+
+    /// <summary>Текст количества для UI (например "1 л × 2")</summary>
+    public string QuantityText
+    {
+        get
+        {
+            if (SelectedProduct == null) return "";
+            var size = SelectedProduct.Quantity > 0
+                ? $"{SelectedProduct.Quantity:#.##} {SelectedProduct.Unit}"
+                : SelectedProduct.Unit ?? "";
+            return Quantity > 1 ? $"{size} × {Quantity}" : size;
+        }
+    }
 
     /// <summary>
     /// Фабричные методы для создания событий
@@ -123,54 +164,14 @@ public partial class WorkflowEvent : ObservableObject
             ToolSuccess = success
         };
 
-        public static WorkflowEvent SearchStarted(string productName, string storeName, string storeColor) => new()
-        {
-            EventType = WorkflowEventType.SearchStarted,
-            Timestamp = DateTime.Now,
-            ProductName = productName,
-            StoreName = storeName,
-            StoreColor = storeColor,
-            IsCompleted = false
-        };
-
-        public static WorkflowEvent SearchCompleted(string productName, string storeName, string storeColor, int count) => new()
-        {
-            EventType = WorkflowEventType.SearchCompleted,
-            Timestamp = DateTime.Now,
-            ProductName = productName,
-            StoreName = storeName,
-            StoreColor = storeColor,
-            SearchResultCount = count
-        };
-
-        public static WorkflowEvent SearchFailed(string productName, string storeName, string storeColor, string error) => new()
-        {
-            EventType = WorkflowEventType.SearchFailed,
-            Timestamp = DateTime.Now,
-            ProductName = productName,
-            StoreName = storeName,
-            StoreColor = storeColor,
-            Text = error,
-            IsError = true
-        };
-
-        public static WorkflowEvent ProductSelectionStarted(string itemName, string storeName, string storeColor) => new()
-        {
-            EventType = WorkflowEventType.ProductSelectionStarted,
-            Timestamp = DateTime.Now,
-            ProductName = itemName,
-            StoreName = storeName,
-            StoreColor = storeColor,
-            IsCompleted = false
-        };
-
         public static WorkflowEvent ProductSelectionCompleted(
             string itemName,
             string storeName,
             string storeColor,
             ProductSearchResult selected,
             string reason,
-            List<ProductSearchResult> alternatives) => new()
+            List<ProductSearchResult> alternatives,
+            int quantity = 1) => new()
         {
             EventType = WorkflowEventType.ProductSelectionCompleted,
             Timestamp = DateTime.Now,
@@ -179,7 +180,8 @@ public partial class WorkflowEvent : ObservableObject
             StoreColor = storeColor,
             SelectedProduct = selected,
             SelectionReason = reason,
-            Alternatives = alternatives
+            Alternatives = alternatives,
+            Quantity = quantity
         };
 
         public static WorkflowEvent ProductSelectionFailed(
@@ -215,7 +217,10 @@ public partial class WorkflowEvent : ObservableObject
     }
 
     /// <summary>
-    /// Создать WorkflowEvent из WorkflowProgress
+    /// Создать WorkflowEvent из WorkflowProgress.
+    /// ВАЖНО: SearchStarted/Completed/Failed НЕ конвертируются напрямую —
+    /// они агрегируются в ViewModel в один SearchProgress на магазин.
+    /// ProductSelectionStarted также НЕ показывается — товар показывается только после выбора.
     /// </summary>
     public static WorkflowEvent? FromProgress(WorkflowProgress progress)
     {
@@ -227,10 +232,13 @@ public partial class WorkflowEvent : ObservableObject
             ToolResultProgress p => Factory.ToolResult(p.Name, p.Result, p.Success),
             ChatCompleteProgress => null, // Обрабатывается отдельно (завершает AiMessage)
             ChatErrorProgress p => Factory.Error(p.Error),
-            SearchStartedProgress p => Factory.SearchStarted(p.ProductName, p.StoreName, p.StoreColor),
-            SearchCompletedProgress p => Factory.SearchCompleted(p.ProductName, p.StoreName, p.StoreColor, p.ResultCount),
-            SearchFailedProgress p => Factory.SearchFailed(p.ProductName, p.StoreName, p.StoreColor, p.Error),
-            ProductSelectionStartedProgress p => Factory.ProductSelectionStarted(p.DraftItemName, p.StoreName, p.StoreColor),
+            // Search events агрегируются в ViewModel в StoreProgressGroup — не конвертируем напрямую
+            SearchStartedProgress => null,
+            SearchCompletedProgress => null,
+            SearchFailedProgress => null,
+            SearchProgressEvent => null, // Обрабатывается через StoreProgressGroup
+            // ProductSelectionStarted не показываем — товар показывается только после выбора
+            ProductSelectionStartedProgress => null,
             ProductSelectionCompletedProgress p => Factory.ProductSelectionCompleted(
                 p.DraftItemName, p.StoreName, p.StoreColor, p.Selected, p.Reason, p.Alternatives),
             ProductSelectionFailedProgress p => Factory.ProductSelectionFailed(
@@ -250,17 +258,15 @@ public class WorkflowEventTemplateSelector : DataTemplateSelector
     public DataTemplate? AiMessageTemplate { get; set; }
     public DataTemplate? ToolCallTemplate { get; set; }
     public DataTemplate? ToolResultTemplate { get; set; }
-    public DataTemplate? SearchStartedTemplate { get; set; }
-    public DataTemplate? SearchCompletedTemplate { get; set; }
-    public DataTemplate? SearchFailedTemplate { get; set; }
-    public DataTemplate? ProductSelectionStartedTemplate { get; set; }
-    public DataTemplate? ProductSelectionCompletedTemplate { get; set; }
-    public DataTemplate? ProductSelectionFailedTemplate { get; set; }
+    public DataTemplate? StoreGroupTemplate { get; set; }
     public DataTemplate? SystemMessageTemplate { get; set; }
     public DataTemplate? ErrorTemplate { get; set; }
 
     public override DataTemplate? SelectTemplate(object? item, DependencyObject container)
     {
+        if (item is StoreProgressGroup)
+            return StoreGroupTemplate;
+
         if (item is not WorkflowEvent evt)
             return base.SelectTemplate(item, container);
 
@@ -270,14 +276,63 @@ public class WorkflowEventTemplateSelector : DataTemplateSelector
             WorkflowEventType.AiMessage => AiMessageTemplate,
             WorkflowEventType.ToolCall => ToolCallTemplate,
             WorkflowEventType.ToolResult => ToolResultTemplate,
-            WorkflowEventType.SearchStarted => SearchStartedTemplate,
-            WorkflowEventType.SearchCompleted => SearchCompletedTemplate,
-            WorkflowEventType.SearchFailed => SearchFailedTemplate,
-            WorkflowEventType.ProductSelectionStarted => ProductSelectionStartedTemplate,
-            WorkflowEventType.ProductSelectionCompleted => ProductSelectionCompletedTemplate,
-            WorkflowEventType.ProductSelectionFailed => ProductSelectionFailedTemplate,
             WorkflowEventType.SystemMessage => SystemMessageTemplate,
             WorkflowEventType.Error => ErrorTemplate,
+            _ => base.SelectTemplate(item, container)
+        };
+    }
+}
+
+/// <summary>
+/// Группа событий по магазину — заголовок с прогрессом + вложенные карточки товаров
+/// </summary>
+public partial class StoreProgressGroup : ObservableObject
+{
+    public string StoreName { get; init; } = "";
+    public string StoreColor { get; init; } = "#888888";
+
+    [ObservableProperty]
+    private int _completedCount;
+
+    [ObservableProperty]
+    private int _totalCount;
+
+    /// <summary>Процент завершения (0-100)</summary>
+    public int ProgressPercent => TotalCount > 0 ? CompletedCount * 100 / TotalCount : 0;
+
+    /// <summary>Поиск завершён</summary>
+    public bool IsSearchCompleted => CompletedCount >= TotalCount && TotalCount > 0;
+
+    /// <summary>Карточки выбранных/не найденных товаров</summary>
+    public System.Collections.ObjectModel.ObservableCollection<WorkflowEvent> Items { get; } = new();
+
+    /// <summary>
+    /// Публичный метод для уведомления UI об изменении вычисляемых свойств
+    /// </summary>
+    public void NotifyProgressChanged()
+    {
+        OnPropertyChanged(nameof(ProgressPercent));
+        OnPropertyChanged(nameof(IsSearchCompleted));
+    }
+}
+
+/// <summary>
+/// Template selector для карточек внутри StoreProgressGroup
+/// </summary>
+public class ProductCardTemplateSelector : DataTemplateSelector
+{
+    public DataTemplate? ProductSelectionCompletedTemplate { get; set; }
+    public DataTemplate? ProductSelectionFailedTemplate { get; set; }
+
+    public override DataTemplate? SelectTemplate(object? item, DependencyObject container)
+    {
+        if (item is not WorkflowEvent evt)
+            return base.SelectTemplate(item, container);
+
+        return evt.EventType switch
+        {
+            WorkflowEventType.ProductSelectionCompleted => ProductSelectionCompletedTemplate,
+            WorkflowEventType.ProductSelectionFailed => ProductSelectionFailedTemplate,
             _ => base.SelectTemplate(item, container)
         };
     }

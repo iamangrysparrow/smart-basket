@@ -150,9 +150,10 @@ public partial class ShoppingViewModel : ObservableObject
     public ObservableCollection<ShoppingChatMessage> Messages { get; } = new();
 
     /// <summary>
-    /// Лента событий workflow (новая система)
+    /// Лента событий workflow (новая система).
+    /// Содержит WorkflowEvent и StoreProgressGroup.
     /// </summary>
-    public ObservableCollection<WorkflowEvent> WorkflowEvents { get; } = new();
+    public ObservableCollection<object> WorkflowEvents { get; } = new();
 
     /// <summary>
     /// Текст ввода пользователя
@@ -2352,11 +2353,15 @@ public partial class ShoppingViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Обработать поток событий от ShoppingChatOperation
+    /// Обработать поток событий от ShoppingChatOperation.
+    /// Агрегирует события SearchStarted/Completed/Failed в один SearchProgress на магазин.
     /// </summary>
     private async Task ProcessWorkflowProgressAsync(IAsyncEnumerable<WorkflowProgress> progressStream, CancellationToken ct)
     {
         WorkflowEvent? currentAiMessage = null;
+
+        // Агрегация поиска по магазинам: StoreName -> StoreProgressGroup
+        var storeGroups = new Dictionary<string, StoreProgressGroup>();
 
         await foreach (var progress in progressStream.WithCancellation(ct))
         {
@@ -2401,30 +2406,29 @@ public partial class ShoppingViewModel : ObservableObject
                     AddWorkflowEvent(WorkflowEvent.Factory.ToolResult(p.Name, p.Result, p.Success));
                     break;
 
+                // === Агрегация событий поиска в StoreProgressGroup на магазин ===
                 case SearchStartedProgress p:
-                    AddWorkflowEvent(WorkflowEvent.Factory.SearchStarted(p.ProductName, p.StoreName, p.StoreColor));
+                    HandleSearchStarted(storeGroups, p);
                     break;
 
                 case SearchCompletedProgress p:
-                    AddWorkflowEvent(WorkflowEvent.Factory.SearchCompleted(p.ProductName, p.StoreName, p.StoreColor, p.ResultCount));
+                    HandleSearchCompleted(storeGroups, p);
                     break;
 
                 case SearchFailedProgress p:
-                    AddWorkflowEvent(WorkflowEvent.Factory.SearchFailed(p.ProductName, p.StoreName, p.StoreColor, p.Error));
+                    HandleSearchFailed(storeGroups, p);
                     break;
 
-                case ProductSelectionStartedProgress p:
-                    AddWorkflowEvent(WorkflowEvent.Factory.ProductSelectionStarted(p.DraftItemName, p.StoreName, p.StoreColor));
+                // ProductSelectionStarted не показываем — товар появится после выбора
+                case ProductSelectionStartedProgress:
                     break;
 
                 case ProductSelectionCompletedProgress p:
-                    AddWorkflowEvent(WorkflowEvent.Factory.ProductSelectionCompleted(
-                        p.DraftItemName, p.StoreName, p.StoreColor, p.Selected, p.Reason, p.Alternatives));
+                    HandleProductSelectionCompleted(storeGroups, p);
                     break;
 
                 case ProductSelectionFailedProgress p:
-                    AddWorkflowEvent(WorkflowEvent.Factory.ProductSelectionFailed(
-                        p.DraftItemName, p.StoreName, p.StoreColor, p.Reason));
+                    HandleProductSelectionFailed(storeGroups, p);
                     break;
 
                 case SystemMessageProgress p:
@@ -2439,6 +2443,116 @@ public partial class ShoppingViewModel : ObservableObject
                     _logger.LogWarning("[ShoppingViewModel] Unknown WorkflowProgress type: {Type}", progress.GetType().Name);
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Обработка SearchStarted — создаём StoreProgressGroup для магазина
+    /// </summary>
+    private void HandleSearchStarted(Dictionary<string, StoreProgressGroup> storeGroups, SearchStartedProgress p)
+    {
+        var totalItems = DraftItems.Count;
+
+        if (!storeGroups.TryGetValue(p.StoreName, out var group))
+        {
+            // Первый поиск в магазине — создаём группу
+            group = new StoreProgressGroup
+            {
+                StoreName = p.StoreName,
+                StoreColor = p.StoreColor,
+                TotalCount = totalItems
+            };
+            storeGroups[p.StoreName] = group;
+
+            // Добавляем в WorkflowEvents как object (будет выбран StoreGroupTemplate)
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                WorkflowEvents.Add(group);
+            });
+        }
+
+        // TotalCount мог измениться — обновляем
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            group.TotalCount = totalItems;
+        });
+    }
+
+    /// <summary>
+    /// Обработка SearchCompleted — увеличиваем счётчик завершённых
+    /// </summary>
+    private void HandleSearchCompleted(Dictionary<string, StoreProgressGroup> storeGroups, SearchCompletedProgress p)
+    {
+        if (storeGroups.TryGetValue(p.StoreName, out var group))
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                group.CompletedCount++;
+                group.NotifyProgressChanged();
+            });
+        }
+    }
+
+    /// <summary>
+    /// Обработка SearchFailed — также увеличиваем счётчик (поиск завершён, хоть и неудачно)
+    /// </summary>
+    private void HandleSearchFailed(Dictionary<string, StoreProgressGroup> storeGroups, SearchFailedProgress p)
+    {
+        if (storeGroups.TryGetValue(p.StoreName, out var group))
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                group.CompletedCount++;
+                group.NotifyProgressChanged();
+            });
+        }
+    }
+
+    /// <summary>
+    /// Обработка ProductSelectionCompleted — добавляем карточку товара в группу магазина
+    /// </summary>
+    private void HandleProductSelectionCompleted(Dictionary<string, StoreProgressGroup> storeGroups, ProductSelectionCompletedProgress p)
+    {
+        // Ищем количество из DraftItems
+        var draftItem = DraftItems.FirstOrDefault(d => d.Name.Equals(p.DraftItemName, StringComparison.OrdinalIgnoreCase));
+        var quantity = draftItem?.Quantity ?? 1;
+
+        var evt = WorkflowEvent.Factory.ProductSelectionCompleted(
+            p.DraftItemName, p.StoreName, p.StoreColor, p.Selected, p.Reason, p.Alternatives, (int)quantity);
+        evt.ProductEmoji = Core.Helpers.ProductEmoji.Get(p.Selected.Name);
+
+        if (storeGroups.TryGetValue(p.StoreName, out var group))
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                group.Items.Add(evt);
+            });
+        }
+        else
+        {
+            // Если группа не найдена (не должно случаться), добавляем как отдельное событие
+            AddWorkflowEvent(evt);
+        }
+    }
+
+    /// <summary>
+    /// Обработка ProductSelectionFailed — добавляем карточку ошибки в группу магазина
+    /// </summary>
+    private void HandleProductSelectionFailed(Dictionary<string, StoreProgressGroup> storeGroups, ProductSelectionFailedProgress p)
+    {
+        var evt = WorkflowEvent.Factory.ProductSelectionFailed(
+            p.DraftItemName, p.StoreName, p.StoreColor, p.Reason);
+
+        if (storeGroups.TryGetValue(p.StoreName, out var group))
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                group.Items.Add(evt);
+            });
+        }
+        else
+        {
+            AddWorkflowEvent(evt);
         }
     }
 
